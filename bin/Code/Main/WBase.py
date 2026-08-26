@@ -141,7 +141,8 @@ class WBase(QtWidgets.QWidget):
         self.tb.setToolButtonStyle(icons_tb)
         sz = 32 if icons_tb == QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon else 16
         self.tb.setIconSize(QtCore.QSize(sz, sz))
-        style = "QToolBar {border-bottom: 1px solid gray; border-top: 1px solid gray;}"
+        tb_border = Code.dic_colors.get("TOOLBAR_BORDER", "gray")
+        style = f"QToolBar {{border-bottom: 1px solid {tb_border}; border-top: 1px solid {tb_border};}}"
         self.tb.setStyleSheet(style)
         self.tb.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.tb.customContextMenuRequested.connect(self.launch_shortcuts)

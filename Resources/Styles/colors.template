@@ -121,3 +121,4 @@ CHROME_SUCCESS=Success
 CHROME_DANGER=Danger
 CHROME_MESSAGE_BG=Message background
 CHROME_MESSAGE_FG=Message foreground
+TOOLBAR_BORDER=Toolbar border colour

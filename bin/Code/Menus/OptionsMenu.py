@@ -112,7 +112,10 @@ class OptionsMenu(BaseMenu.RootMenu):
         WindowUsuarios.set_password(self.procesador)
 
     def set_theme(self, name: str):
+        dic_previo = Code.configuration.read_dic_x()
         CaissaThemes.apply_theme(name)
+        if Code.configuration.needs_reinit(dic_previo):
+            self.reiniciar()
 
     def run_select(self, resp):
         if resp.startswith("set_theme:"):

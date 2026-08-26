@@ -73,6 +73,25 @@ def apply_theme(name: str):
         conf.x_style_icons = getattr(
             IconosBase.icons, theme["icons"], IconosBase.icons.NORMAL
         )
+
+    # -- toolbar orientation / button style --
+    # A theme that specifies toolbar settings owns them; a theme that omits them
+    # resets to standard defaults so VSCode-specific layout never bleeds into
+    # other themes.
+    toolbar = theme.get("toolbar", {})
+    from PySide6.QtCore import Qt
+    _style_map = {
+        "icon_only":        Qt.ToolButtonStyle.ToolButtonIconOnly.value,
+        "text_under_icon":  Qt.ToolButtonStyle.ToolButtonTextUnderIcon.value,
+        "text_beside_icon": Qt.ToolButtonStyle.ToolButtonTextBesideIcon.value,
+        "text_only":        Qt.ToolButtonStyle.ToolButtonTextOnly.value,
+    }
+    conf.x_tb_orientation_horizontal = (toolbar.get("orientation", "horizontal") != "vertical")
+    if "style" in toolbar and toolbar["style"] in _style_map:
+        conf.x_tb_icons = _style_map[toolbar["style"]]
+    elif not toolbar:
+        conf.x_tb_icons = Qt.ToolButtonStyle.ToolButtonTextUnderIcon.value
+
     conf.x_caissa_theme = name
     conf.graba()
 

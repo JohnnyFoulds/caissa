@@ -1,8 +1,12 @@
 {
-  "name": "VSCode",
-  "style": "VSCode",
+  "name": "Caissa",
+  "style": "Caissa",
   "icons": "VSCODE",
   "pieces": "Merida_VSCode",
+  "toolbar": {
+    "orientation": "vertical",
+    "style": "icon_only"
+  },
   "board": {
     "light_squares": "#252526",
     "dark_squares": "#1e1e1e",

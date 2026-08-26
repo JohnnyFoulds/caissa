@@ -79,29 +79,31 @@ QScrollBar::sub-page:horizontal
     background: transparent;
 }
 
-/* TOOLBAR ---------------------------------------------------------------------*/
+/* TOOLBAR — VS Code activity bar (vertical, icon-only) ------------------------*/
 QToolButton
 {
     background-color: transparent;
     color: #737373;
-    padding: 6px 10px;
-    margin: 1px;
-    border-radius: 6px;
-    border: 1px solid transparent;
+    padding: 8px;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    min-width: 32px;
+    min-height: 32px;
 }
 
 QToolButton:hover
 {
     background-color: #2d2d2d;
-    border: 1px solid #363636;
-    color: #ffffff;
+    color: #d4d4d4;
+    border: none;
 }
 
 QToolButton:pressed
 {
     background-color: #228df2;
-    border: 1px solid #4c9df3;
     color: #ffffff;
+    border: none;
 }
 
 QToolButton#qt_toolbar_ext_button
@@ -109,6 +111,15 @@ QToolButton#qt_toolbar_ext_button
     background-color: #2d2d2d;
     border: 1px solid #363636;
     border-radius: 4px;
+}
+
+QToolBar::separator
+{
+    background: transparent;
+    height: 0;
+    width: 0;
+    margin: 0;
+    padding: 0;
 }
 
 /* INPUT WIDGETS ---------------------------------------------------------------*/

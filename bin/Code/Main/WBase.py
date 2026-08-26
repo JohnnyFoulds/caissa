@@ -124,7 +124,7 @@ class WBase(QtWidgets.QWidget):
             ly_ai = Colocacion.H().relleno().otroi(ly_t).otroi(ly_bi).relleno().margen(0)
             ly = Colocacion.V().control(self.tb).relleno().otro(ly_ai).relleno().margen(2)
         else:
-            ly_ai = Colocacion.H().relleno().control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
+            ly_ai = Colocacion.H().control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
             ly = Colocacion.V().relleno().otro(ly_ai).relleno().margen(2)
 
         self.setLayout(ly)
@@ -139,10 +139,20 @@ class WBase(QtWidgets.QWidget):
 
         icons_tb = self.configuration.type_icons()
         self.tb.setToolButtonStyle(icons_tb)
-        sz = 32 if icons_tb == QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon else 16
+        is_vertical = not self.configuration.x_tb_orientation_horizontal
+        is_icon_only = icons_tb == QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly
+        if icons_tb == QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon:
+            sz = 32
+        elif is_vertical and is_icon_only:
+            sz = 32  # activity-bar style: large icons, no text
+        else:
+            sz = 16
         self.tb.setIconSize(QtCore.QSize(sz, sz))
         tb_border = Code.dic_colors.get("TOOLBAR_BORDER", "gray")
-        style = f"QToolBar {{border-bottom: 1px solid {tb_border}; border-top: 1px solid {tb_border};}}"
+        if is_vertical:
+            style = f"QToolBar {{border-right: 1px solid {tb_border}; border-top: none; border-bottom: none; border-left: none;}}"
+        else:
+            style = f"QToolBar {{border-bottom: 1px solid {tb_border}; border-top: 1px solid {tb_border};}}"
         self.tb.setStyleSheet(style)
         self.tb.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.tb.customContextMenuRequested.connect(self.launch_shortcuts)
@@ -154,11 +164,14 @@ class WBase(QtWidgets.QWidget):
         if Code.eboard:
             dic_opciones[TB_EBOARD] = [_("Enable"), Code.eboard.icon_eboard()]
 
-        if not self.configuration.x_tb_orientation_horizontal:
+        if is_vertical:
             self.tb.setOrientation(QtCore.Qt.Orientation.Vertical)
-            font_metrics = QtGui.QFontMetrics(self.tb.font())
-            max_px = max(font_metrics.horizontalAdvance(label) for label, ico in dic_opciones.values())
-            self.tb.setFixedWidth(max_px + 12)
+            if is_icon_only:
+                self.tb.setFixedWidth(sz + 16)  # 32 + 16 = 48px, matching VS Code activity bar
+            else:
+                font_metrics = QtGui.QFontMetrics(self.tb.font())
+                max_px = max(font_metrics.horizontalAdvance(label) for label, ico in dic_opciones.values())
+                self.tb.setFixedWidth(max_px + 12)
 
             # mx = 0
             # lb = ""

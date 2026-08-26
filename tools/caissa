@@ -1,11 +1,11 @@
 #!/bin/bash
-# LucasChess launcher for macOS (Apple Silicon)
+# Caissa launcher for macOS (Apple Silicon)
 # Pre-warms the Docker engine bridge container, then starts the GUI.
 #
 # Usage:
-#   lucaschess [args passed to LucasR.py]
-#   lucaschess /path/to/file.pgn
-#   lucaschess -play
+#   caissa [args passed to LucasR.py]
+#   caissa /path/to/file.pgn
+#   caissa -play
 set -e
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

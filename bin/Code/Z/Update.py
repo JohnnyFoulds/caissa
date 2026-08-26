@@ -122,80 +122,14 @@ def update_eboard(main_window):
 
 
 def update(main_window):
-    if Code.configuration.x_digital_board:
-        if Code.eboard:
-            Code.eboard.deactivate()
-        update_eboard(main_window)
-
-    current_version = Code.VERSION.replace(" ", "0").replace(".", "")[1:].encode()
-    base_version = Code.BASE_VERSION.encode()
-    mens_error = None
-    done_update = False
-
-    try:
-        f = urllib.request.urlopen(WEBUPDATES)
-        for blinea in f:
-            act = blinea.strip()
-            if act and not act.startswith(b"#"):  # Comentarios
-                li = act.split(b" ")
-                if len(li) == 4 and li[3].isdigit():
-                    base, version, urlfichero, tam = li
-                    if base == base_version:
-                        if current_version < version:
-                            if not update_file(_X(_("version %1"), version.decode()), urlfichero.decode(), int(tam)):
-                                mens_error = _X(
-                                    _("An error has occurred during the upgrade to version %1"), version.decode()
-                                )
-                            else:
-                                done_update = True
-
-        f.close()
-    except urllib.error.URLError:
-        mens_error = _("Encountered a network problem, cannot access the Internet")
-
-    if mens_error:
-        QTMessages.message_error(main_window, mens_error)
-        return False
-
-    if not done_update:
-        QTMessages.message_bold(main_window, _("There are no pending updates"))
-        return False
-
-    return True
+    # Auto-update disabled in Caissa — this fork diverges from upstream versioning.
+    # For releases see https://github.com/JohnnyFoulds/caissa/releases
+    return False
 
 
 def test_update(procesador):
-    current_version = Code.VERSION.replace(" ", "0").replace(".", "")[1:].encode()
-    base_version = Code.BASE_VERSION.encode()
-    nresp = 0
-    try:
-        f = urllib.request.urlopen(WEBUPDATES)
-        for blinea in f:
-            act = blinea.strip()
-            if act and not act.startswith(b"#"):  # Comentarios
-                li = act.split(b" ")
-                if len(li) == 4 and li[3].isdigit():
-                    base, version, urlfichero, tam = li
-                    if base == base_version:
-                        if current_version < version:
-                            nresp = QTMessages.question_withcancel_123(
-                                procesador.main_window,
-                                _("Update"),
-                                _("Version %s is ready to update") % version.decode(),
-                                _("Update now"),
-                                _("Do not do anything"),
-                                _("Don't ask again"),
-                            )
-                            break
-        f.close()
-    except:
-        pass
-
-    if nresp == 1:
-        procesador.actualiza()
-    elif nresp == 3:
-        procesador.configuration.x_check_for_update = False
-        procesador.configuration.graba()
+    # Auto-update disabled in Caissa.
+    pass
 
 
 def update_manual(main_window) -> bool:

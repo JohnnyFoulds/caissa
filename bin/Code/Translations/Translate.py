@@ -23,7 +23,7 @@ class Translations:
         ):
             setattr(builtins, key, routine)
 
-        Code.lucas_chess = self.translate("Lucas Chess")
+        Code.lucas_chess = "Caissa"
 
     @staticmethod
     def sinonimos(dic):

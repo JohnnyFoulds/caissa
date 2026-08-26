@@ -30,11 +30,11 @@ class WAbout(QtWidgets.QDialog):
         head = f'<span style="font-size:30pt; font-weight="700"; font-family:arial; >{Code.lucas_chess}</span><br>'
         head += f'<span style="font-size:15pt;">{_X(_("version %1"), Code.VERSION)}</span><br>'
         head += (
-            f'<span style="font-size:10pt;>{_("Author")}: <a href="mailto:lukasmonk@gmail.com">Lucas Monge</a></span>'
+            f'<span style="font-size:10pt;">A modernised macOS fork of '
+            f'<a href="https://github.com/lukasmonk/lucaschessR6">Lucas Chess R6</a> '
+            f'by <a href="mailto:lukasmonk@gmail.com">Lucas Monge</a> — '
+            f'<a href="https://github.com/JohnnyFoulds/caissa">JohnnyFoulds/caissa</a></span>'
         )
-        head += f' - <a style="font-size:10pt;" href="{Code.web}">{Code.web}</a>'
-        head += f' - <a style="font-size:10pt;" href="{Code.blog}">Blog : Fresh news</a>'
-        head += f' - <a style="font-size:10pt;" href="{Code.github}">Sources: github</a>'
         head += (
             f'<br>{_("License")} <a style="font-size:10pt;" '
             f'href="https://www.gnu.org/licenses/gpl-3.0.html">GPL 3.0</a>'

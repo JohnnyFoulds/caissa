@@ -4,15 +4,25 @@ import Code
 
 
 class Icons:
-    NORMAL = 0
-    SEPIA = 1
-    DARK = 2
-    dic_files = {NORMAL: "Iconos", SEPIA: "Iconos_sepia", DARK: "Iconos_dark"}
+    NORMAL   = 0
+    SEPIA    = 1
+    DARK     = 2
+    MIDNIGHT = 3
+    DAYLIGHT = 4
+    dic_files = {
+        NORMAL:   "Iconos",
+        SEPIA:    "Iconos_sepia",
+        DARK:     "Iconos_dark",
+        MIDNIGHT: "Iconos_midnight",
+        DAYLIGHT: "Iconos_daylight",
+    }
     bin_icons = None
     dic_icons = None
     mode = NORMAL
 
     def reset(self, mode):
+        if mode not in self.dic_files:
+            mode = self.NORMAL
         self.mode = mode
         self.bin_icons = self.read_bin()
         self.dic_icons = self.read_dic()
@@ -22,6 +32,8 @@ class Icons:
             (_("By default"), self.NORMAL),
             (_("Sepia"), self.SEPIA),
             (_("Dark"), self.DARK),
+            (_("Midnight"), self.MIDNIGHT),
+            (_("Daylight"), self.DAYLIGHT),
         ]
 
     def read_bin(self):

@@ -100,6 +100,9 @@ def run_gui(procesador):
 
     procesador.iniciar_gui()
 
+    from Code.Debug import RemoteControl as RC
+    Code.remote_control = RC.RemoteControl()
+
     Code.garbage_collector = GarbageCollector.GarbageCollector()
     Code.garbage_collector.start()
 

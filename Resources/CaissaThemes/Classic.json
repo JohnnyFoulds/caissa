@@ -1,0 +1,13 @@
+{
+  "name": "Classic",
+  "style": "By default",
+  "icons": "NORMAL",
+  "pieces": "Merida",
+  "board": {
+    "light_squares": "#FCFBE3",
+    "dark_squares": "#CDBB99",
+    "exterior": "#FFFFFF",
+    "text": "#7A6A53",
+    "border": "#99B2B7"
+  }
+}

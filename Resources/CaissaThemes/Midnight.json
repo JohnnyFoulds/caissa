@@ -1,0 +1,13 @@
+{
+  "name": "Midnight",
+  "style": "Midnight",
+  "icons": "MIDNIGHT",
+  "pieces": "Merida",
+  "board": {
+    "light_squares": "#4a6fa5",
+    "dark_squares": "#2d4c73",
+    "exterior": "#0f172a",
+    "text": "#6366f1",
+    "border": "#334155"
+  }
+}

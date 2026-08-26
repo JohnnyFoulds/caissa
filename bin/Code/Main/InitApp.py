@@ -109,15 +109,29 @@ color: %s;
 def apply_live_style(configuration):
     """Re-apply the current theme to the running app without restarting.
 
-    Updates the global stylesheet, QPalette, and font so color/theme changes
-    take effect immediately.  Widgets with baked-in inline stylesheets (set at
-    creation time) will pick up new values the next time they are created.
-    Icon-pack changes still require a restart (toolbars hold stale QIcon objects).
+    Updates the global stylesheet, QPalette, font, and icon pack so that
+    every visual change takes effect immediately.  Widgets with inline
+    stylesheets set at creation time pick up new values the next time they
+    are created; everything else updates in-place.
     """
+    from Code.QT import IconosBase
+
     app = QtWidgets.QApplication.instance()
     if app is None:
         return
     init_app_style(app, configuration)
+
+    # Reload icon pack and refresh all toolbar QActions in-place.
+    # Menus are rebuilt lazily on next open so they need no explicit refresh.
+    IconosBase.icons.reset(configuration.x_style_icons)
+    if Code.procesador and hasattr(Code.procesador, "main_window"):
+        mw = Code.procesador.main_window
+        if mw and hasattr(mw, "base"):
+            base = mw.base
+            fresh = base.dic_opciones_tb()
+            for key, action in base.dic_toolbar.items():
+                if key in fresh:
+                    action.setIcon(fresh[key][1])
 
     QtGui.QFontDatabase.addApplicationFont(Code.path_resource("IntFiles", "ChessMerida.ttf"))
 

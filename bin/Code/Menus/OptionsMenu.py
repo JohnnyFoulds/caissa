@@ -8,6 +8,7 @@ from Code.Menus import BaseMenu
 from Code.QT import Iconos, SelectFiles, WColors
 from Code.Shortcuts import Shortcuts, WShortcuts
 from Code.Sound import WindowSonido
+from Code.Themes import CaissaThemes
 from Code.Translations import WSelectLanguage
 from Code.Z import RemoveResults, Util
 
@@ -22,6 +23,11 @@ class OptionsMenu(BaseMenu.RootMenu):
         if txt != "Language":
             txt += " (Language)"
         self.new("select_language", txt, Iconos.Language())
+
+        submenu_themes = self.new_submenu(_("Theme"), Iconos.Vista())
+        for theme in CaissaThemes.load_themes():
+            tname = theme.get("name", "")
+            submenu_themes.new(f"set_theme:{tname}", tname, Iconos.Vista())
 
         submenu_colors = self.new_submenu(_("Colors"), Iconos.Colores())
         submenu_colors.new("edit_board_colors", _("Main board"), Iconos.EditarColores())
@@ -105,5 +111,11 @@ class OptionsMenu(BaseMenu.RootMenu):
     def set_password(self):
         WindowUsuarios.set_password(self.procesador)
 
+    def set_theme(self, name: str):
+        CaissaThemes.apply_theme(name)
+
     def run_select(self, resp):
-        getattr(self, resp)()
+        if resp.startswith("set_theme:"):
+            self.set_theme(resp[len("set_theme:"):])
+        else:
+            getattr(self, resp)()

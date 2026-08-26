@@ -262,6 +262,7 @@ class Configuration:
         self.x_style = "Fusion"
         self.x_style_mode = "By default"
         self.x_style_icons = IconosBase.icons.NORMAL
+        self.x_caissa_theme = "Classic"
         self.style_sheet_default = None  # temporary var
 
         self.x_mode_select_lc = False
@@ -737,9 +738,10 @@ class Configuration:
             "x_opacity_tool_board",
             "x_position_tool_board",
             "x_shadows_board",
-            "x_style_icons",
-            # x_style_mode removed: theme changes are now applied live via
-            # InitApp.apply_live_style() without requiring a restart.
+            # x_style_mode and x_style_icons removed: both are now applied live
+            # via InitApp.apply_live_style() — no restart required for theme/icon
+            # changes.  Toolbar QActions are refreshed in-place; menus rebuild
+            # lazily on next open.
             "x_tb_orientation_horizontal",
         }
         for x, value in dic_previo.items():

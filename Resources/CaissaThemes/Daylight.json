@@ -1,0 +1,13 @@
+{
+  "name": "Daylight",
+  "style": "Daylight",
+  "icons": "DAYLIGHT",
+  "pieces": "Cburnett",
+  "board": {
+    "light_squares": "#c8d8ee",
+    "dark_squares": "#4a6499",
+    "exterior": "#e2e8f0",
+    "text": "#1e293b",
+    "border": "#cbd5e1"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "VSCode",
+  "style": "VSCode",
+  "icons": "MIDNIGHT",
+  "pieces": "Merida",
+  "board": {
+    "light_squares": "#9eadbb",
+    "dark_squares": "#4a5a6a",
+    "exterior": "#111111",
+    "text": "#228df2",
+    "border": "#292929"
+  }
+}

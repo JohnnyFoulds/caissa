@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""
+caissa-ctl — send a command to the running Caissa instance.
+
+Usage:
+  caissa-ctl ping
+  caissa-ctl info
+  caissa-ctl themes
+  caissa-ctl theme Midnight
+  caissa-ctl screenshot [/path/to/out.png]
+  caissa-ctl menu <key>
+"""
+import json
+import socket
+import sys
+
+SOCKET_PATH = "/tmp/caissa-control.sock"
+
+
+def send(cmd: str) -> dict:
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(SOCKET_PATH)
+    s.sendall((cmd + "\n").encode())
+    data = b""
+    while b"\n" not in data:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    s.close()
+    return json.loads(data.decode().strip())
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+    cmd = " ".join(sys.argv[1:])
+    try:
+        result = send(cmd)
+        print(json.dumps(result, indent=2))
+    except FileNotFoundError:
+        print("error: Caissa is not running (socket not found)", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)

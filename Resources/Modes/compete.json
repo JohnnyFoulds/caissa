@@ -1,0 +1,27 @@
+{
+  "name": "Compete",
+  "description": "Elo ladders, tournaments, leagues, and Swiss. Competitive play.",
+  "menu_keys": [
+    "competition",
+    "lucaselo", "micelo", "wicker", "thegrid",
+    "ficselo_*", "fideelo_*", "lichesselo_*", "maialadder",
+    "strenght101", "challenge101",
+    "free", "free_*", "human", "person_*",
+    "pgn_visor", "pgn_paste",
+    "cambiaconfiguration", "select_language",
+    "set_theme:*", "edit_board_colors", "change_colors",
+    "sonidos", "atajos_edit", "set_password",
+    "docs", "web", "acercade",
+    "https://github.com/JohnnyFoulds/caissa/releases"
+  ],
+  "toolbar": [
+    "TB_QUIT", "TB_COMPETE", "TB_PLAY",
+    "TB_RESIGN", "TB_DRAW", "TB_TAKEBACK", "TB_REINIT",
+    "TB_LEVEL", "TB_HELP", "TB_ADVICE", "TB_STOP", "TB_TUTOR_STOP",
+    "TB_ADJOURNMENTS", "TB_ADJOURN",
+    "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY", "TB_ACCEPT",
+    "TB_CONFIG", "TB_PREVIOUS", "TB_NEXT"
+  ],
+  "style": null,
+  "icons": null
+}

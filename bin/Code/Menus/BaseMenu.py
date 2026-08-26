@@ -83,6 +83,11 @@ class RootMenu(RootMenuBase):
         if self.pending_update:
             self.li_options = []
             self.add_options()
+            try:
+                from Code.UIModes import UIModes
+                UIModes.filter_menu_options(self)
+            except Exception:
+                pass
             self.pending_update = False
 
     def launch(self):

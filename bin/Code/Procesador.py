@@ -473,6 +473,15 @@ class Procesador:
         elif key == TB_REPLAY:
             self.manager.replay_direct()
 
+        else:
+            try:
+                from Code.UIModes import Actions
+                action_def = Actions.get(key)
+                if action_def:
+                    action_def["handler"]()
+            except Exception:
+                pass
+
     def adjournments(self):
         menu = QTDialogs.LCMenu(self.main_window)
         li_adjournments = Adjournments.Adjournments().list_menu()

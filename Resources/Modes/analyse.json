@@ -1,0 +1,29 @@
+{
+  "name": "Analyse",
+  "description": "Board, engine output, PGN tree, variations. Analysis tools front and centre.",
+  "menu_keys": [
+    "free", "free_*", "human",
+    "person_*",
+    "pgn_visor", "pgn_paste", "pgn_manual_save",
+    "openings_lines", "openings_custom", "openings_polyglot", "openings_books",
+    "dbase_*", "create_own_game",
+    "dailytest",
+    "cambiaconfiguration", "select_language",
+    "set_theme:*", "edit_board_colors", "change_colors",
+    "sonidos", "atajos_edit", "set_password",
+    "docs", "web", "acercade",
+    "https://github.com/JohnnyFoulds/caissa/releases"
+  ],
+  "toolbar": [
+    "TB_QUIT", "TB_PLAY",
+    "TB_RESIGN", "TB_DRAW", "TB_TAKEBACK", "TB_REINIT",
+    "TB_LEVEL", "TB_HELP", "TB_ADVICE", "TB_STOP", "TB_TUTOR_STOP",
+    "TB_VARIATIONS", "TB_COMMENTS", "TB_UTILITIES",
+    "TB_PREVIOUS", "TB_NEXT", "TB_PGN_LABELS",
+    "TB_SAVE", "TB_SAVE_AS", "TB_OPEN", "TB_FILE",
+    "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY", "TB_ACCEPT",
+    "TB_CONFIG", "TB_ADJOURNMENTS", "TB_ENGINES"
+  ],
+  "style": null,
+  "icons": null
+}

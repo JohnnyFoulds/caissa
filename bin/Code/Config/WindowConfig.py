@@ -45,6 +45,11 @@ def options(parent, configuration):
 
     form.combobox(_("Type of icons"), IconosBase.icons.combobox(), configuration.x_style_icons)
 
+    from Code.UIModes import UIModes as _UIModes
+    li_ui_modes = [[m.get("name", ""), m.get("name", "")] for m in _UIModes.load_modes()]
+    if li_ui_modes:
+        form.combobox(_("UI mode"), li_ui_modes, configuration.x_ui_mode)
+
     form.separador()
     li = [
         (_("Play against an engine"), MENU_PLAY_ANY_ENGINE),
@@ -339,12 +344,14 @@ def options(parent, configuration):
             configuration.x_style,
             configuration.x_style_mode,
             configuration.x_style_icons,
-            configuration.x_menu_play,
+            *_ui_mode_rest,
             mode_native_select,
             configuration.x_show_puzzles_on_startup,
             configuration.x_prevention_crashes,
             configuration.x_check_for_update,
         ) = li_gen
+        if _ui_mode_rest:
+            configuration.x_ui_mode = _ui_mode_rest[0]
 
         # Auto-link icon pack to matching Caissa theme so picking one theme
         # is a single selection rather than two separate controls.

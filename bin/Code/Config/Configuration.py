@@ -263,6 +263,7 @@ class Configuration:
         self.x_style_mode = "By default"
         self.x_style_icons = IconosBase.icons.NORMAL
         self.x_caissa_theme = "Classic"
+        self.x_ui_mode = "Classical"
         self.style_sheet_default = None  # temporary var
 
         self.x_mode_select_lc = False
@@ -743,6 +744,7 @@ class Configuration:
             # changes.  Toolbar QActions are refreshed in-place; menus rebuild
             # lazily on next open.
             "x_tb_orientation_horizontal",
+            "x_ui_mode",
         }
         for x, value in dic_previo.items():
             if dic_current[x] != value:

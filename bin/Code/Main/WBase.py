@@ -208,7 +208,7 @@ class WBase(QtWidgets.QWidget):
 
     @staticmethod
     def dic_opciones_tb():
-        return {
+        result = {
             TB_ENGINES: (_("Engines"), Iconos.Engines()),
             TB_PLAY: (_("Play"), Iconos.Libre()),
             TB_COMPETE: (_("Compete"), Iconos.NuevaPartida()),
@@ -263,6 +263,13 @@ class WBase(QtWidgets.QWidget):
             TB_ADJUDICATOR_STOP: (_("Stop"), Iconos.StopTraining()),
             TB_ADJUDICATOR: (_("Adjudicator"), Iconos.Adjudicator()),
         }
+        try:
+            from Code.UIModes import Actions
+            for key, action_def in Actions.all_items():
+                result[key] = (action_def["label"], action_def["icon"])
+        except Exception:
+            pass
+        return result
 
     def launch_shortcuts(self):
         if self.with_shortcuts:
@@ -484,6 +491,15 @@ class WBase(QtWidgets.QWidget):
                 li_acciones.append(TB_EBOARD)
             title = _("Disable") if Code.eboard.driver else _("Enable")
             self.dic_toolbar[TB_EBOARD].setIconText(title)
+
+        # ── mode filter (never removes NEVER_FILTER_TOOLBAR keys) ──────────
+        try:
+            from Code.UIModes import UIModes
+            if not UIModes.allows_all_toolbar():
+                li_acciones = [k for k in li_acciones if UIModes.allows_toolbar(k)]
+        except Exception:
+            pass
+
         last = len(li_acciones) - 1
         for n, k in enumerate(li_acciones):
             self.dic_toolbar[k].setVisible(True)

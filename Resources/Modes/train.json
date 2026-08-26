@@ -1,0 +1,30 @@
+{
+  "name": "Train",
+  "description": "Tactics, endgames, openings, Leitner boxes, and the daily test.",
+  "menu_keys": [
+    "memory", "find_all_moves_player", "find_all_moves_rival",
+    "horses_*", "puente_*", "visualiza",
+    "coordinates_*", "anotar",
+    "dailytest",
+    "leitner", "leitner_*",
+    "tactics*",
+    "endgames*", "endgame*",
+    "openings_lines", "openings_custom",
+    "/Users/*",
+    "free", "free_*", "human", "person_*",
+    "cambiaconfiguration", "select_language",
+    "set_theme:*", "edit_board_colors", "change_colors",
+    "sonidos", "atajos_edit", "set_password",
+    "docs", "web", "acercade",
+    "https://github.com/JohnnyFoulds/caissa/releases"
+  ],
+  "toolbar": [
+    "TB_QUIT", "TB_TRAIN",
+    "TB_RESIGN", "TB_TAKEBACK", "TB_REINIT",
+    "TB_LEVEL", "TB_HELP", "TB_ADVICE", "TB_STOP", "TB_TUTOR_STOP",
+    "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY", "TB_ACCEPT",
+    "TB_CONFIG", "TB_PREVIOUS", "TB_NEXT"
+  ],
+  "style": null,
+  "icons": null
+}

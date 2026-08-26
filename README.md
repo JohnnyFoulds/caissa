@@ -9,6 +9,8 @@
 ![GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-lightgrey)
 ![Git LFS required](https://img.shields.io/badge/Git_LFS-required-red)
 
+![Caissa screenshot](docs/screenshot.png)
+
 ---
 
 ## Requirements

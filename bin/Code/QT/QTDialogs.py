@@ -786,7 +786,8 @@ class MensajeFics(QtWidgets.QDialog):
             | QtCore.Qt.WindowType.WindowTitleHint
         )
         self.setWindowIcon(Iconos.Fics())
-        self.setStyleSheet("QDialog, QLabel { background: #E3F1F9 }")
+        bg = Code.dic_colors.get("CHROME_MESSAGE_BG", "#E3F1F9")
+        self.setStyleSheet(f"QDialog, QLabel {{ background: {bg} }}")
 
         lbm = Controles.LB(self, f"<big><b>{mens}</b></big>")
         self.bt = Controles.PB(self, _("One moment please..."), rutina=self.final, plano=True)
@@ -838,7 +839,8 @@ class MensajeFide(QtWidgets.QDialog):
             | QtCore.Qt.WindowType.WindowTitleHint
         )
         self.setWindowIcon(Iconos.Fide())
-        self.setStyleSheet("QDialog, QLabel { background: #E9E9E9 }")
+        bg = Code.dic_colors.get("CHROME_SURFACE_2", "#E9E9E9")
+        self.setStyleSheet(f"QDialog, QLabel {{ background: {bg} }}")
 
         lbm = Controles.LB(self, f"<big><b>{mens}</b></big>")
         self.bt = Controles.PB(self, _("One moment please..."), rutina=self.final, plano=True)

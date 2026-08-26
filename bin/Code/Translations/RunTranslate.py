@@ -10,6 +10,7 @@ from PySide6 import QtCore, QtWidgets
 import Code
 from Code.Z import Util
 from Code.Config import Configuration
+from Code.Main import InitApp
 from Code.QT import (
     Colocacion,
     Columnas,
@@ -772,11 +773,7 @@ def run_wtranslation(path_db):
 
     app = QtWidgets.QApplication([])
 
-    app.setStyle(QtWidgets.QStyleFactory.create(configuration.x_style))
-    QtWidgets.QApplication.setPalette(QtWidgets.QApplication.style().standardPalette())
-    path = Code.path_resource("Styles", f"{configuration.x_style_mode}.qss")
-    with open(path) as f:
-        app.setStyleSheet(f.read())
+    InitApp.init_app_style(app, configuration)
 
     wtranslate = WTranslate(path_db)
 

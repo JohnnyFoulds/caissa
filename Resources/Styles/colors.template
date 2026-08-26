@@ -109,3 +109,15 @@ SQUARED_CONTROLLED_B_5=5...
 [Show square pressed]
 SELECTION_BOARD_BOX=Box
 SELECTION_BOARD_FILLING=Filling
+
+[Chrome]
+CHROME_SURFACE=Surface
+CHROME_SURFACE_2=Surface (alt / hover)
+CHROME_BORDER=Border
+CHROME_TEXT_DIM=Dim text
+CHROME_ACCENT=Accent
+CHROME_ACCENT_HOVER=Accent (hover)
+CHROME_SUCCESS=Success
+CHROME_DANGER=Danger
+CHROME_MESSAGE_BG=Message background
+CHROME_MESSAGE_FG=Message foreground

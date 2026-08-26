@@ -64,8 +64,43 @@ color: %s;
         )
     app.setStyleSheet(default + style_sheet)
 
-    qpalette = QtWidgets.QApplication.style().standardPalette()
-    qpalette.setColor(QtGui.QPalette.ColorRole.Link, Code.dic_qcolors["LINKS"])
+    if Code.dic_colors.get("IS_DARK") == "1":
+        # Build a full dark QPalette so Qt-drawn internals (combo popups,
+        # tooltips, disabled text, scroll areas) follow the theme.
+        # Test must be == "1", not truthy: "0" is a non-empty string.
+        qpalette = QtGui.QPalette()
+        bg   = Code.dic_qcolors["BACKGROUND"]
+        fg   = Code.dic_qcolors["FOREGROUND"]
+        surf = Code.dic_qcolors["CHROME_SURFACE"]
+        dim  = Code.dic_qcolors["CHROME_TEXT_DIM"]
+        acc  = Code.dic_qcolors["CHROME_ACCENT"]
+        white = QtGui.QColor("#ffffff")
+        roles = [
+            (QtGui.QPalette.ColorRole.Window,           bg),
+            (QtGui.QPalette.ColorRole.WindowText,       fg),
+            (QtGui.QPalette.ColorRole.Base,             bg),
+            (QtGui.QPalette.ColorRole.AlternateBase,    surf),
+            (QtGui.QPalette.ColorRole.Text,             fg),
+            (QtGui.QPalette.ColorRole.BrightText,       white),
+            (QtGui.QPalette.ColorRole.Button,           surf),
+            (QtGui.QPalette.ColorRole.ButtonText,       fg),
+            (QtGui.QPalette.ColorRole.ToolTipBase,      surf),
+            (QtGui.QPalette.ColorRole.ToolTipText,      fg),
+            (QtGui.QPalette.ColorRole.Highlight,        acc),
+            (QtGui.QPalette.ColorRole.HighlightedText,  white),
+            (QtGui.QPalette.ColorRole.PlaceholderText,  dim),
+            (QtGui.QPalette.ColorRole.Link,             Code.dic_qcolors["LINKS"]),
+        ]
+        for role, color in roles:
+            qpalette.setColor(QtGui.QPalette.ColorGroup.All,      role, color)
+        # Disabled group — desaturated and half-opacity variants
+        for role, color in roles:
+            disabled = QtGui.QColor(color)
+            disabled.setAlpha(128)
+            qpalette.setColor(QtGui.QPalette.ColorGroup.Disabled, role, disabled)
+    else:
+        qpalette = QtWidgets.QApplication.style().standardPalette()
+        qpalette.setColor(QtGui.QPalette.ColorRole.Link, Code.dic_qcolors["LINKS"])
     app.setPalette(qpalette)
 
     app.setEffectEnabled(QtCore.Qt.UIEffect.UI_AnimateMenu)

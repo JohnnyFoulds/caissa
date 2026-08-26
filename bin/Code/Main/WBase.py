@@ -926,7 +926,9 @@ class WMessage(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self, owner)
 
         self.lb_message = Controles.LB(self).set_font_type(puntos=11, peso=400)
-        self.lb_message.setStyleSheet("background-color: #1f497d; color: #FFFFFF;padding: 16px;")
+        bg = Code.dic_colors.get("CHROME_MESSAGE_BG", "#1f497d")
+        fg = Code.dic_colors.get("CHROME_MESSAGE_FG", "#ffffff")
+        self.lb_message.setStyleSheet(f"background-color: {bg}; color: {fg}; padding: 16px;")
 
         self.bt_cancel = Controles.PB(self, _("Cancel"), self.cancel, False)
         self.canceled = False

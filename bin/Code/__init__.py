@@ -16,14 +16,20 @@ if current_dir:
 
 lucas_chess: Optional[str] = None  # asignado en Translate
 
-platform = "win32" if sys.platform == "win32" else "linux"
+platform = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "linux"
 
-folder_os = Util.opj(current_dir, "OS", platform)
+# When running inside a PyInstaller bundle, data files live under sys._MEIPASS
+# (the _internal/ directory next to the executable), not next to sys.argv[0].
+_frozen = getattr(sys, "_MEIPASS", None)
+
+folder_os = Util.opj(_frozen or current_dir, "OS", platform)
 sys.path.insert(0, folder_os)
 sys.path.insert(0, os.path.realpath(os.curdir))
 
 folder_root = os.path.realpath("..")
-folder_resources = Util.opj(folder_root, "Resources")
+# In a frozen bundle, Resources/ lives under _MEIPASS alongside the OS/ folder.
+# In a normal git-clone run, it lives one level up (sibling of bin/).
+folder_resources = Util.opj(_frozen, "Resources") if _frozen else Util.opj(folder_root, "Resources")
 
 
 def path_resource(*lista):

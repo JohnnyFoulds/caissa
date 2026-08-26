@@ -101,6 +101,8 @@ class StockfishManager:
         folder = os.path.dirname(conf.path_exe)
         path = Util.opj(folder, "versions.txt")
 
+        if not os.path.isfile(path):
+            return []
         with open(path, "rt") as f:
             return [line.strip() for line in f if "x86-64" in line]
 

@@ -1,1 +1,10 @@
-*.nnue filter=lfs diff=lfs merge=lfs -text
+*.nnue                                               filter=lfs diff=lfs merge=lfs -text
+*.pb.gz                                              filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/Engines/maia/*.bin                     filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/Engines/irina/irina                    filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/Engines/stockfish/stockfish-18-arm64   filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/Engines/lc0/Lc0-0.32.1                filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/Engines/drawfish/drawfish              filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/FasterCode.*.so                        filter=lfs diff=lfs merge=lfs -text
+bin/OS/darwin/uci_options.sqlite                     filter=lfs diff=lfs merge=lfs -text
+bin/OS/linux/Engines/drawfish/drawfish               filter=lfs diff=lfs merge=lfs -text

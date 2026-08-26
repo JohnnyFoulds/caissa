@@ -1,2 +1,10 @@
 UserData/
-
+__pycache__/
+*.pyc
+.venv/
+bin/bug.log
+lc.folder
+bin/_fastercode/src/*.so
+bin/OS/linux/Engines/alouette/alouette64.cfg
+bin/OS/linux/Engines/arasan/games.pgn
+bin/OS/linux/Engines/fractal/chesslog

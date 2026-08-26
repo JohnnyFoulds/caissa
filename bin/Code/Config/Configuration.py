@@ -305,7 +305,9 @@ class Configuration:
 
             add_folder(Code.path_resource("Openings"))
             for engine in ("eguzkilore", "eguzki", "maia", "irina", "rodentii"):
-                add_folder(Util.opj(Code.folder_engines, engine))
+                folder = Util.opj(Code.folder_engines, engine)
+                if os.path.isdir(folder):
+                    add_folder(folder)
         return self._dic_books
 
     def path_book(self, alias):

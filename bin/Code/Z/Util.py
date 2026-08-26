@@ -93,6 +93,10 @@ def is_linux() -> bool:
     return sys.platform.startswith("linux")
 
 
+def is_mac() -> bool:
+    return sys.platform == "darwin"
+
+
 def is_windows() -> bool:
     return sys.platform == "win32"
 
@@ -897,6 +901,15 @@ def startfile(path: Union[str, Path]) -> bool:
 
         if is_windows():
             os.startfile(str(path_obj))
+            return True
+
+        if is_mac():
+            subprocess.Popen(
+                ["open", str(path_obj)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
             return True
 
         # Linux

@@ -311,7 +311,7 @@ class Configuration:
         return self._dic_books
 
     def path_book(self, alias):
-        return self.dic_books[alias]
+        return self.dic_books.get(alias)
 
     def read_eval(self):
         return {key[7:]: getattr(self, key) for key in dir(self) if key.startswith("x_eval_")}

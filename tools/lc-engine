@@ -75,8 +75,21 @@ MODE="$1"
 EXE="$2"
 ENGINE_DIR="$(dirname "$EXE")"
 
-# Ensure container is running before exec-ing
-"${BASH_SOURCE[0]}" --ensure 2>/dev/null || true
+# Preflight: fail fast with a clear diagnostic instead of blocking a UCI pipe forever.
+if ! command -v docker &>/dev/null; then
+    printf 'lc-engine: Docker not found — bridged engines are unavailable.\nInstall Docker Desktop to use the full engine roster.\n' >&2
+    exit 1
+fi
+_STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+if [ "$_STATUS" != "running" ] && [ "$_STATUS" != "paused" ]; then
+    # Try once to start the container, then re-check.
+    "${BASH_SOURCE[0]}" --ensure 2>/dev/null || true
+    _STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+    if [ "$_STATUS" != "running" ] && [ "$_STATUS" != "paused" ]; then
+        printf 'lc-engine: container "%s" not running (status: %s).\nStart Docker Desktop and retry, or use the native engines.\n' "$CONTAINER" "$_STATUS" >&2
+        exit 1
+    fi
+fi
 
 # -i: keep stdin open for UCI pipe (never -t: TTY mangles UCI line endings)
 exec docker exec -i -w "$ENGINE_DIR" "$CONTAINER" /opt/lc/lc-run "$MODE" "$EXE"

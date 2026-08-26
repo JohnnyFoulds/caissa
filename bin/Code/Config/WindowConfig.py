@@ -412,8 +412,8 @@ def options(parent, configuration):
         if por_defecto:
             li_asp1 = (
                 "",
-                11,
-                11,
+                13,
+                13,
                 False,
                 11,
                 False,
@@ -439,7 +439,7 @@ def options(parent, configuration):
 
         por_defecto = li_asp2[0]
         if por_defecto:
-            li_asp2 = (348, 24, 11, False, True, NOTATION_ALGEBRAIC, True, True, False, False, 11, 16)
+            li_asp2 = (348, 28, 11, False, True, NOTATION_ALGEBRAIC, True, True, False, False, 11, 16)
         else:
             del li_asp2[0]
         (

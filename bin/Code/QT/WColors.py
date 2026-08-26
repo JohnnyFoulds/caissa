@@ -289,7 +289,10 @@ class WColors(LCDialog.LCDialog):
                     elif line == "}":
                         current = None
                     elif "#" in line:
-                        key, value = line.split(":")
+                        try:
+                            key, value = line.split(":")
+                        except Exception:
+                            continue
                         key = key.strip()
                         color = f"#{value.split('#')[1][:6]}"
                         key_gen = f"{current}|{key}"

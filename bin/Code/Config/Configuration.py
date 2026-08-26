@@ -150,10 +150,10 @@ class Configuration:
 
         self.x_pgn_width = 348
         self.x_pgn_fontpoints = 11
-        self.x_pgn_rowheight = 24
+        self.x_pgn_rowheight = 28
         self.x_pgn_withfigurines = True
 
-        self.x_databases_rowheight = 24
+        self.x_databases_rowheight = 28
 
         self.x_pgn_english = False
 
@@ -164,9 +164,11 @@ class Configuration:
         self.x_copy_ctrl = True  # False = Alt C
 
         self.x_font_family = ""
-        self.x_font_points = 11
+        self.x_font_points = 13
 
-        self.x_menu_points = 11
+        self.x_menu_points = 13
+
+        self.x_modern_metrics_applied = False
         self.x_menu_bold = False
 
         self.x_tb_fontpoints = 11
@@ -453,6 +455,16 @@ class Configuration:
                 if x.startswith("x_") and x in dic:
                     setattr(self, x, dic[x])
             self.li_personalities = dic.get("PERSONALITIES", self.li_personalities)
+
+        # One-shot migration: apply modern typography metrics to existing configs.
+        # x_modern_metrics_applied is absent from old pickles, so bool(False) triggers this once.
+        if not self.x_modern_metrics_applied:
+            self.x_font_points = 13
+            self.x_menu_points = 13
+            self.x_pgn_rowheight = 28
+            self.x_databases_rowheight = 28
+            self.x_modern_metrics_applied = True
+            self.graba()
 
         for x in os.listdir(Code.current_dir):
             if x.endswith(".pon"):

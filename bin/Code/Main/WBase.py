@@ -124,8 +124,8 @@ class WBase(QtWidgets.QWidget):
             ly_ai = Colocacion.H().relleno().otroi(ly_t).otroi(ly_bi).relleno().margen(0)
             ly = Colocacion.V().control(self.tb).relleno().otro(ly_ai).relleno().margen(2)
         else:
-            ly_ai = Colocacion.H().control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
-            ly = Colocacion.V().relleno().otro(ly_ai).relleno().margen(2)
+            ly_ai = Colocacion.H().set_separation(0).control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
+            ly = Colocacion.V().relleno().otro(ly_ai).relleno().margen(0)
 
         self.setLayout(ly)
 
@@ -150,7 +150,7 @@ class WBase(QtWidgets.QWidget):
         self.tb.setIconSize(QtCore.QSize(sz, sz))
         tb_border = Code.dic_colors.get("TOOLBAR_BORDER", "gray")
         if is_vertical:
-            style = f"QToolBar {{border-right: 1px solid {tb_border}; border-top: none; border-bottom: none; border-left: none;}}"
+            style = f"QToolBar {{border-right: 1px solid {tb_border}; border-top: none; border-bottom: none; border-left: none; margin: 0; padding: 0;}}"
         else:
             style = f"QToolBar {{border-bottom: 1px solid {tb_border}; border-top: 1px solid {tb_border};}}"
         self.tb.setStyleSheet(style)
@@ -277,7 +277,10 @@ class WBase(QtWidgets.QWidget):
         mx = int(ae * 0.08)
         key = "BASE" if self.parent.key_video == "maind" else "BASEV"
         config_board = self.manager.configuration.config_board(key, mx)
-        self.board = Board.Board(self, config_board, allow_eboard=True)
+        from Code.Themes import CaissaThemes
+        _theme = CaissaThemes.find_theme(getattr(self.configuration, "x_caissa_theme", ""))
+        _hide_visual_menu = bool(_theme and _theme.get("board", {}).get("hide_visual_menu"))
+        self.board = Board.Board(self, config_board, allow_eboard=True, with_menu_visual=not _hide_visual_menu)
         self.board.draw_window()
         self.board.setFocus()
 

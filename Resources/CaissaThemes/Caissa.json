@@ -12,6 +12,7 @@
     "dark_squares": "#1e1e1e",
     "exterior": "#333333",
     "text": "#d4d4d4",
-    "border": "#333333"
+    "border": "#333333",
+    "hide_visual_menu": true
   }
 }

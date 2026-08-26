@@ -3,6 +3,7 @@ import os
 import Code
 from Code.Board import WBoardColors
 from Code.Config import WindowConfig, WindowUsuarios
+from Code.Main import InitApp
 from Code.Menus import BaseMenu
 from Code.QT import Iconos, SelectFiles, WColors
 from Code.Shortcuts import Shortcuts, WShortcuts
@@ -59,6 +60,10 @@ class OptionsMenu(BaseMenu.RootMenu):
         dic_previo = Code.configuration.read_dic_x()
         if WindowConfig.options(self.wparent, Code.configuration):
             Code.configuration.graba()
+            # Apply QSS + palette immediately so the user sees the change now.
+            InitApp.apply_live_style(Code.configuration)
+            # A full restart is still needed when the icon pack or deeper
+            # layout settings change (font size, toolbar orientation, etc.).
             if Code.configuration.needs_reinit(dic_previo):
                 self.reiniciar()
 
@@ -69,7 +74,7 @@ class OptionsMenu(BaseMenu.RootMenu):
     def change_colors(self):
         w = WColors.WColors(self.procesador)
         if w.exec():
-            self.reiniciar()
+            InitApp.apply_live_style(Code.configuration)
 
     def sonidos(self):
         w = WindowSonido.WSonidos(self.procesador)

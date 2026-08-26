@@ -105,6 +105,20 @@ color: %s;
 
     app.setEffectEnabled(QtCore.Qt.UIEffect.UI_AnimateMenu)
 
+
+def apply_live_style(configuration):
+    """Re-apply the current theme to the running app without restarting.
+
+    Updates the global stylesheet, QPalette, and font so color/theme changes
+    take effect immediately.  Widgets with baked-in inline stylesheets (set at
+    creation time) will pick up new values the next time they are created.
+    Icon-pack changes still require a restart (toolbars hold stale QIcon objects).
+    """
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    init_app_style(app, configuration)
+
     QtGui.QFontDatabase.addApplicationFont(Code.path_resource("IntFiles", "ChessMerida.ttf"))
 
     font = Controles.FontTypeNew(family=configuration.x_font_family, point_size=configuration.x_font_points)

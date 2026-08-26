@@ -346,6 +346,15 @@ def options(parent, configuration):
             configuration.x_check_for_update,
         ) = li_gen
 
+        # Auto-link icon pack to matching Caissa theme so picking one theme
+        # is a single selection rather than two separate controls.
+        _theme_icons = {
+            "Midnight": IconosBase.icons.MIDNIGHT,
+            "Daylight": IconosBase.icons.DAYLIGHT,
+        }
+        if configuration.x_style_mode in _theme_icons:
+            configuration.x_style_icons = _theme_icons[configuration.x_style_mode]
+
         configuration.x_mode_select_lc = not mode_native_select
 
         # Board 1 ###################################################################################################

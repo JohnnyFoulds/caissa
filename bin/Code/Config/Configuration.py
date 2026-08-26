@@ -738,7 +738,8 @@ class Configuration:
             "x_position_tool_board",
             "x_shadows_board",
             "x_style_icons",
-            "x_style_mode",
+            # x_style_mode removed: theme changes are now applied live via
+            # InitApp.apply_live_style() without requiring a restart.
             "x_tb_orientation_horizontal",
         }
         for x, value in dic_previo.items():

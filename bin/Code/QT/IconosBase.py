@@ -9,12 +9,14 @@ class Icons:
     DARK     = 2
     MIDNIGHT = 3
     DAYLIGHT = 4
+    VSCODE   = 5
     dic_files = {
         NORMAL:   "Iconos",
         SEPIA:    "Iconos_sepia",
         DARK:     "Iconos_dark",
         MIDNIGHT: "Iconos_midnight",
         DAYLIGHT: "Iconos_daylight",
+        VSCODE:   "Iconos_vscode",
     }
     bin_icons = None
     dic_icons = None
@@ -34,6 +36,7 @@ class Icons:
             (_("Dark"), self.DARK),
             (_("Midnight"), self.MIDNIGHT),
             (_("Daylight"), self.DAYLIGHT),
+            (_("VSCode"), self.VSCODE),
         ]
 
     def read_bin(self):

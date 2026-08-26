@@ -63,6 +63,18 @@ def _tint_midnight(src: str, dst: str):
     tinted.save(dst)
 
 
+def _tint_vscode(src: str, dst: str):
+    """Neutral light glyph for dark backgrounds: matches VS Code's white/grey icon aesthetic."""
+    img = Image.open(src).convert("RGBA")
+    alpha = img.split()[3]
+    gray = ImageOps.invert(img.convert("L"))   # invert so dark shapes become light
+    tinted = ImageOps.colorize(gray, black="#3c3c3c", mid="#9e9e9e", white="#d4d4d4")
+    tinted = ImageEnhance.Contrast(tinted).enhance(1.2)
+    tinted = tinted.filter(ImageFilter.SHARPEN)
+    tinted.putalpha(alpha)
+    tinted.save(dst)
+
+
 def _tint_daylight(src: str, dst: str):
     """Dark glyph for light backgrounds: grayscale then apply navy/indigo ramp."""
     img = Image.open(src).convert("RGBA")
@@ -170,5 +182,9 @@ if __name__ == "__main__":
     print("\nGenerating Iconos_daylight …")
     dic_d = _generate_pack(entries, "Iconos_daylight", _tint_daylight, "_tmp_daylight.png")
     _verify_keyset(dic_d)
+
+    print("\nGenerating Iconos_vscode …")
+    dic_v = _generate_pack(entries, "Iconos_vscode", _tint_vscode, "_tmp_vscode.png")
+    _verify_keyset(dic_v)
 
     print("\nDone.")

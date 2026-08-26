@@ -2,12 +2,12 @@
   "name": "VSCode",
   "style": "VSCode",
   "icons": "VSCODE",
-  "pieces": "Merida",
+  "pieces": "Merida_VSCode",
   "board": {
-    "light_squares": "#9eadbb",
-    "dark_squares": "#4a5a6a",
-    "exterior": "#1e1e1e",
+    "light_squares": "#252526",
+    "dark_squares": "#1e1e1e",
+    "exterior": "#333333",
     "text": "#d4d4d4",
-    "border": "#1e1e1e"
+    "border": "#333333"
   }
 }

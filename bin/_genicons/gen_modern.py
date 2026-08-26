@@ -18,6 +18,20 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 TEMA = "Formatos.tema"
 OUT  = "../../Resources/IntFiles"
 
+# ── Override map for VSCODE pack: replace old-style icons with VS Code codicons ─
+# Key: (nom_dir.lower(), nom_fichero.lower())  →  path to pre-rendered 32x32 PNG
+_OVERRIDES_VSCODE_DIR = os.path.join(os.path.dirname(__file__), "overrides", "vscode")
+VSCODE_OVERRIDES = {
+    ("nuvola",  "connect_established.png"):       "play.png",           # Libre / Play
+    ("nuvola",  "edu_miscellaneous.png"):          "mortar-board.png",   # Entrenamiento / Train
+    ("nuvola",  "run.png"):                        "game.png",           # NuevaPartida / Compete
+    ("gnome",   "64px-gnome-application-exit.png"):"sign-out.png",       # FinPartida / Quit
+    ("nuvola",  "messagebox_info.png"):            "info.png",           # Informacion
+    ("nuvola",  "kcontrol.png"):                   "tools.png",          # Tools
+    ("icons8",  "icons8-servicios-32.png"):        "server-process.png", # Engines
+    ("gnome",   "32px-gnome-preferences-desktop.png"): "settings-gear.png",  # Options
+}
+
 # ── Exclusion set 1: hardware photos / piece graphics → copy unchanged ──────
 COPY_UNCHANGED = {
     "Milleniumt.png", "dgt.png", "dgtB.png", "Certabo.png", "Novag.png",
@@ -112,7 +126,7 @@ def _read_tema(ctema: str):
     return entries
 
 
-def _generate_pack(entries, pack_name: str, tint_fn, tmp_name: str):
+def _generate_pack(entries, pack_name: str, tint_fn, tmp_name: str, overrides: dict = None):
     bin_path = os.path.join(OUT, f"{pack_name}.bin")
     dic_path = os.path.join(OUT, f"{pack_name}.dic")
     dedup: dict = {}   # (dir.lower(), file.lower()) → (offset_from, offset_to)
@@ -126,7 +140,12 @@ def _generate_pack(entries, pack_name: str, tint_fn, tmp_name: str):
             src = os.path.join(nom_dir, nom_fichero)
             key = (nom_dir.lower(), nom_fichero.lower())
             if key not in dedup:
-                if _is_unchanged(nom_dir, nom_fichero):
+                override_file = (overrides or {}).get(key)
+                if override_file:
+                    override_path = os.path.join(_OVERRIDES_VSCODE_DIR, override_file)
+                    with open(override_path, "rb") as f:
+                        data = f.read()
+                elif _is_unchanged(nom_dir, nom_fichero):
                     with open(src, "rb") as f:
                         data = f.read()
                 else:
@@ -184,7 +203,7 @@ if __name__ == "__main__":
     _verify_keyset(dic_d)
 
     print("\nGenerating Iconos_vscode …")
-    dic_v = _generate_pack(entries, "Iconos_vscode", _tint_vscode, "_tmp_vscode.png")
+    dic_v = _generate_pack(entries, "Iconos_vscode", _tint_vscode, "_tmp_vscode.png", overrides=VSCODE_OVERRIDES)
     _verify_keyset(dic_v)
 
     print("\nDone.")

@@ -1,0 +1,34 @@
+FROM debian:bookworm AS base
+# Platform: linux/amd64 (Rosetta or qemu-inside-container for x86)
+LABEL maintainer="lucaschess-bridge"
+
+# i386 multiarch for 32-bit Windows engines (wine32)
+RUN dpkg --add-architecture i386 && apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        # Classic WoW64 Wine: real i386 libs, not new-WoW64 (Wine 10 new-WoW64 breaks many 32-bit apps)
+        wine wine32 wine64 \
+        # In-container qemu for engines that use AVX2/AVX512 (Rosetta doesn't implement those)
+        # and for i386 Windows engines through qemu-i386-static
+        qemu-user-static \
+        # Engine runtime libraries
+        libstdc++6 libstdc++6:i386 \
+        zlib1g zlib1g:i386 \
+        libgomp1 libgomp1:i386 \
+        libatomic1 \
+        libgfortran5 \
+        libopenblas0 \
+        # Python for the relay script
+        python3 \
+        # Utilities (flock is part of util-linux, already installed)
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Wine prefix will be initialized lazily on first engine launch via the volume.
+ENV WINEPREFIX=/wine/prefix WINEDEBUG=-all WINEARCH=win64
+RUN mkdir -p /wine/prefix
+
+# Install bridge tools
+COPY lc-run relay.py /opt/lc/
+RUN chmod +x /opt/lc/lc-run /opt/lc/relay.py
+
+CMD ["sleep", "infinity"]

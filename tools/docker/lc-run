@@ -1,0 +1,42 @@
+#!/bin/sh
+# lc-run MODE EXEC_ABS_PATH [ARGS...]
+#
+# Runs a UCI engine inside the container, picking the right runner.
+# Modes:
+#   direct  — run the binary directly (native Linux x86-64)
+#   qemu64  — run via qemu-x86_64-static (for AVX2/AVX512 engines Rosetta can't run)
+#   wine    — run via wine (32-bit or 64-bit Windows .exe, classic WoW64)
+#   wine32  — alias for wine; kept for backward compatibility
+#
+# Debian bookworm ships Wine 8.0 classic WoW64 — the `wine` command handles
+# both 32-bit and 64-bit Windows executables via real i386 libraries.
+# There is no separate `wine64` binary in this setup.
+#
+# Called by the host-side wrapper script as:
+#   docker exec -i -w <engine_dir> lucas-engines /opt/lc/lc-run MODE /abs/path/to/engine
+set -e
+
+MODE="$1"
+EXE="$2"
+shift 2
+
+# cd to the engine directory so relative paths (nets, books) resolve
+cd "$(dirname "$EXE")"
+EXE="$(basename "$EXE")"
+
+case "$MODE" in
+    direct)
+        exec /opt/lc/relay.py "./$EXE" "$@"
+        ;;
+    qemu64)
+        exec /opt/lc/relay.py /usr/bin/qemu-x86_64-static "./$EXE" "$@"
+        ;;
+    wine|wine32)
+        # Classic WoW64: wine handles both 32-bit and 64-bit Windows EXEs
+        exec /opt/lc/relay.py wine "$EXE" "$@"
+        ;;
+    *)
+        echo "lc-run: unknown mode '$MODE'" >&2
+        exit 1
+        ;;
+esac

@@ -1,0 +1,82 @@
+#!/bin/bash
+# lc-engine — host-side Docker engine bridge
+#
+# Usage:
+#   lc-engine --ensure          # idempotently start the container (called by lucaschess launcher)
+#   lc-engine --stop            # stop the container
+#   lc-engine --status          # print container status
+#   lc-engine --build           # (re)build the image
+#   lc-engine MODE EXEC_PATH    # run an engine (used by per-engine wrapper scripts)
+#
+# MODE is one of: direct | qemu64 | wine | wine32
+# EXEC_PATH is the absolute host path to the engine binary.
+
+set -e
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONTAINER="lucas-engines"
+IMAGE="lucas-engines:latest"
+WINEPREFIX_VOL="lucas-wine"
+
+case "${1:-}" in
+    --build)
+        echo "Building $IMAGE ..."
+        docker build --platform linux/amd64 \
+            -f "$REPO/tools/docker/Dockerfile.engines" \
+            -t "$IMAGE" \
+            "$REPO/tools/docker/"
+        echo "Done."
+        exit 0
+        ;;
+    --ensure)
+        # Idempotent: start only if not already running.
+        STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+        case "$STATUS" in
+            running) exit 0 ;;
+            paused)  docker unpause "$CONTAINER" >/dev/null; exit 0 ;;
+            exited|created)
+                docker start "$CONTAINER" >/dev/null
+                exit 0
+                ;;
+            missing)
+                # Race-safe: if two processes start at once the second `docker run`
+                # fails with "container name already in use" — that is harmless.
+                docker run -d --name "$CONTAINER" --platform linux/amd64 \
+                    -v "$REPO:$REPO" \
+                    -v "$WINEPREFIX_VOL:/wine" \
+                    -e WINEPREFIX=/wine/prefix \
+                    -e WINEDEBUG=-all \
+                    -e WINEARCH=win64 \
+                    "$IMAGE" sleep infinity >/dev/null 2>&1 || true
+                # If no Wine prefix exists yet, init it (headless)
+                sleep 0.5
+                docker exec "$CONTAINER" sh -c \
+                    'test -f "$WINEPREFIX/system.reg" || (wine wineboot --init 2>/dev/null; true)' \
+                    2>/dev/null || true
+                ;;
+        esac
+        exit 0
+        ;;
+    --stop)
+        docker stop "$CONTAINER" 2>/dev/null && echo "Stopped." || echo "Not running."
+        exit 0
+        ;;
+    --status)
+        docker inspect -f 'Status: {{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "Status: missing"
+        exit 0
+        ;;
+    --*)
+        echo "Unknown option: $1" >&2; exit 1
+        ;;
+esac
+
+# Normal usage: lc-engine MODE /abs/path/to/engine
+MODE="$1"
+EXE="$2"
+ENGINE_DIR="$(dirname "$EXE")"
+
+# Ensure container is running before exec-ing
+"${BASH_SOURCE[0]}" --ensure 2>/dev/null || true
+
+# -i: keep stdin open for UCI pipe (never -t: TTY mangles UCI line endings)
+exec docker exec -i -w "$ENGINE_DIR" "$CONTAINER" /opt/lc/lc-run "$MODE" "$EXE"

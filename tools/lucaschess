@@ -1,0 +1,27 @@
+#!/bin/bash
+# LucasChess launcher for macOS (Apple Silicon)
+# Pre-warms the Docker engine bridge container, then starts the GUI.
+#
+# Usage:
+#   lucaschess [args passed to LucasR.py]
+#   lucaschess /path/to/file.pgn
+#   lucaschess -play
+set -e
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON="$REPO/.venv/bin/python3"
+LC_ENGINE="$REPO/tools/lc-engine"
+
+if [ ! -x "$PYTHON" ]; then
+    echo "LucasChess: venv not found. Please run the setup steps first."  >&2
+    exit 1
+fi
+
+# Pre-warm the bridge container in the background (non-fatal if Docker is down)
+if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+    "$LC_ENGINE" --ensure 2>/dev/null &
+fi
+
+# Run from bin/ so LucasR.py can find Code/ and OS/
+cd "$REPO/bin"
+exec "$PYTHON" LucasR.py "$@"

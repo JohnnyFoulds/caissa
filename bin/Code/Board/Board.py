@@ -1758,7 +1758,10 @@ class Board(QtWidgets.QGraphicsView):
         self.set_last_position(position)
         if self.variation_history:
             self.activate_side(position.is_white)
-        QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+        QtCore.QCoreApplication.processEvents(
+            QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents |
+            QtCore.QEventLoop.ProcessEventsFlag.ExcludeSocketNotifiers
+        )
 
     def fila2punto(self, row):
         factor = (8 - row) if self.is_white_bottom else (row - 1)
@@ -2632,7 +2635,10 @@ class Board(QtWidgets.QGraphicsView):
             self.remove_arrows()
         self.init_kb_buffer()
         self.pieces_are_active = True
-        QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+        QtCore.QCoreApplication.processEvents(
+            QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents |
+            QtCore.QEventLoop.ProcessEventsFlag.ExcludeSocketNotifiers
+        )
 
     def play_current_position(self):
         if hasattr(self.main_window, "manager") and hasattr(self.main_window.manager, "play_current_position"):

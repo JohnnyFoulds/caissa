@@ -123,6 +123,8 @@ class EngineManager:
         self.enabled_emit_bestmove_found = False
 
     def check_engine(self) -> bool:
+        if self.is_closed:
+            return False
         if self.starting_the_engine:
             return True
         if self.engine_run is not None:

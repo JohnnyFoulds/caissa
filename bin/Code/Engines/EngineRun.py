@@ -740,32 +740,22 @@ class EngineRun(QtCore.QObject):
         # Intentar cierre del proceso
         if self.process is not None:
             try:
-                pid = -1
-                with contextlib.suppress(RuntimeError, AttributeError, ValueError, TypeError):
-                    pid = int(self.process.processId())
-                if pid > 0:
-                    # Estrategia 1: Intento de cierre normal
-                    try:
-                        self._send_command("quit")
-                    except Exception:
-                        self._log_exception("quit command failed")
-
-                    # Terminar con QProcess
-                    try:
-                        # Usar psutil directamente si es posible, es más fiable para forzar
-                        self._kill_process_tree(pid, including_parent=True, timeout=1)
-                    except (RuntimeError, AttributeError):
-                        pass
-                    except Exception as e:
-                        if __debug__:
-                            Debug.prln(f"Error en cierre con psutil: {e}", color="yellow")
+                self._send_command("quit")
             except Exception:
-                self._log_exception("process close failed")
+                self._log_exception("quit command failed")
 
-            # Cerrar QProcess internamente
+            # Use Qt-native termination so Qt's internal process tracking stays
+            # in sync.  psutil.wait() races with Qt's kqueue/SIGCHLD handler:
+            # psutil reaps the zombie first, Qt never detects the exit, and
+            # QProcess.state() stays "Running" when the C++ destructor fires.
+            # That leaves stale kqueue events which crash inside processEvents().
             try:
                 if QtCore.QCoreApplication.instance():
-                    self.process.waitForFinished(200)
+                    if not self.process.waitForFinished(500):
+                        self.process.terminate()
+                        if not self.process.waitForFinished(1000):
+                            self.process.kill()
+                            self.process.waitForFinished(500)
                 self.process.close()
             except Exception:
                 self._log_exception("QProcess close failed")

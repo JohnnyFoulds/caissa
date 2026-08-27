@@ -314,6 +314,7 @@ class RemoteControl(QtCore.QObject):
 
     def _toolbar_info(self) -> dict:
         import Code
+        from PySide6.QtCore import QPoint
         proc = Code.procesador
         if not proc or not hasattr(proc, "main_window"):
             return {"error": "no main window"}
@@ -321,20 +322,26 @@ class RemoteControl(QtCore.QObject):
         tb = getattr(mw, "tb", None) or getattr(getattr(mw, "base", None), "tb", None)
         if not tb:
             return {"error": "no toolbar"}
+        mw_origin = mw.mapToGlobal(QPoint(0, 0))
         buttons = []
         for action in tb.actions():
             widget = tb.widgetForAction(action)
             if widget:
                 sz = widget.size()
+                gpos = widget.mapToGlobal(QPoint(0, 0))
                 buttons.append({
                     "text": action.text(),
                     "enabled": action.isEnabled(),
                     "width": sz.width(),
                     "height": sz.height(),
+                    "x": gpos.x() - mw_origin.x(),
+                    "y": gpos.y() - mw_origin.y(),
                 })
+        dpr = mw.devicePixelRatio()
         return {
             "count": len(buttons),
             "toolbar_size": {"w": tb.width(), "h": tb.height()},
+            "device_pixel_ratio": dpr,
             "buttons": buttons,
         }
 

@@ -43,10 +43,12 @@ docs/
 - `UIModes.active_mode()` returns the current mode dict
 - `WBase.pon_toolbar` calls `UIModes.toolbar_inject()` and prepends injected actions
 
-### Theme Overlay System (not yet implemented — see SDD)
+### Theme Overlay System
 - `Resources/Styles/<name>.ui.json` — renames/hides fields in Configuration dialog
-- Applied at dialog-open time via `OverlayForm` proxy
+- Applied at dialog-open time via `OverlayForm` proxy (`bin/Code/Config/FormOverlay.py`)
 - Absence of `.ui.json` = upstream behaviour, zero changes
+- Mode-owned config section: `config_section` key in mode JSON appends a mode-owned tab
+- Mode UI hooks: `bin/Code/UIModes/actions/<mode>_ui.py` with optional `patch_config_form`
 - See `docs/theme-mode-system.md` for the full spec
 
 ### Config Keys
@@ -106,6 +108,21 @@ See `docs/standards/docstring-standards.md`.
 - `logging.getLogger(__name__)` at module level
 - `%s`-style lazy formatting, not f-strings
 - See `docs/standards/logging-standard.md`
+
+### Changelog
+
+**`CHANGELOG.md` must be kept up to date.** Every PR that adds, changes, or fixes
+something user-visible or architecturally significant must include a `CHANGELOG.md`
+update in the same commit.
+
+Rules:
+- New entries go under `## [Unreleased]` → appropriate sub-heading
+  (`### Added`, `### Changed`, `### Fixed`, `### Removed`)
+- One bullet per logical change; reference the PR number `(#N)` or commit where useful
+- When a release is tagged, rename `[Unreleased]` to `[x.y.z] — YYYY-MM-DD` and open
+  a fresh `[Unreleased]` section above it
+- Do **not** document internal refactors, test-only changes, or doc-only commits unless
+  they change observable behaviour or the public API surface
 
 ### Code Style
 - Do not reformat existing Lucas Chess R6 code

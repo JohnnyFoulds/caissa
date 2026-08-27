@@ -1,0 +1,217 @@
+# Changelog
+
+All notable changes to **Caissa** are documented here.
+
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Caissa uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
+
+---
+
+## [Unreleased]
+
+### Added
+- **Theme overlay system — Steps 5–8** (`feat/overlay-steps-5-8`, PR #3)
+  - `config_section` key in mode JSON: active mode can append a mode-owned tab
+    (combobox/checkbox/spinbox/edit fields) to the General Configuration dialog
+  - `configuration.mode_settings` dict: namespace-keyed storage persisted in the
+    config pickle under `MODE_SETTINGS`; backwards-compatible (old pickles default `{}`)
+  - `UIModes.load_mode_hook(mode_name)`: loads `actions/<mode>_ui.py` if present;
+    `WindowConfig` calls `hook.patch_config_form(form, conf, overlay)` before `run()`
+  - 27 classical-invariant unit tests in `tests/test_classical_invariant.py`
+    (no Qt/display; run with `pytest tests/test_classical_invariant.py`)
+  - Result unpack in `WindowConfig.options()` changed to index-based so an extra
+    mode-section tab can never corrupt existing tab positions
+
+- **UI integration testing framework** (`feat/ui-testing-framework`, PR #2)
+  - `tests/ui/client.py`: `CaissaClient` wrapping the RemoteControl Unix socket;
+    typed assertion helpers (`assert_dialog_field`, `assert_tab_exists`, etc.)
+  - `tests/ui/conftest.py`: session-scoped `caissa_proc` + `client` fixtures;
+    function-scoped `config_theme` fixture with automatic teardown restore
+  - `tests/ui/test_overlay.py`: T-OVL-01–08 (Caissa theme label renames,
+    hidden fields, tab renames, player-name round-trip)
+  - `tests/ui/test_classical.py`: T-CLS-01–02 (classical invariant via live app)
+  - `pytest.ini` with testpaths, markers, timeout config
+  - `CAISSA_TEST=1` env-var guard in `Procesador.py` suppresses startup dialogs
+    (update check, startup puzzles, first-time config) so tests reach home screen
+
+- **Theme UI overlay system — Layer 1** (`feat/overlay-system`, PR #1)
+  - `bin/Code/Config/FormOverlay.py`: `OverlayForm` proxy wrapping `FormLayout`;
+    intercepts field builds to rename/hide labels; `result()` for safe named-field lookup
+  - `load_overlay(theme_name)` reads `Resources/Styles/<name>.ui.json`; returns `{}`
+    if absent (classical invariant preserved)
+  - `Resources/Styles/Caissa.ui.json`: renames Mode→Theme, UI mode→Mode; hides
+    Window style / Menu Play / Preventing system crashes; renames 5 tabs
+  - `WindowConfig.options()` wrapped with `OverlayForm`; named-field unpack replaces
+    fragile positional `*_ui_mode_rest` approach
+  - `docs/ui-testing.md`: SDD for the UI testing framework
+  - `docs/theme-mode-system.md`: SDD for the full Theme/Mode overlay architecture
+
+- **Engineering standards and tooling**
+  - `CLAUDE.md`: project guide with repo structure, key concepts, workflow rules
+  - `docs/standards/coding-standards.md`: branch+PR workflow, commit message format,
+    protected `main`, auto-merge policy
+  - `docs/standards/spec-driven-development.md`: SDD-first requirement
+  - `docs/standards/docstring-standards.md`: RST/Sphinx style
+  - `docs/standards/error-handling.md`: domain exceptions, exc_info, raise-from
+  - `docs/standards/logging-standard.md`: `%s`-style lazy formatting
+
+- **RemoteControl commands** (`bin/Code/Debug/RemoteControl.py`)
+  - `set_config <key> <value>`: sets a config attribute, saves, re-applies QSS
+  - `open_config`: opens General Configuration dialog asynchronously via
+    `QTimer.singleShot(0, proc.menu_options)`
+  - Tests for both commands in `tests/test_remote_control.py`
+
+### Fixed
+- `RemoteControl._open_config` called `proc.opciones()` (non-existent); corrected
+  to `proc.menu_options()`
+
+---
+
+## [Pre-release work — no version tag yet]
+
+The sections below document work completed before the formal PR/branch workflow
+was established (commits `7a657d4`…`991c2c7` on `main`).
+
+### Added — Coach mode and UI Modes framework (Phase 5–7)
+
+- **UI Modes framework** (`00ab3b8`)
+  - `Resources/Modes/*.json`: mode definitions with `toolbar`, `menu_keys`,
+    `toolbar_inject` allowlists
+  - `bin/Code/UIModes/UIModes.py`: `load_modes()`, `active_mode()`,
+    `allows_toolbar()`, `filter_menu_options()`, `toolbar_inject()`
+  - `bin/Code/Menus/BaseMenu.py`: `filter_menu_options` called from `check_pending()`
+  - `bin/Code/Main/WBase.py`: `pon_toolbar` applies toolbar filter + injects
+    mode-defined actions
+  - `Configuration.x_ui_mode`: new config key; added to `needs_reinit`
+  - `WindowConfig.options()`: Mode combobox from `Resources/Modes/*.json` scan
+  - `tools/dump_ui_keys.py`: introspects all menus + toolbar keys; outputs
+    `tools/ui-keys.md`
+
+- **Four focused modes** (`00ab3b8`)
+  - `Resources/Modes/classical.json`: null allowlists — full upstream experience
+  - `Resources/Modes/just-play.json`: board + clock only
+  - `Resources/Modes/analyse.json`: engine output + PGN tree
+  - `Resources/Modes/train.json`: tactics + Leitner + openings
+  - `Resources/Modes/compete.json`: Elo ladders + tournaments
+  - All modes include `TB_OPTIONS` so Configuration is always reachable (`991c2c7`)
+
+- **Coach mode landing screen** (`245ec16`)
+  - `bin/Code/UIModes/actions/coach_home.py`: 2×2 card grid (Play · Openings ·
+    Review · Daily puzzle), registered as `caissa:coach_home`
+  - `Resources/Modes/coach.json`: Coach mode JSON with `toolbar_inject`
+  - `bin/Code/UIModes/actions/switch_mode.py`: `caissa:switch_mode` escape hatch
+    present in every mode's toolbar
+
+### Added — Caissa theme and icon system
+
+- **Caissa/VSCode signature theme** (`9519c47`, `f8a035d` and refinements)
+  - `Resources/Styles/Caissa.qss` / `Caissa.colors`: dark VS Code–inspired chrome,
+    activity-bar sidebar, accent `#6366f1`, rounded corners, slim scrollbars
+  - `Resources/Styles/VSCode.qss` (deprecated name, now Caissa)
+  - Board colours matched to VS Code charcoal `#1e1e1e`
+  - Balestegui2 piece set used as default (`3a6d8b0`)
+  - Sidebar gap, separator lines, and wrench icon removed (`718de27`)
+
+- **VS Code icon pack** (`4f961a1`, `27efbbb`, `b5c1ca6`)
+  - 52 SVG overrides for home-screen and game-screen toolbar icons
+  - Custom codicons-style toolbar icons matching the VS Code aesthetic
+  - Adjourn icon normalised; sidebar icon consistency test suite added (`46afb7d`)
+  - Stroke weights tuned to visual parity between home and play screens
+
+- **Midnight and Daylight themes** (`94f106d`)
+  - `Resources/Styles/Midnight.qss` / `Midnight.colors`
+  - `Resources/Styles/Daylight.qss` / `Daylight.colors`
+  - Shared 8px radius, 10px padding; identical geometry between dark and light
+  - Palette covers: QScrollBar, QLineEdit, QSpinBox, QTextEdit, QProgressBar, tabs,
+    headers, focus ring, selection highlight
+
+- **Midnight/Daylight icon packs** (`5e2a6d8`)
+  - `Resources/IntFiles/Iconos_midnight.*`, `Iconos_daylight.*`
+  - Duotone recolour using `haz_sepia` pipeline; exclusion sets for semantic colours
+    (Leitner boxes, Everest decorative, status LEDs)
+  - `IconosBase.MIDNIGHT = 3`, `DAYLIGHT = 4` registered in `dic_files`
+
+- **IS_DARK QPalette and CHROME_* colour keys** (`fd3e12f`)
+  - `IS_DARK` flag in `.colors` files drives a full `QPalette` in `init_app_style`
+  - 10 new `CHROME_*` keys (`CHROME_SURFACE`, `CHROME_ACCENT`, etc.) in all themes
+  - Inline `setStyleSheet` calls for most-visible chrome sites routed through
+    `Code.dic_colors`
+
+- **Live retheme without restart** (`b4e4127`, `f8a035d`)
+  - `InitApp.apply_live_style()`: re-applies QSS + palette immediately on config save
+  - Icon pack change still requires restart; all other style changes are instant
+  - RemoteControl `theme <name>` command applies theme atomically
+
+### Added — macOS platform and foundation (Phase 0)
+
+- **Apple Silicon native platform** (`36be1a3`)
+  - `bin/OS/darwin/OSEngines.py`: native engine registry for arm64
+  - Native engines committed to LFS: Stockfish 18 (0.5 MB + shared NNUE nets),
+    Lc0 0.32.1 (1.8 MB), irina (92 KB), 10× Maia nets + books
+  - `bin/OS/darwin/FasterCode.cpython-313-darwin.so`: arm64 C extension
+  - `bin/OS/darwin/uci_options.sqlite`
+  - All absolute Homebrew symlinks replaced with real relocatable binaries
+
+- **macOS toolchain** (`02c3413`)
+  - `tools/caissa`: main launcher (venv + `CAISSA_TEST` support)
+  - `tools/caissa-ctl`: RemoteControl CLI client
+  - `tools/lc-engine`: Docker bridge shim for Linux engine wrappers
+  - `tools/gen_darwin_engines.py`: generates relocatable wrapper scripts
+  - `tools/build_stockfish.sh`, `build_lc0.sh`, `build_irina.sh`,
+    `build_drawfish.sh`: reproducible source builds
+
+- **Docker optional / native Drawfish** (`4ae71bd`)
+  - `OSEngines.py` availability probe: single `docker inspect` with 2 s timeout;
+    skips bridged loop entirely when Docker is absent or stopped
+  - Native `bin/OS/darwin/Engines/drawfish/drawfish` (arm64, no NNUE)
+  - Relocatable wrapper generation: `REPO=$(cd … && pwd)` self-location
+  - `eguzkilore` removed from native keys (was registering an ELF x86-64 binary
+    as native arm64)
+  - `Configuration.path_book` guarded against missing alias (unguarded dict lookup
+    was taking down the Play against engine dialog)
+
+- **Rename to Caissa** (`68afb07`)
+  - `Code.lucas_chess` → `"Caissa"` (single assignment in `Translate.py`)
+  - `VERSION = "1.0"`, `UPSTREAM_VERSION = "R 6.0.4"` (provenance preserved)
+  - Auto-updater disabled: menu entry removed, `Update.update()` / `update_at_start()`
+    short-circuited; `update_manual()` (local ZIP install) preserved
+  - GPL §5(a) attribution in About dialog
+  - `README.md`: platform (Apple Silicon, macOS 14+) stated in first screenful,
+    badge row, requirements, install, engine roster, credits
+  - `LucasChess.command` → `Caissa.command`; `tools/lucaschess` → `tools/caissa`
+
+- **Stockfish NNUE repair** (`fe58582`)
+  - LFS stub `.nnue` files caused Stockfish exit code 1 after first `go` command
+  - Fixed by ensuring full LFS checkout of both NNUE files
+
+### Added — Testing infrastructure
+
+- **RemoteControl Unix socket server** (`f8a035d` and many subsequent commits)
+  - `bin/Code/Debug/RemoteControl.py`: Qt-safe command dispatcher over
+    `/tmp/caissa-control.sock`; 30+ commands covering ping, info, screenshot,
+    toolbar, game control, UI inspection/interaction, dialog control
+  - `tools/caissa-ctl`: CLI wrapper for manual use and debugging
+  - `tests/test_remote_control.py`: live-app tests (23+ assertions); requires
+    running Caissa process; auto-skips if socket absent
+
+- **Sidebar icon consistency test suite** (`46afb7d`)
+  - `tests/test_sidebar_icon_consistency.py`: asserts all sidebar icons render
+    at consistent visual weight and size
+
+### Fixed
+
+- `dialog_cancel` was closing the main window instead of the topmost dialog
+  (`9874f12`); all 23 RemoteControl tests green after fix
+- Toolbar square-button enforcement: `abca1e7` fixed vertical icon-only toolbar
+  to use 48×48 px buttons consistently
+- Game toolbar draw icon and duplicate gears resolved (`d30be61`)
+
+---
+
+## [Upstream] — Lucas Chess R6.0.4
+
+Base from which Caissa was forked. See
+[lukasmonk/lucaschessR6](https://github.com/lukasmonk/lucaschessR6) for full
+upstream history.

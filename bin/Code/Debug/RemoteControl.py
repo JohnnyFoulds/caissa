@@ -273,13 +273,13 @@ class RemoteControl(QtCore.QObject):
 
     def _screenshot(self, path: str) -> dict:
         import Code
-        screen = QtWidgets.QApplication.primaryScreen()
         mw = None
         if Code.procesador and hasattr(Code.procesador, "main_window"):
             mw = Code.procesador.main_window
         if mw and mw.isVisible():
-            pixmap = screen.grabWindow(int(mw.winId()))
+            pixmap = mw.grab()  # widget.grab() works on any screen/monitor
         else:
+            screen = QtWidgets.QApplication.primaryScreen()
             pixmap = screen.grabWindow(0)
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         pixmap.save(path)

@@ -35,9 +35,14 @@ VSCODE_OVERRIDES = {
     ("gnome",   "64px-gnome-preferences-desktop.png"):"settings-gear.png",  # Director (64px)
     ("gnome",   "preferences-other.png"):             "gear.png",           # Utilidades
 
-    # ── Accept / Cancel ──────────────────────────────────────────────────────
+    # ── Accept / Cancel / Game actions ──────────────────────────────────────
     ("gnome",   "64px-dialog-apply.png"):             "check.png",          # Aceptar, S_Aceptar
     ("gnome",   "64px-gnome-emblem-unreadable.png"):  "close.png",          # Cancelar, S_Cancelar
+    ("gnome",   "64px-gnome-process-stop.png"):       "circle-slash.png",   # Abandonar (Resign)
+    ("icons8",  "exposure_32px.png"):                 "git-merge.png",      # Tablas (Draw)
+    ("icons8",  "icons8-idea-32.png"):                "lightbulb.png",      # Advice
+    ("icons8",  "icons8_stop_sign_32px.png"):         "debug-stop.png",     # Stop (Play now)
+    ("ultimate","system-search.png"):                 "settings-gear.png",  # Configurar (TB_CONFIG)
 
     # ── File operations ───────────────────────────────────────────────────────
     ("nuvola",  "3floppy_unmount.png"):               "save.png",           # Grabar, GrabarFichero

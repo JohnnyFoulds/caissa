@@ -3,20 +3,21 @@ modern_fritz_ui.py — mode lifecycle hook for the Modern Fritz skin.
 
 Called by Procesador.start() / reset() when the active mode is "Modern Fritz".
 
-Target layout
-─────────────
+Target layout (after home panel is dismissed)
+─────────────────────────────────────────────
     MainWindow.splitter (horizontal)
     ├─ [0]  WBase                — board + toolbar + side eval bar
     └─ [1]  _fritz_right_col  (QSplitter, Vertical)
-               ├─ [0]  WFritzHome OR WFritzAnalysisTable  — home panel / engine table
-               └─ [1]  pgn_information                    — move list (reparented)
+               ├─ [0]  WFritzHome OR WFritzAnalysisTable  — home / engine table
+               ├─ [1]  WFritzEvalGraph (80 px fixed)       — eval profile graph
+               └─ [2]  pgn_information                     — move list (reparented)
 
-On mode entry, WFritzHome is shown.  After the user picks "New Game" /
-"Load Game" / "Analyze", the home panel is swapped out for WFritzAnalysisTable
-and the normal play flow continues.
+On mode entry, WFritzHome is shown.  After the user picks an action the home
+panel is swapped for WFritzAnalysisTable + WFritzEvalGraph and the chosen
+flow starts (new game, load, analyze).
 
-Cleanup (on_mode_exit) restores pgn_information to the main splitter and removes
-the sub-splitter before Procesador.reset() clears the rest of the state.
+Cleanup (on_mode_exit) restores pgn_information to the main splitter and
+removes the sub-splitter before Procesador.reset() clears the rest of the state.
 """
 import logging
 
@@ -30,13 +31,12 @@ def on_mode_enter(procesador):
     mw = procesador.main_window
 
     from Code.UIModes.WFritzHome import WFritzHome
-    from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
 
     # Build the vertical right column
     right_col = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, mw)
     right_col.setChildrenCollapsible(False)
 
-    # Start with the home panel
+    # Start with the home panel (eval graph + table added later, on action)
     home = WFritzHome(mw)
     right_col.addWidget(home)
     # Reparent move list into right column
@@ -53,6 +53,7 @@ def on_mode_enter(procesador):
 
     mw._fritz_home = home
     mw._fritz_analysis_table = None
+    mw._fritz_eval_graph = None
     mw._fritz_right_col = right_col
 
     # Connect home panel signal — swap to analysis view when user picks action
@@ -62,7 +63,7 @@ def on_mode_enter(procesador):
 
 
 def _on_home_action(procesador, action: str):
-    """Swap home panel → analysis table, then dispatch the chosen action."""
+    """Swap home panel → analysis table + eval graph, then dispatch the action."""
     mw = procesador.main_window
 
     home = getattr(mw, "_fritz_home", None)
@@ -70,22 +71,34 @@ def _on_home_action(procesador, action: str):
     if home is None or right_col is None:
         return
 
-    # Build analysis table (replaces home panel)
-    from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
-    table = WFritzAnalysisTable(mw, mw.base.analysis_bar)
+    bar = mw.base.analysis_bar
 
-    # Swap: remove home, insert table at position 0
+    # Build analysis table
+    from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
+    table = WFritzAnalysisTable(mw, bar)
+
+    # Build eval graph (fixed 80 px, inserted between table and move list)
+    from Code.UIModes.WFritzEvalGraph import WFritzEvalGraph
+    eval_graph = WFritzEvalGraph(mw, bar)
+
+    # Swap: replace home (index 0) with the analysis table
     right_col.replaceWidget(0, table)
-    right_col.setSizes([200, 500])
+    # Insert eval graph at index 1; pgn_information shifts to index 2
+    right_col.insertWidget(1, eval_graph)
+    right_col.setSizes([200, 80, 400])
+
     table.show()
+    eval_graph.show()
     table.start()
+    eval_graph.start()
 
     home.hide()
     home.setParent(None)
     mw._fritz_home = None
     mw._fritz_analysis_table = table
+    mw._fritz_eval_graph = eval_graph
 
-    _log.debug("Modern Fritz: swapped home → analysis table")
+    _log.debug("Modern Fritz: home → analysis table + eval graph")
 
     # Dispatch the chosen action
     _dispatch_action(procesador, action)
@@ -119,6 +132,11 @@ def _fritz_new_game(procesador):
     if dic is None:
         return
 
+    # Reset eval graph for the new game
+    eval_graph = getattr(mw, "_fritz_eval_graph", None)
+    if eval_graph is not None:
+        eval_graph.reset()
+
     from Code.PlayAgainstEngine import ManagerPlayAgainstEngine
     manager = ManagerPlayAgainstEngine.ManagerPlayAgainstEngine(procesador)
     manager.start(dic)
@@ -129,14 +147,19 @@ def on_mode_exit(procesador):
     mw = procesador.main_window
 
     table = getattr(mw, "_fritz_analysis_table", None)
+    eval_graph = getattr(mw, "_fritz_eval_graph", None)
     home = getattr(mw, "_fritz_home", None)
     right_col = getattr(mw, "_fritz_right_col", None)
 
-    if table is not None:
-        try:
-            table.stop()
-        except Exception:
-            _log.debug("Fritz table stop error", exc_info=True)
+    for widget, attr in [(table, "_fritz_analysis_table"),
+                         (eval_graph, "_fritz_eval_graph"),
+                         (home, "_fritz_home")]:
+        if widget is not None:
+            try:
+                if hasattr(widget, "stop"):
+                    widget.stop()
+            except Exception:
+                _log.debug("Fritz widget stop error (%s)", attr, exc_info=True)
 
     if right_col is not None:
         try:
@@ -151,7 +174,9 @@ def on_mode_exit(procesador):
             except AttributeError:
                 pass
 
-    for attr, widget in [("_fritz_analysis_table", table), ("_fritz_home", home)]:
+    for widget, attr in [(table, "_fritz_analysis_table"),
+                         (eval_graph, "_fritz_eval_graph"),
+                         (home, "_fritz_home")]:
         if widget is not None:
             try:
                 widget.hide()

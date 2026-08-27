@@ -24,6 +24,10 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   - `modern_fritz_ui.on_mode_enter`: shows `WFritzHome` first; connects
     `action_chosen` signal to swap in `WFritzAnalysisTable` then dispatch the
     action through the existing menu handlers (no new game-start logic)
+  - `WFritzEvalGraph`: 80 px fixed-height evaluation profile graph — QPainter bar
+    chart, Fritz-blue bars for white advantage, red for black, ±600 cp scale; polls
+    `AnalysisBar.mrm` at 250 ms and accumulates one centipawn value per half-move;
+    trims on backward navigation; inserted between analysis table and move list
   - `WFritzNewGame`: Fritz-style simplified game-start dialog — three toggle-button
     rows (Side: White/Black/Random, Level: Easy/Club/Active/Strong/Master/
     Grandmaster, Time: No limit/Blitz/Rapid/Classical); builds a complete

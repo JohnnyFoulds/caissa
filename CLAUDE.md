@@ -60,6 +60,22 @@ docs/
 
 Full standards documents are in `docs/standards/`. Summary of key rules:
 
+### Branching and PRs
+
+**Never commit directly to `main`.** All work goes on a branch and merges via a PR.
+
+```bash
+git checkout -b feat/<topic>   # branch from latest main
+# ... commits ...
+gh pr create                   # open PR on JohnnyFoulds/caissa
+# merge on GitHub, then:
+git checkout main && git pull
+```
+
+Branch naming: `feat/<topic>`, `fix/<topic>`, `refactor/<topic>`, `docs/<topic>`, `chore/<topic>`
+
+See `docs/standards/coding-standards.md`.
+
 ### Commit Messages
 Conventional Commits format: `type(scope): subject`
 

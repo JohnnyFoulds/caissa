@@ -31,8 +31,16 @@ feat(modes): add TB_OPTIONS to all focused mode toolbars
 
 ## 2. Branching Strategy
 
-- `main` — stable branch; source of truth for the JohnnyFoulds/caissa fork
-- Short-lived branches off `main`: `feat/<topic>`, `fix/<topic>`, `refactor/<topic>`, `docs/<topic>`, `chore/<topic>`
+- `main` — stable, protected; never commit directly to `main`
+- All work happens on short-lived branches off `main`: `feat/<topic>`, `fix/<topic>`, `refactor/<topic>`, `docs/<topic>`, `chore/<topic>`
+- Merge to `main` only via a Pull Request on `JohnnyFoulds/caissa`
+
+**Workflow:**
+1. `git checkout -b feat/<topic>` from latest `main`
+2. One or more commits on the branch
+3. `gh pr create` with summary and test plan
+4. Merge (squash or merge commit) via GitHub
+5. `git checkout main && git pull`
 
 **IMPORTANT:** Never push to `lukasmonk/lucaschessR6`. All pushes go to `JohnnyFoulds/caissa` only.
 

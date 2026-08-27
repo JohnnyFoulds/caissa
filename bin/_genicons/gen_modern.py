@@ -22,14 +22,77 @@ OUT  = "../../Resources/IntFiles"
 # Key: (nom_dir.lower(), nom_fichero.lower())  →  path to pre-rendered 32x32 PNG
 _OVERRIDES_VSCODE_DIR = os.path.join(os.path.dirname(__file__), "overrides", "vscode")
 VSCODE_OVERRIDES = {
-    ("nuvola",  "connect_established.png"):       "play.png",           # Libre / Play
-    ("nuvola",  "edu_miscellaneous.png"):          "mortar-board.png",   # Entrenamiento / Train
-    ("nuvola",  "run.png"):                        "game.png",           # NuevaPartida / Compete
-    ("gnome",   "64px-gnome-application-exit.png"):"sign-out.png",       # FinPartida / Quit
-    ("nuvola",  "messagebox_info.png"):            "info.png",           # Informacion
-    ("nuvola",  "kcontrol.png"):                   "tools.png",          # Tools
-    ("icons8",  "icons8-servicios-32.png"):        "server-process.png", # Engines
-    ("gnome",   "32px-gnome-preferences-desktop.png"): "settings-gear.png",  # Options
+    # ── Main menu ────────────────────────────────────────────────────────────
+    ("nuvola",  "connect_established.png"):            "play.png",           # Libre
+    ("nuvola",  "edu_miscellaneous.png"):              "mortar-board.png",   # Entrenamiento/Tutor
+    ("nuvola",  "run.png"):                            "game.png",           # NuevaPartida/FichPGN
+    ("gnome",   "64px-gnome-application-exit.png"):   "sign-out.png",       # FinPartida
+    ("woocons", "application-exit.png"):              "sign-out.png",       # Terminar
+    ("nuvola",  "messagebox_info.png"):               "info.png",           # Informacion
+    ("nuvola",  "kcontrol.png"):                      "tools.png",          # Tools
+    ("icons8",  "icons8-servicios-32.png"):           "server-process.png", # Engines
+    ("gnome",   "32px-gnome-preferences-desktop.png"):"settings-gear.png",  # Options (32px)
+    ("gnome",   "64px-gnome-preferences-desktop.png"):"settings-gear.png",  # Director (64px)
+    ("gnome",   "preferences-other.png"):             "gear.png",           # Utilidades
+
+    # ── Accept / Cancel ──────────────────────────────────────────────────────
+    ("gnome",   "64px-dialog-apply.png"):             "check.png",          # Aceptar, S_Aceptar
+    ("gnome",   "64px-gnome-emblem-unreadable.png"):  "close.png",          # Cancelar, S_Cancelar
+
+    # ── File operations ───────────────────────────────────────────────────────
+    ("nuvola",  "3floppy_unmount.png"):               "save.png",           # Grabar, GrabarFichero
+    ("nuvola",  "3floppy_mount.png"):                 "save-as.png",        # GrabarComo
+    ("gnome",   "64px-gnome-folder-saved-search.png"):"folder-opened.png",  # Recuperar, FolderChange
+
+    # ── Edit operations ───────────────────────────────────────────────────────
+    ("gnome",   "64px-gnome-edit-copy.png"):          "copy.png",           # Copiar
+    ("gnome",   "64px-gnome-edit-paste.png"):         "clippy.png",         # Pegar
+    ("gnome",   "64px-gnome-edit-delete.png"):        "trash.png",          # Borrar, S_Limpiar
+    ("gnome",   "64px-gnome-edit-undo.png"):          "discard.png",        # Defecto (restore)
+    ("gnome",   "64px-gnome-list-add.png"):           "add.png",            # Nuevo
+    ("gnome",   "64px-gnome-document-revert.png"):    "edit.png",           # Modificar
+    ("gnome",   "64px-gnome-view-restore.png"):       "insert.png",         # Insertar, Mezclar
+
+    # ── Navigation ────────────────────────────────────────────────────────────
+    ("nuvola",  "left.png"):                          "debug-step-back.png",# Atras (prev move)
+    ("gnome",   "64px-gnome-go-bottomr.png"):         "triangle-left.png",  # Inicio (first)
+    ("gnome",   "64px-gnome-go-bottoml.png"):         "triangle-right.png", # Final (last)
+    ("gnome",   "64px-gnome-go-previous.png"):        "chevron-left.png",   # AnteriorF
+    ("gnome",   "64px-gnome-go-next.png"):            "chevron-right.png",  # SiguienteF
+    ("gnome",   "64px-gnome-go-up.png"):              "arrow-up.png",       # Arriba
+    ("gnome",   "64px-gnome-go-down.png"):            "arrow-down.png",     # Abajo
+    ("gnome",   "64px-gnome-go-jump.png"):            "target.png",         # Flechas (jump)
+
+    # ── Replay / movie controls ───────────────────────────────────────────────
+    ("woocons", "button_pause.png"):                  "debug-pause.png",    # Pelicula_Pausa
+    ("woocons", "button_play.png"):                   "debug-continue.png", # Pelicula_Seguir, Play
+    ("woocons", "button_playr.png"):                  "play.png",           # Run
+    ("woocons", "button_playm.png"):                  "play.png",           # Run2
+    ("woocons", "button_add.png"):                    "add.png",            # Pelicula_Rapido
+    ("woocons", "button_white_remove.png"):           "dash.png",           # Pelicula_Lento
+    ("woocons", "button_white_load.png"):             "refresh.png",        # Pelicula_Repetir/Reiniciar
+
+    # ── Search and analysis ───────────────────────────────────────────────────
+    ("nuvola",  "viewmag.png"):                       "search.png",         # Buscar
+    ("gnome",   "64px-gnome-zoom-fit-best.png"):      "filter.png",         # Filtrar
+    ("icons8",  "icons8_search_property_32px.png"):   "eye.png",            # Analizar
+
+    # ── Help / info ───────────────────────────────────────────────────────────
+    ("nuvola",  "khelpcenter.png"):                   "question.png",       # Ayuda
+    ("nuvola",  "khelpcenter64.png"):                 "question.png",       # AyudaGR
+    ("gnome",   "64px-gnome-dialog-question.png"):    "question.png",       # Check
+
+    # ── Databases / books ─────────────────────────────────────────────────────
+    ("icons8",  "icons8_database_32px.png"):          "database.png",       # Databases
+    ("icons8",  "icons8-base-de-datos-32.png"):       "database.png",       # Database
+    ("nuvola",  "kpdf.png"):                          "library.png",        # Libros
+    ("icons8",  "icons8-libro-32.png"):               "library.png",        # Openings
+
+    # ── Marking / history / achievements ─────────────────────────────────────
+    ("gnome",   "64px-gnome-emblem-generic.png"):     "tag.png",            # Marcar
+    ("nuvola",  "history.png"):                       "history.png",        # Aplazamientos
+    ("nuvola",  "history_clear.png"):                 "history.png",        # Aplazar
+    ("icons8",  "trophy.png"):                        "star-full.png",      # Trophy
 }
 
 # ── Exclusion set 1: hardware photos / piece graphics → copy unchanged ──────

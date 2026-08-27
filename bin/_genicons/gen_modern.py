@@ -33,16 +33,16 @@ VSCODE_OVERRIDES = {
     ("icons8",  "icons8-servicios-32.png"):           "server-process.png", # Engines
     ("gnome",   "32px-gnome-preferences-desktop.png"):"settings-gear.png",  # Options (32px)
     ("gnome",   "64px-gnome-preferences-desktop.png"):"settings-gear.png",  # Director (64px)
-    ("gnome",   "preferences-other.png"):             "gear.png",           # Utilidades
 
     # ── Accept / Cancel / Game actions ──────────────────────────────────────
     ("gnome",   "64px-dialog-apply.png"):             "check.png",          # Aceptar, S_Aceptar
     ("gnome",   "64px-gnome-emblem-unreadable.png"):  "close.png",          # Cancelar, S_Cancelar
     ("gnome",   "64px-gnome-process-stop.png"):       "circle-slash.png",   # Abandonar (Resign)
-    ("icons8",  "exposure_32px.png"):                 "git-merge.png",      # Tablas (Draw)
+    ("icons8",  "exposure_32px.png"):                 "star-half.png",      # Tablas (Draw) — ½ point
     ("icons8",  "icons8-idea-32.png"):                "lightbulb.png",      # Advice
     ("icons8",  "icons8_stop_sign_32px.png"):         "debug-stop.png",     # Stop (Play now)
-    ("ultimate","system-search.png"):                 "settings-gear.png",  # Configurar (TB_CONFIG)
+    ("ultimate","system-search.png"):                 "settings.png",       # Configurar (TB_CONFIG) — gear+sliders
+    ("gnome",   "preferences-other.png"):             "tools.png",          # Utilidades (TB_UTILITIES) — wrench
 
     # ── File operations ───────────────────────────────────────────────────────
     ("nuvola",  "3floppy_unmount.png"):               "save.png",           # Grabar, GrabarFichero

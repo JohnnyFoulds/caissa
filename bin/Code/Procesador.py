@@ -1,3 +1,4 @@
+import os
 import random
 import sys
 
@@ -193,7 +194,7 @@ class Procesador:
 
         self.cpu = CPU.CPU(self.main_window)
 
-        if self.configuration.x_check_for_update:
+        if self.configuration.x_check_for_update and not os.environ.get("CAISSA_TEST"):
             Update.test_update(self)
 
         if len(sys.argv) > 1:
@@ -279,7 +280,7 @@ class Procesador:
             self.main_window.set_title()
         if self.is_first_time:
             self.is_first_time = False
-            if self.configuration.x_show_puzzles_on_startup:
+            if self.configuration.x_show_puzzles_on_startup and not os.environ.get("CAISSA_TEST"):
                 self.presentacion()
         self.kibitzers_manager.stop()
 
@@ -551,6 +552,8 @@ class Procesador:
         shortcuts.launch_key(key_shortcut)
 
     def change_configuration_first_time(self):
+        if os.environ.get("CAISSA_TEST"):
+            return
         if WindowConfig.options_first_time(self.main_window, self.configuration):
             self.configuration.graba()
 

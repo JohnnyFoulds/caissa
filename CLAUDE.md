@@ -67,8 +67,8 @@ Full standards documents are in `docs/standards/`. Summary of key rules:
 ```bash
 git checkout -b feat/<topic>   # branch from latest main
 # ... commits ...
-gh pr create                   # open PR on JohnnyFoulds/caissa
-gh pr review --approve && gh pr merge --squash --delete-branch
+gh pr create --repo JohnnyFoulds/caissa   # open PR
+gh pr merge --repo JohnnyFoulds/caissa <N> --squash --delete-branch
 git checkout main && git pull
 ```
 

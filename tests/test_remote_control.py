@@ -341,3 +341,109 @@ class TestUIInteraction:
         assert resp.get("ok") is True, f"click_toolbar Pause failed: {resp}"
         time.sleep(0.3)
         _cancel_game()
+
+
+# ---------------------------------------------------------------------------
+# set_config command
+# ---------------------------------------------------------------------------
+
+class TestSetConfig:
+    """Tests for the set_config RemoteControl command."""
+
+    def setup_method(self):
+        _cancel_game()
+
+    def test_set_config_returns_ok(self):
+        resp = _send("info")
+        original_style = resp.get("style_mode", "By default")
+        new_style = "By default" if original_style != "By default" else "By default"
+        resp = _send(f"set_config x_style_mode {new_style}")
+        assert resp.get("ok") is True, f"set_config failed: {resp}"
+        assert resp.get("key") == "x_style_mode"
+
+    def test_set_config_unknown_key_returns_error(self):
+        resp = _send("set_config x_nonexistent_key value")
+        assert "error" in resp, f"expected error for unknown key, got: {resp}"
+
+    def test_set_config_no_args_returns_error(self):
+        resp = _send("set_config")
+        assert "error" in resp, f"expected error for missing args, got: {resp}"
+
+    def test_set_config_bool_coercion(self):
+        resp = _send("info")
+        # Flip x_check_for_update to false (safe — we're in test mode anyway)
+        resp = _send("set_config x_check_for_update false")
+        assert resp.get("ok") is True, f"set_config bool failed: {resp}"
+        assert resp.get("value") is False
+
+    def test_set_config_persists_via_info(self):
+        """set_config x_style_mode change is reflected in subsequent info call."""
+        info_before = _send("info")
+        original = info_before.get("style_mode", "By default")
+        new_val = "By default"
+        _send(f"set_config x_style_mode {new_val}")
+        info_after = _send("info")
+        assert info_after.get("style_mode") == new_val, (
+            f"style_mode not updated: {info_after}"
+        )
+        # Restore
+        _send(f"set_config x_style_mode {original}")
+
+
+# ---------------------------------------------------------------------------
+# open_config command
+# ---------------------------------------------------------------------------
+
+class TestOpenConfig:
+    """Tests for the open_config RemoteControl command."""
+
+    def setup_method(self):
+        _cancel_game()
+        # Dismiss any open dialog
+        try:
+            _send("dialog_cancel", timeout=3)
+        except Exception:
+            pass
+        time.sleep(0.3)
+
+    def teardown_method(self):
+        # Always close any open dialog after each test
+        try:
+            _send("dialog_cancel", timeout=3)
+        except Exception:
+            pass
+        time.sleep(0.3)
+
+    def test_open_config_returns_ok(self):
+        resp = _send("open_config")
+        assert resp.get("ok") is True, f"open_config failed: {resp}"
+
+    def test_open_config_opens_dialog(self):
+        _send("open_config")
+        # Poll for dialog to appear
+        def dialog_appeared():
+            r = _send("dialog_info", timeout=5)
+            return "title" in r and "error" not in r
+
+        appeared = _wait_for_condition(dialog_appeared, timeout=5.0, poll=0.3)
+        assert appeared, "Configuration dialog did not open after open_config"
+
+    def test_open_config_dialog_title(self):
+        _send("open_config")
+        _wait_for_condition(
+            lambda: "error" not in _send("dialog_info", timeout=5),
+            timeout=5.0, poll=0.3
+        )
+        info = _send("dialog_info")
+        assert "General configuration" in info.get("title", ""), (
+            f"Unexpected dialog title: {info.get('title')!r}"
+        )
+
+    def test_open_config_dialog_can_be_cancelled(self):
+        _send("open_config")
+        _wait_for_condition(
+            lambda: "error" not in _send("dialog_info", timeout=5),
+            timeout=5.0, poll=0.3
+        )
+        resp = _send("dialog_cancel")
+        assert resp.get("ok") is True, f"dialog_cancel failed: {resp}"

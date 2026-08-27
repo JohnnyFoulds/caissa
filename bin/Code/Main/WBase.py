@@ -150,7 +150,13 @@ class WBase(QtWidgets.QWidget):
         self.tb.setIconSize(QtCore.QSize(sz, sz))
         tb_border = Code.dic_colors.get("TOOLBAR_BORDER", "gray")
         if is_vertical:
-            style = f"QToolBar {{border-right: 1px solid {tb_border}; border-top: none; border-bottom: none; border-left: none; margin: 0; padding: 0;}}"
+            btn_sz = sz + 16  # 48px — square button, VS Code activity bar standard
+            style = (
+                f"QToolBar {{border-right: 1px solid {tb_border}; border-top: none;"
+                f" border-bottom: none; border-left: none; margin: 0; padding: 0;}}"
+                f" QToolBar QToolButton {{min-height: {btn_sz}px; max-height: {btn_sz}px;"
+                f" min-width: {btn_sz}px; max-width: {btn_sz}px; padding: 0;}}"
+            )
         else:
             style = f"QToolBar {{border-bottom: 1px solid {tb_border}; border-top: 1px solid {tb_border};}}"
         self.tb.setStyleSheet(style)

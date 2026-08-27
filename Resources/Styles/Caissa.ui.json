@@ -1,0 +1,17 @@
+{
+  "labels": {
+    "Mode":         "Theme",
+    "UI mode":      "Mode",
+    "Window style": null,
+    "Menu Play":    null,
+    "Preventing system crashes when playing": null
+  },
+  "tabs": {
+    "Boards 1":     "Pieces",
+    "Boards 2":     "Board",
+    "Appearance 1": "Layout",
+    "Appearance 2": "Colours",
+    "Change elos":  "Rating"
+  },
+  "default_style": "Fusion"
+}

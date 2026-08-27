@@ -23,7 +23,9 @@ from Code.Z import Util
 
 
 def options(parent, configuration):
-    form = FormLayout.FormLayout(parent, _("General configuration"), Iconos.Opciones(), minimum_width=640)
+    from Code.Config.FormOverlay import OverlayForm, load_overlay
+    _base_form = FormLayout.FormLayout(parent, _("General configuration"), Iconos.Opciones(), minimum_width=640)
+    form = OverlayForm(_base_form, load_overlay(configuration.x_style_mode))
 
     sb_width_60 = 60
     sb_width_70 = 70
@@ -337,21 +339,17 @@ def options(parent, configuration):
 
         li_gen, li_son, li_b1, li_b2, li_asp1, li_asp2, li_nc = resp
 
-        # General #################################################################################################
-
-        (
-            configuration.x_player,
-            configuration.x_style,
-            configuration.x_style_mode,
-            configuration.x_style_icons,
-            *_ui_mode_rest,
-            mode_native_select,
-            configuration.x_show_puzzles_on_startup,
-            configuration.x_prevention_crashes,
-            configuration.x_check_for_update,
-        ) = li_gen
-        if _ui_mode_rest:
-            configuration.x_ui_mode = _ui_mode_rest[0]
+        # General — named-field lookup so hidden overlay fields never corrupt position
+        g = lambda lbl, default=None: form.result(0, li_gen, lbl, default)
+        configuration.x_player = g(_("Player's name"), configuration.x_player)
+        configuration.x_style = g(_("Window style"), configuration.x_style)
+        configuration.x_style_mode = g(_("Mode"), configuration.x_style_mode)
+        configuration.x_style_icons = g(_("Type of icons"), configuration.x_style_icons)
+        configuration.x_ui_mode = g(_("UI mode"), configuration.x_ui_mode)
+        mode_native_select = g(_("Use native dialog to select files"), not configuration.x_mode_select_lc)
+        configuration.x_show_puzzles_on_startup = g(_("Show puzzles on startup"), configuration.x_show_puzzles_on_startup)
+        configuration.x_prevention_crashes = g(_("Preventing system crashes when playing"), configuration.x_prevention_crashes)
+        configuration.x_check_for_update = g(_("Check for updates at startup"), configuration.x_check_for_update)
 
         # Auto-link icon pack to matching Caissa theme so picking one theme
         # is a single selection rather than two separate controls.

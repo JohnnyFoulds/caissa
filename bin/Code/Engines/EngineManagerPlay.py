@@ -194,8 +194,11 @@ class EngineManagerPlay(EngineManager.EngineManager):
             self.active_loop = None
             try:
                 if self.engine_run is not None:
-                    self.engine_run.bestmove_found.disconnect(check_state)
-                    self.engine_run.engine_terminated.disconnect(check_engine_terminated)
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", RuntimeWarning)
+                        self.engine_run.bestmove_found.disconnect(check_state)
+                        self.engine_run.engine_terminated.disconnect(check_engine_terminated)
             except (RuntimeError, TypeError):
                 pass
             if timer is not None:

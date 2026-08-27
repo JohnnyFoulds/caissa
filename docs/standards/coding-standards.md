@@ -39,8 +39,15 @@ feat(modes): add TB_OPTIONS to all focused mode toolbars
 1. `git checkout -b feat/<topic>` from latest `main`
 2. One or more commits on the branch
 3. `gh pr create` with summary and test plan
-4. Merge (squash or merge commit) via GitHub
-5. `git checkout main && git pull`
+4. Auto-approve and merge immediately (see note below)
+5. `git checkout main && git pull && git branch -d feat/<topic>`
+
+**Auto-merge policy (current):** When a feature is complete and work is moving to the next task,
+Claude Code approves and merges the PR automatically without waiting for manual review:
+```bash
+gh pr review --approve && gh pr merge --squash --delete-branch
+```
+This policy is temporary. It will be changed to require manual review once the codebase stabilises.
 
 **IMPORTANT:** Never push to `lukasmonk/lucaschessR6`. All pushes go to `JohnnyFoulds/caissa` only.
 

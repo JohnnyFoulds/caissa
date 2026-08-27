@@ -68,9 +68,12 @@ Full standards documents are in `docs/standards/`. Summary of key rules:
 git checkout -b feat/<topic>   # branch from latest main
 # ... commits ...
 gh pr create                   # open PR on JohnnyFoulds/caissa
-# merge on GitHub, then:
+gh pr review --approve && gh pr merge --squash --delete-branch
 git checkout main && git pull
 ```
+
+**Auto-merge policy (current):** Claude Code approves and merges PRs automatically when a feature
+is done and work is moving to the next task. This will switch to manual review later.
 
 Branch naming: `feat/<topic>`, `fix/<topic>`, `refactor/<topic>`, `docs/<topic>`, `chore/<topic>`
 

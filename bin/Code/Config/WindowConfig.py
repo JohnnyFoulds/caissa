@@ -24,8 +24,10 @@ from Code.Z import Util
 
 def options(parent, configuration):
     from Code.Config.FormOverlay import OverlayForm, load_overlay
+    from Code.UIModes import UIModes as _UIModes
+    _overlay = load_overlay(configuration.x_style_mode)
     _base_form = FormLayout.FormLayout(parent, _("General configuration"), Iconos.Opciones(), minimum_width=640)
-    form = OverlayForm(_base_form, load_overlay(configuration.x_style_mode))
+    form = OverlayForm(_base_form, _overlay)
 
     sb_width_60 = 60
     sb_width_70 = 70
@@ -47,7 +49,6 @@ def options(parent, configuration):
 
     form.combobox(_("Type of icons"), IconosBase.icons.combobox(), configuration.x_style_icons)
 
-    from Code.UIModes import UIModes as _UIModes
     li_ui_modes = [[m.get("name", ""), m.get("name", "")] for m in _UIModes.load_modes()]
     if li_ui_modes:
         form.combobox(_("UI mode"), li_ui_modes, configuration.x_ui_mode)
@@ -332,12 +333,55 @@ def options(parent, configuration):
 
     form.add_tab(_("Change elos"))
 
+    # Step 5: Append mode-owned config section if the active mode defines one
+    _active_mode = _UIModes.active_mode()
+    _mode_cs = _active_mode.get("config_section")
+    _mode_cs_tab_idx = None
+    if _mode_cs:
+        _mode_cs_tab_idx = 7
+        _ns = _mode_cs.get("namespace", "")
+        _saved = configuration.mode_settings.get(_ns, {})
+        for _field in _mode_cs.get("fields", []):
+            _ftype = _field.get("type", "")
+            _flabel = _field.get("label", "")
+            _fkey = _field.get("key", "")
+            _fdefault = _field.get("default")
+            _fcurrent = _saved.get(_fkey, _fdefault)
+            if _ftype == "combobox":
+                form.combobox(_flabel, _field.get("options", []), _fcurrent)
+            elif _ftype == "checkbox":
+                form.checkbox(_flabel, bool(_fcurrent))
+            elif _ftype == "spinbox":
+                form.spinbox(_flabel, _field.get("min", 0), _field.get("max", 100), 60,
+                             _fcurrent if _fcurrent is not None else _field.get("min", 0))
+            elif _ftype == "edit":
+                form.edit(_flabel, _fcurrent or "")
+        form.add_tab(_(_mode_cs.get("tab", "Mode")))
+
+    # Step 7: Call mode UI hook if present (after base + overlay + mode section)
+    import logging as _logging
+    _hook = _UIModes.load_mode_hook(_active_mode.get("name", ""))
+    if _hook and hasattr(_hook, "patch_config_form"):
+        try:
+            _hook.patch_config_form(form, configuration, _overlay)
+        except Exception as _exc:
+            _logging.getLogger(__name__).error(
+                "patch_config_form hook failed: %s", _exc, exc_info=True
+            )
+
     resultado = form.run()
 
     if resultado:
         accion, resp = resultado
 
-        li_gen, li_son, li_b1, li_b2, li_asp1, li_asp2, li_nc = resp
+        # Index-based unpack so an appended mode-section tab never corrupts positions
+        li_gen  = resp[0] if len(resp) > 0 else []
+        li_son  = resp[1] if len(resp) > 1 else []
+        li_b1   = resp[2] if len(resp) > 2 else []
+        li_b2   = resp[3] if len(resp) > 3 else []
+        li_asp1 = resp[4] if len(resp) > 4 else []
+        li_asp2 = resp[5] if len(resp) > 5 else []
+        li_nc   = resp[6] if len(resp) > 6 else []
 
         # General — named-field lookup so hidden overlay fields never corrupt position
         g = lambda lbl, default=None: form.result(0, li_gen, lbl, default)
@@ -499,6 +543,17 @@ def options(parent, configuration):
 
         if new_maia_elo != maia_state.current_elo():
             maia_state.set_current_elo(new_maia_elo)
+
+        # Save mode-owned section results
+        if _mode_cs is not None and _mode_cs_tab_idx is not None and len(resp) > _mode_cs_tab_idx:
+            li_mode_cs = resp[_mode_cs_tab_idx]
+            _ns = _mode_cs.get("namespace", "")
+            if _ns not in configuration.mode_settings:
+                configuration.mode_settings[_ns] = {}
+            for _i, _field in enumerate(_mode_cs.get("fields", [])):
+                if _i < len(li_mode_cs):
+                    configuration.mode_settings[_ns][_field.get("key", "")] = li_mode_cs[_i]
+            configuration.graba()
 
         return True
     else:

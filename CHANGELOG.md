@@ -12,6 +12,25 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Modern Fritz — one-screen layout fix** (`feat/modern-fritz-layout`, PR #6)
+  - `WFritzPlayerHeader`: Fritz-style player info strip (black player top, white bottom)
+    polling `WBase.lb_player_*` / `lb_clock_*` at 500 ms; fixed 60 px height; Fritz blue
+    clock colour; shown as the topmost pane of the Fritz right column during play
+  - `modern_fritz_ui._swap_home_to_analysis`: complete rewrite — reparents `mw.base.pgn`
+    (the actual game move list) into Fritz right column as the bottom pane; collapses
+    WBase's internal right-panel widgets (player labels, clocks, rotulos, captures) to
+    zero size so the board fills WBase; stores (layout, index) for full restoration on
+    exit; Fritz right column becomes [WFritzPlayerHeader, WFritzAnalysisTable,
+    WFritzEvalGraph, pgn] — a genuine Fritz-like one-screen arrangement
+  - `modern_fritz_ui.on_mode_exit`: restores `mw.base.pgn` to its exact layout position
+    in WBase, restores all widget size constraints, calls `show_replay()` — Classical
+    mode renders identically to upstream after switching back
+  - `_find_widget_in_layout(top_layout, target)`: recursive layout-tree search helper
+    returning (layout, index) for a widget's direct container
+  - `tests/ui/test_fritz_layout.py`: five Fritz-specific e2e tests (T-FRITZ-01–05)
+    covering home panel width, in-game panel sizes, player header visibility, toolbar
+    Fritz-style assertion, and mode-exit restoration
+
 - **Modern Fritz — Stage 1: visual overhaul** (`feat/modern-fritz-layout`, PR #6)
   - `WFritzAnalysisTable`: proper multi-PV engine analysis table — up to 5 lines,
     each showing rank, score (Fritz blue/red), depth, and principal variation;
@@ -46,6 +65,12 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
     Fritz medium-grey (`#252526` bg, `#2d2d2d` surface, `#3c3c3c` surface-2,
     `#505050` border, `#d4d4d4` text) — 98 colour values updated; Q1/Q2/Q3 checks
     pass clean; `BOARD_STATIC` preserved dark
+  - Move quality colour coding in the PGN notation panel (Stage 5): Fritz-palette
+    background tints for NAG-annotated moves — green shades for good/brilliant (!,
+    !!), teal for interesting (!?), amber for dubious (?!), orange for mistake (?),
+    red for blunder (??); monkey-patched onto the WBase instance at mode entry
+    (`grid_color_fondo` + `ControlGrid.siColorFondo = True`) and fully removed on
+    mode exit; NAG data requires Tutor/rating display to be active during play
   - Right-column layout: vertical `QSplitter` — home/analysis panel above
     `pgn_information` (move list); `on_mode_exit` restores `pgn_information` to the
     main splitter before cleanup

@@ -6,10 +6,14 @@ Called by Procesador.start() / reset() when the active mode is "Modern Fritz".
 Target layout
 ─────────────
     MainWindow.splitter (horizontal)
-    ├─ [0]  WBase          — board + toolbar + side eval bar
-    └─ [1]  _fritz_right_col  (QSplitter, Vertical)  ← inserted by this hook
-               ├─ [0]  WFritzEnginePanel  — engine name / depth / eval bar / best line
-               └─ [1]  pgn_information   — move list (reparented from main splitter)
+    ├─ [0]  WBase                — board + toolbar + side eval bar
+    └─ [1]  _fritz_right_col  (QSplitter, Vertical)
+               ├─ [0]  WFritzHome OR WFritzAnalysisTable  — home panel / engine table
+               └─ [1]  pgn_information                    — move list (reparented)
+
+On mode entry, WFritzHome is shown.  After the user picks "New Game" /
+"Load Game" / "Analyze", the home panel is swapped out for WFritzAnalysisTable
+and the normal play flow continues.
 
 Cleanup (on_mode_exit) restores pgn_information to the main splitter and removes
 the sub-splitter before Procesador.reset() clears the rest of the state.
@@ -22,60 +26,104 @@ _log = logging.getLogger(__name__)
 
 
 def on_mode_enter(procesador):
-    """Activate Fritz layout: eval bar + right column (engine panel + move list)."""
+    """Activate Fritz layout: home panel + move list in a vertical right column."""
     mw = procesador.main_window
 
-    # Start the side eval bar (also starts the analyzer engine)
-    mw.activate_analysis_bar(True)
+    from Code.UIModes.WFritzHome import WFritzHome
+    from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
 
-    # Build the Fritz engine panel
-    try:
-        from Code.UIModes.WFritzEnginePanel import WFritzEnginePanel
-        fritz_panel = WFritzEnginePanel(mw, mw.base.analysis_bar)
-    except Exception:
-        _log.error("Could not create WFritzEnginePanel", exc_info=True)
-        mw.active_information_pgn(True)
-        return
-
-    # Build a vertical sub-splitter: fritz panel (top) + move list (bottom)
+    # Build the vertical right column
     right_col = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, mw)
     right_col.setChildrenCollapsible(False)
-    right_col.addWidget(fritz_panel)
-    # Reparenting pgn_information into right_col (Qt removes it from mw.splitter)
-    right_col.addWidget(mw.pgn_information)
-    right_col.setSizes([110, 500])
 
-    # Add the right column to the main horizontal splitter
+    # Start with the home panel
+    home = WFritzHome(mw)
+    right_col.addWidget(home)
+    # Reparent move list into right column
+    right_col.addWidget(mw.pgn_information)
+    right_col.setSizes([280, 500])
+
     mw.splitter.addWidget(right_col)
     right_col.show()
-    fritz_panel.show()
-    fritz_panel.start()
+    home.show()
 
-    # Activate the move-list panel (operates on pgn_information's internal splitter)
+    # Start analysis bar (engine fires up in background)
+    mw.activate_analysis_bar(True)
     mw.active_information_pgn(True)
 
-    mw._fritz_panel = fritz_panel
+    mw._fritz_home = home
+    mw._fritz_analysis_table = None
     mw._fritz_right_col = right_col
 
-    _log.debug("Modern Fritz layout activated")
+    # Connect home panel signal — swap to analysis view when user picks action
+    home.action_chosen.connect(lambda action: _on_home_action(procesador, action))
+
+    _log.debug("Modern Fritz layout activated (home screen)")
+
+
+def _on_home_action(procesador, action: str):
+    """Swap home panel → analysis table, then dispatch the chosen action."""
+    mw = procesador.main_window
+
+    home = getattr(mw, "_fritz_home", None)
+    right_col = getattr(mw, "_fritz_right_col", None)
+    if home is None or right_col is None:
+        return
+
+    # Build analysis table (replaces home panel)
+    from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
+    table = WFritzAnalysisTable(mw, mw.base.analysis_bar)
+
+    # Swap: remove home, insert table at position 0
+    right_col.replaceWidget(0, table)
+    right_col.setSizes([200, 500])
+    table.show()
+    table.start()
+
+    home.hide()
+    home.setParent(None)
+    mw._fritz_home = None
+    mw._fritz_analysis_table = table
+
+    _log.debug("Modern Fritz: swapped home → analysis table")
+
+    # Dispatch the chosen action
+    _dispatch_action(procesador, action)
+
+
+def _dispatch_action(procesador, action: str):
+    """Route a home-screen action into the existing Lucas Chess handlers."""
+    import Code
+    from Code.Shortcuts import Shortcuts
+    sh = Shortcuts.Shortcuts(procesador)
+
+    try:
+        if action == "new_game":
+            sh.play_menu().run_exec("free")
+        elif action == "load_game":
+            sh.tools_menu().run_exec("openPGN")
+        elif action == "analyze":
+            sh.play_menu().run_exec("voyager2")
+    except Exception:
+        _log.debug("Fritz home action dispatch failed: %s", action, exc_info=True)
 
 
 def on_mode_exit(procesador):
     """Restore the standard layout before Procesador.reset() wipes state."""
     mw = procesador.main_window
 
-    fritz_panel = getattr(mw, "_fritz_panel", None)
+    table = getattr(mw, "_fritz_analysis_table", None)
+    home = getattr(mw, "_fritz_home", None)
     right_col = getattr(mw, "_fritz_right_col", None)
 
-    if fritz_panel is not None:
+    if table is not None:
         try:
-            fritz_panel.stop()
+            table.stop()
         except Exception:
-            _log.debug("Fritz panel stop error", exc_info=True)
+            _log.debug("Fritz table stop error", exc_info=True)
 
     if right_col is not None:
         try:
-            # Move pgn_information back to the main splitter before destroying right_col
             mw.splitter.addWidget(mw.pgn_information)
             right_col.hide()
             right_col.setParent(None)
@@ -87,15 +135,15 @@ def on_mode_exit(procesador):
             except AttributeError:
                 pass
 
-    if fritz_panel is not None:
-        try:
-            fritz_panel.hide()
-            fritz_panel.setParent(None)
-        except Exception:
-            pass
-        finally:
+    for attr, widget in [("_fritz_analysis_table", table), ("_fritz_home", home)]:
+        if widget is not None:
             try:
-                del mw._fritz_panel
+                widget.hide()
+                widget.setParent(None)
+            except Exception:
+                pass
+            try:
+                delattr(mw, attr)
             except AttributeError:
                 pass
 

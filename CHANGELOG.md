@@ -12,19 +12,27 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
-- **Modern Fritz layout changes** (`feat/modern-fritz-layout`, PR #6)
-  - `on_mode_enter` / `on_mode_exit` hooks now wired into `Procesador.start()` /
-    `reset()` — all modes with a `<name>_ui.py` hook get lifecycle callbacks
-  - `WFritzEnginePanel`: Fritz-style engine widget (horizontal eval bar + depth/
-    score/best-line) displayed as top section of the right column in Fritz mode
-  - Right-column layout: vertical `QSplitter` with Fritz engine panel (top, 110 px)
-    above `pgn_information` (move list), replacing the old flat horizontal insert;
-    `on_mode_exit` moves `pgn_information` back to the main splitter before cleanup
-  - `UIModes.load_mode_hook`: normalise mode name to filename by replacing both
-    spaces and hyphens with underscores (`"Modern Fritz"` → `modern_fritz_ui.py`)
-  - `Modern Fritz.qss` / `.colors` updated to proper near-black Fritz palette
-    (background `#161616`, accent `#0078d4` — ChessBase/Windows blue)
-  - `docs/modern-fritz.md` SDD updated with Fritz 15–18 layout reference
+- **Modern Fritz — Stage 1: visual overhaul** (`feat/modern-fritz-layout`, PR #6)
+  - `WFritzAnalysisTable`: proper multi-PV engine analysis table — up to 5 lines,
+    each showing rank, score (Fritz blue/red), depth, and principal variation;
+    `+`/`−` buttons control the number of visible PV lines; polls `analysis_bar.mrm`
+    at 250 ms; replaces the old single-line `WFritzEnginePanel`
+  - `WFritzHome`: Fritz-style home/landing panel shown on mode entry — three
+    action buttons (New Game, Load Game, Enter & Analyze); swaps itself out for
+    the analysis table when an action is chosen, giving the "one-screen" Fritz feel
+    without requiring a popup dialog to start playing
+  - `modern_fritz_ui.on_mode_enter`: shows `WFritzHome` first; connects
+    `action_chosen` signal to swap in `WFritzAnalysisTable` then dispatch the
+    action through the existing menu handlers (no new game-start logic)
+  - `Modern Fritz.qss` / `.colors`: palette shifted from near-black (`#161616`) to
+    Fritz medium-grey (`#252526` bg, `#2d2d2d` surface, `#3c3c3c` surface-2,
+    `#505050` border, `#d4d4d4` text) — 98 colour values updated; Q1/Q2/Q3 checks
+    pass clean; `BOARD_STATIC` preserved dark
+  - Right-column layout: vertical `QSplitter` — home/analysis panel above
+    `pgn_information` (move list); `on_mode_exit` restores `pgn_information` to the
+    main splitter before cleanup
+  - `UIModes.load_mode_hook`: normalise mode name to filename (spaces and hyphens →
+    underscores; `"Modern Fritz"` → `modern_fritz_ui.py`)
 
 - **Modern Fritz retro skin** (`feat/modern-fritz`, PR #5)
   - `Resources/Styles/Modern Fritz.qss` / `Modern Fritz.colors`: dark navy + Fritz-blue

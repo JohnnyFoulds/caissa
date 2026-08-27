@@ -242,6 +242,15 @@ class Procesador:
         WindowBMT.window_bmt(self)
 
     def reset(self):
+        from Code.UIModes.UIModes import active_mode as _active_mode, load_mode_hook as _load_mode_hook
+        _hook = _load_mode_hook(_active_mode().get("name", ""))
+        if _hook and hasattr(_hook, "on_mode_exit"):
+            try:
+                _hook.on_mode_exit(self)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).error("on_mode_exit failed", exc_info=True)
+
         self.main_window.activate_analysis_bar(False)
         self.main_window.deactivate_eboard(0)
         self.main_window.activate_captures(False)
@@ -283,6 +292,15 @@ class Procesador:
             if self.configuration.x_show_puzzles_on_startup and not os.environ.get("CAISSA_TEST"):
                 self.presentacion()
         self.kibitzers_manager.stop()
+
+        from Code.UIModes.UIModes import active_mode as _active_mode, load_mode_hook as _load_mode_hook
+        _hook = _load_mode_hook(_active_mode().get("name", ""))
+        if _hook and hasattr(_hook, "on_mode_enter"):
+            try:
+                _hook.on_mode_enter(self)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).error("on_mode_enter failed", exc_info=True)
 
     def presentacion(self, if_start=True):
         self.in_the_presentation = if_start

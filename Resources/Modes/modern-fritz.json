@@ -1,0 +1,16 @@
+{
+  "name": "Modern Fritz",
+  "description": "Fritz-inspired dark skin with signature blue accent. Full feature set.",
+  "icon": "Kibitzers",
+
+  "menu_keys": null,
+  "toolbar": null,
+  "toolbar_inject": ["caissa:switch_mode"],
+
+  "config_section": null,
+  "style": "Modern Fritz",
+  "icons": "MIDNIGHT",
+  "font": null,
+  "defaults": {},
+  "layout": null
+}

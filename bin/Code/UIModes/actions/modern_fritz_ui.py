@@ -93,19 +93,35 @@ def _on_home_action(procesador, action: str):
 
 def _dispatch_action(procesador, action: str):
     """Route a home-screen action into the existing Lucas Chess handlers."""
-    import Code
     from Code.Shortcuts import Shortcuts
     sh = Shortcuts.Shortcuts(procesador)
 
     try:
         if action == "new_game":
-            sh.play_menu().run_exec("free")
+            _fritz_new_game(procesador)
         elif action == "load_game":
             sh.tools_menu().run_exec("openPGN")
         elif action == "analyze":
             sh.play_menu().run_exec("voyager2")
     except Exception:
         _log.debug("Fritz home action dispatch failed: %s", action, exc_info=True)
+
+
+def _fritz_new_game(procesador):
+    """Show a Fritz-style level picker and start the game directly — no PAE popup."""
+    mw = procesador.main_window
+    from Code.UIModes.WFritzNewGame import WFritzNewGame
+    dlg = WFritzNewGame(mw)
+    if not dlg.exec():
+        return
+
+    dic = dlg.get_dic()
+    if dic is None:
+        return
+
+    from Code.PlayAgainstEngine import ManagerPlayAgainstEngine
+    manager = ManagerPlayAgainstEngine.ManagerPlayAgainstEngine(procesador)
+    manager.start(dic)
 
 
 def on_mode_exit(procesador):

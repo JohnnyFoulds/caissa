@@ -24,6 +24,13 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   - `modern_fritz_ui.on_mode_enter`: shows `WFritzHome` first; connects
     `action_chosen` signal to swap in `WFritzAnalysisTable` then dispatch the
     action through the existing menu handlers (no new game-start logic)
+  - `WFritzNewGame`: Fritz-style simplified game-start dialog — three toggle-button
+    rows (Side: White/Black/Random, Level: Easy/Club/Active/Strong/Master/
+    Grandmaster, Time: No limit/Blitz/Rapid/Classical); builds a complete
+    `dic_var` and calls `ManagerPlayAgainstEngine.start()` directly, bypassing
+    the full Play-Against-Engine popup entirely
+  - `modern_fritz_ui._fritz_new_game`: helper that shows `WFritzNewGame` and starts
+    the game directly — no ConfigurationsPAE round-trip, no Shortcuts indirection
   - `Modern Fritz.qss` / `.colors`: palette shifted from near-black (`#161616`) to
     Fritz medium-grey (`#252526` bg, `#2d2d2d` surface, `#3c3c3c` surface-2,
     `#505050` border, `#d4d4d4` text) — 98 colour values updated; Q1/Q2/Q3 checks

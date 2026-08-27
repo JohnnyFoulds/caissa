@@ -281,6 +281,8 @@ class Configuration:
 
         self.__theme_num = 1  # 1=red 2=old
 
+        self.mode_settings: dict = {}  # namespace → {key: value} for mode-owned config fields
+
         self.engines: ConfigEngines.ConfigEngines = ConfigEngines.ConfigEngines(self)
         self.dic_conf_boards_pk = {}
 
@@ -449,6 +451,7 @@ class Configuration:
     def graba(self):
         dic = self.read_dic_x()
         dic["PERSONALITIES"] = self.li_personalities
+        dic["MODE_SETTINGS"] = self.mode_settings
         Util.save_pickle(self.paths.file, dic)
 
     def lee(self):
@@ -457,6 +460,7 @@ class Configuration:
                 if x.startswith("x_") and x in dic:
                     setattr(self, x, dic[x])
             self.li_personalities = dic.get("PERSONALITIES", self.li_personalities)
+            self.mode_settings = dic.get("MODE_SETTINGS", {})
 
         # One-shot migration: apply modern typography metrics to existing configs.
         # x_modern_metrics_applied is absent from old pickles, so bool(False) triggers this once.

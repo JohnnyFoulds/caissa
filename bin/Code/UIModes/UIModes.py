@@ -121,6 +121,42 @@ def _key_allowed(key: str, literals, prefixes) -> bool:
     return False
 
 
+def load_mode_hook(mode_name: str):
+    """
+    Load the optional UI hook module for a mode.
+
+    :param mode_name: Mode name string (e.g. ``"Coach"``).
+    :returns:         The loaded module, or ``None`` if the hook file does not exist
+                      or fails to load.
+
+    The hook file is ``bin/Code/UIModes/actions/<mode_name_lower>_ui.py``.
+    It may expose any of:
+
+    * ``patch_config_form(form, configuration, overlay)``
+    * ``on_mode_enter(main_window)``
+    * ``on_mode_exit(main_window)``
+    """
+    import importlib.util
+    import logging as _logging
+
+    actions_dir = os.path.join(os.path.dirname(__file__), "actions")
+    path = os.path.join(actions_dir, f"{mode_name.lower()}_ui.py")
+    if not os.path.exists(path):
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(
+            f"_caissa_mode_{mode_name.lower()}_ui", path
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        _logging.getLogger(__name__).error(
+            "Failed to load mode hook %s", path, exc_info=True
+        )
+        return None
+
+
 def filter_menu_options(menu: BaseMenu.RootMenuBase):
     """Prune menu.li_options in-place to only allowed keys. Removes empty submenus."""
     mode = active_mode()

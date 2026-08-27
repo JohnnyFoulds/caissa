@@ -16,9 +16,12 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   - `on_mode_enter` / `on_mode_exit` hooks now wired into `Procesador.start()` /
     `reset()` — all modes with a `<name>_ui.py` hook get lifecycle callbacks
   - `WFritzEnginePanel`: Fritz-style engine widget (horizontal eval bar + depth/
-    score/best-line) injected into `MainWindow.splitter` only in Fritz mode
-  - `modern_fritz_ui.py` hook: activates eval bar, move-list panel, and injects
-    the Fritz panel; `on_mode_exit` removes it cleanly before reset
+    score/best-line) displayed as top section of the right column in Fritz mode
+  - Right-column layout: vertical `QSplitter` with Fritz engine panel (top, 110 px)
+    above `pgn_information` (move list), replacing the old flat horizontal insert;
+    `on_mode_exit` moves `pgn_information` back to the main splitter before cleanup
+  - `UIModes.load_mode_hook`: normalise mode name to filename by replacing both
+    spaces and hyphens with underscores (`"Modern Fritz"` → `modern_fritz_ui.py`)
   - `Modern Fritz.qss` / `.colors` updated to proper near-black Fritz palette
     (background `#161616`, accent `#0078d4` — ChessBase/Windows blue)
   - `docs/modern-fritz.md` SDD updated with Fritz 15–18 layout reference

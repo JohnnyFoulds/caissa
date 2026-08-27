@@ -12,6 +12,16 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Modern Fritz retro skin** (`feat/modern-fritz`, PR #5)
+  - `Resources/Styles/Modern Fritz.qss` / `Modern Fritz.colors`: dark navy + Fritz-blue
+    accent (`#1976d2`); 728-line QSS derived from Midnight with identical geometry
+  - `Resources/Modes/modern-fritz.json`: full Classical feature set, pins `style` and
+    `icons` so the Fritz look is automatic when the mode is selected
+  - `docs/modern-fritz.md`: SDD covering palette, file roles, and authoring-rule compliance
+  - `InitApp.init_app_style`: reads `active_mode().get("style")` and uses the mode-pinned
+    QSS for the session (user's `x_style_mode` preference is preserved)
+  - `InitApp.apply_live_style`: resolves `active_mode().get("icons")` as an `Icons` class
+    attribute to allow mode-pinned icon pack without touching user preference
 - **Theme overlay system — Steps 5–8** (`feat/overlay-steps-5-8`, PR #3)
   - `config_section` key in mode JSON: active mode can append a mode-owned tab
     (combobox/checkbox/spinbox/edit fields) to the General Configuration dialog

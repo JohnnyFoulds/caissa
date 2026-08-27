@@ -14,9 +14,16 @@ def init_app_style(app, configuration):
         style = "fusion"
     app.setStyle(QtWidgets.QStyleFactory.create(style))
 
-    # - Style Mode
-    style_mode = configuration.x_style_mode
+    # - Style Mode (active mode may pin a specific theme via its "style" field)
+    from Code.UIModes.UIModes import active_mode as _active_mode
+    _mode_style = _active_mode().get("style")
+
+    style_mode = _mode_style or configuration.x_style_mode
     path_qss = Code.path_resource("Styles", f"{style_mode}.qss")
+    if not os.path.isfile(path_qss):
+        # Mode-pinned style not found — fall back to user preference
+        style_mode = configuration.x_style_mode
+        path_qss = Code.path_resource("Styles", f"{style_mode}.qss")
     if not os.path.isfile(path_qss):
         style_mode = configuration.x_style_mode = "By default"
         configuration.graba()
@@ -121,9 +128,15 @@ def apply_live_style(configuration):
         return
     init_app_style(app, configuration)
 
-    # Reload icon pack and refresh all toolbar QActions in-place.
-    # Menus are rebuilt lazily on next open so they need no explicit refresh.
-    IconosBase.icons.reset(configuration.x_style_icons)
+    # Reload icon pack — active mode may pin a specific pack via its "icons" field.
+    from Code.UIModes.UIModes import active_mode as _active_mode
+    _mode_icons_name = _active_mode().get("icons")
+    if _mode_icons_name:
+        _mode_icons_val = getattr(IconosBase.Icons, _mode_icons_name, None)
+        effective_icons = _mode_icons_val if _mode_icons_val is not None else configuration.x_style_icons
+    else:
+        effective_icons = configuration.x_style_icons
+    IconosBase.icons.reset(effective_icons)
     if Code.procesador and hasattr(Code.procesador, "main_window"):
         mw = Code.procesador.main_window
         if mw and hasattr(mw, "base"):

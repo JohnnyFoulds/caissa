@@ -28,6 +28,9 @@ Commands (newline-terminated, sent to /tmp/caissa-control.sock):
   make_move <uci>                   → inject a player move (e.g. e2e4, e7e8q)
   game_info                         → current game state: fen, moves, turn, toolbar
 
+  set_config <key> <value>          → set one configuration attribute (bool/int/str) + save
+  open_config                       → open General Configuration dialog (async)
+
 All responses are JSON + newline.
 """
 
@@ -251,6 +254,12 @@ class RemoteControl(QtCore.QObject):
 
         if verb == "force_cancel":
             return self._force_cancel()
+
+        if verb == "set_config":
+            return self._set_config(arg)
+
+        if verb == "open_config":
+            return self._open_config()
 
         return {"error": f"unknown command: {verb!r}"}
 
@@ -782,6 +791,69 @@ class RemoteControl(QtCore.QObject):
         result["toolbar"] = tb_info.get("buttons", [])
 
         return result
+
+    def _set_config(self, arg: str) -> dict:
+        """Set a single configuration attribute.
+
+        Usage: ``set_config <key> <value>``
+        Supported types: bool (true/false), int (digits-only), str.
+
+        After updating the attribute, re-applies the app style so QSS changes
+        take effect without a restart.
+        """
+        parts = arg.split(None, 1)
+        if len(parts) < 2:
+            return {"error": "usage: set_config <key> <value>"}
+        key, raw_value = parts[0], parts[1].strip()
+
+        import Code
+        conf = Code.configuration
+        if not hasattr(conf, key):
+            return {"error": f"unknown configuration key: {key!r}"}
+
+        # Type-coerce to match the existing attribute type
+        existing = getattr(conf, key)
+        if isinstance(existing, bool):
+            value = raw_value.lower() in ("true", "1", "yes")
+        elif isinstance(existing, int):
+            try:
+                value = int(raw_value)
+            except ValueError:
+                return {"error": f"key {key!r} expects int, got {raw_value!r}"}
+        else:
+            value = raw_value
+
+        setattr(conf, key, value)
+        conf.graba()
+
+        # Re-apply style when x_style_mode changes so QSS takes effect immediately
+        if key == "x_style_mode":
+            try:
+                from Code.Main import InitApp
+                app = QtWidgets.QApplication.instance()
+                InitApp.init_app_style(app, conf)
+            except Exception as exc:
+                return {"ok": True, "key": key, "value": value, "style_warning": str(exc)}
+
+        return {"ok": True, "key": key, "value": value}
+
+    def _open_config(self) -> dict:
+        """Open the General Configuration dialog.
+
+        Uses QTimer.singleShot to avoid blocking the dispatch loop.
+        Returns immediately; the dialog opens asynchronously.
+        """
+        import Code
+        proc = Code.procesador
+        if not proc:
+            return {"error": "no procesador"}
+        try:
+            if not getattr(proc, "main_window", None):
+                return {"error": "no main window"}
+            QtCore.QTimer.singleShot(0, proc.menu_options)
+            return {"ok": True}
+        except Exception as exc:
+            return {"error": str(exc)}
 
     def _force_cancel(self) -> dict:
         """Force-return to home screen without showing any confirmation dialog."""

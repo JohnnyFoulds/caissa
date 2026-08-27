@@ -22,7 +22,7 @@
     "TB_PREVIOUS", "TB_NEXT", "TB_PGN_LABELS",
     "TB_SAVE", "TB_SAVE_AS", "TB_OPEN", "TB_FILE",
     "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY", "TB_ACCEPT",
-    "TB_CONFIG", "TB_ADJOURNMENTS", "TB_ENGINES"
+    "TB_CONFIG", "TB_OPTIONS", "TB_ADJOURNMENTS", "TB_ENGINES"
   ],
   "style": null,
   "icons": null

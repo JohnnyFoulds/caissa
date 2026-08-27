@@ -23,7 +23,7 @@
     "TB_RESIGN", "TB_TAKEBACK", "TB_REINIT",
     "TB_LEVEL", "TB_HELP", "TB_ADVICE", "TB_STOP", "TB_TUTOR_STOP",
     "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY", "TB_ACCEPT",
-    "TB_CONFIG", "TB_PREVIOUS", "TB_NEXT"
+    "TB_CONFIG", "TB_OPTIONS", "TB_PREVIOUS", "TB_NEXT"
   ],
   "style": null,
   "icons": null

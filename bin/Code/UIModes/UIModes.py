@@ -90,6 +90,11 @@ def allows_all_toolbar() -> bool:
     return active_mode().get("toolbar") is None
 
 
+def toolbar_inject() -> list:
+    """Return action keys the active mode wants prepended to every toolbar."""
+    return active_mode().get("toolbar_inject", [])
+
+
 # ── menu filtering ────────────────────────────────────────────────────────────
 
 def _build_menu_filter(mode: dict):

@@ -1,0 +1,33 @@
+{
+  "name": "Coach",
+  "description": "Guided coaching: play Maia, drill openings, review mistakes, daily puzzle.",
+  "menu_keys": [
+    "free", "free_*", "human",
+    "person_*",
+    "competition",
+    "leitner", "dailytest", "bmt", "potencia",
+    "tactics_by_repetition_*",
+    "openings_lines", "openings_custom", "train_book_ol", "train_book",
+    "maialadder", "lucaselo",
+    "cambiaconfiguration", "select_language",
+    "set_theme:*", "edit_board_colors", "change_colors",
+    "sonidos", "atajos_edit", "set_password",
+    "docs", "web", "acercade",
+    "https://github.com/JohnnyFoulds/caissa/releases"
+  ],
+  "toolbar": [
+    "TB_QUIT",
+    "caissa:coach_home",
+    "TB_PLAY",
+    "TB_TRAIN",
+    "TB_COMPETE",
+    "TB_OPTIONS",
+    "TB_RESIGN", "TB_DRAW", "TB_TAKEBACK", "TB_REINIT",
+    "TB_LEVEL", "TB_HELP", "TB_ADVICE",
+    "TB_CLOSE", "TB_CANCEL", "TB_STOP", "TB_TUTOR_STOP", "TB_END_REPLAY",
+    "TB_ACCEPT", "TB_ADJOURNMENTS", "TB_ADJOURN", "TB_CONFIG"
+  ],
+  "toolbar_inject": ["caissa:coach_home"],
+  "style": null,
+  "icons": null
+}

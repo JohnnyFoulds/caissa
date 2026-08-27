@@ -503,6 +503,9 @@ class WBase(QtWidgets.QWidget):
             from Code.UIModes import UIModes
             if not UIModes.allows_all_toolbar():
                 li_acciones = [k for k in li_acciones if UIModes.allows_toolbar(k)]
+            for inj in reversed(UIModes.toolbar_inject()):
+                if inj not in li_acciones and inj in self.dic_toolbar:
+                    li_acciones = [inj] + list(li_acciones)
         except Exception:
             pass
 

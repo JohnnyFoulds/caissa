@@ -24,6 +24,13 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   - `modern_fritz_ui.on_mode_enter`: shows `WFritzHome` first; connects
     `action_chosen` signal to swap in `WFritzAnalysisTable` then dispatch the
     action through the existing menu handlers (no new game-start logic)
+  - `caissa:fritz_level` action (`fritz_level.py`): toolbar "Level" button that
+    opens the Fritz level/time-control picker and restarts the game with new
+    settings — no menu navigation required
+  - `modern-fritz.json` toolbar allowlist: restricted to Fritz-relevant keys
+    (resign, draw, takeback, new game, pause, config, utilities + home-screen
+    keys); `TB_ADJOURN` removed; both `caissa:fritz_level` and
+    `caissa:switch_mode` injected at toolbar start
   - `WFritzEvalGraph`: 80 px fixed-height evaluation profile graph — QPainter bar
     chart, Fritz-blue bars for white advantage, red for black, ±600 cp scale; polls
     `AnalysisBar.mrm` at 250 ms and accumulates one centipawn value per half-move;

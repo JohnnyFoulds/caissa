@@ -5,6 +5,69 @@
 
 ---
 
+## 0. Cross-Platform Compatibility
+
+### Current state
+
+Caissa runs on **macOS Apple Silicon only** — not because of any code constraint, but because
+the vendored engine binaries in `bin/OS/` are `arm64`-only and the README scoped the initial
+release that way deliberately. The Python code itself is fully cross-platform.
+
+### The Windows path is open
+
+Nothing we have built closes it:
+
+- All Caissa additions (modes, themes, RPA layer, config overlays) are pure Python
+- PySide6 is cross-platform — Windows, macOS, Linux
+- The upstream Windows engine binaries exist in `bin/OS/win32/Engines/` and can be pulled
+  from `lukasmonk/lucaschessR6` at any time
+- No PyInstaller spec exists yet, but writing one is a packaging task, not a code task
+
+To produce a Windows installer:
+
+```bash
+# Pull win32 engines from upstream
+git remote add upstream https://github.com/lukasmonk/lucaschessR6
+git fetch upstream
+git checkout upstream/main -- bin/OS/win32/
+
+# On a Windows machine or GitHub Actions windows-latest runner:
+pip install pyinstaller
+pyinstaller caissa.spec   # spec file to be written
+```
+
+The packaging work is roughly a day: write the `.spec` file, bundle `Resources/`, handle
+the `UserData/` path correctly on Windows, produce an NSIS or Inno Setup installer.
+
+### Rules that must not be broken — ever
+
+These are the lines that keep the Windows path open. Violating any of them may not break
+macOS immediately but will silently break Windows.
+
+| Rule | Why |
+|---|---|
+| **No `os.path` hardcoded separators** — always use `os.path.join()` or `pathlib.Path` | Backslash vs forward slash |
+| **No hardcoded `/tmp/` paths** — use `tempfile.gettempdir()` | `/tmp` does not exist on Windows |
+| **No hardcoded Unix socket paths** — `RemoteControl` already uses a configurable path; keep it that way | Unix domain sockets work on Windows 10+ but the path rules differ |
+| **No `os.fork()`, `os.kill()`, `signal.SIGTERM` without a Windows fallback** — use `subprocess` and `psutil` instead | `os.fork` is Unix-only |
+| **No `chmod`/`chown` calls without a `hasattr` guard** — these are no-ops or errors on Windows | Permissions model is completely different |
+| **No shell=True with Unix-specific syntax** — pipes, `&&`, `>>` are cmd.exe-incompatible | Use `subprocess` with a list of args |
+| **Resource paths via `Code.path_resource()` only** — never relative paths, never `__file__`-relative joins | PyInstaller rewrites `__file__`; `path_resource` handles both dev and frozen correctly |
+| **No PySide6 imports outside the three-module allowlist** — `Driver.py`, `Vision/Capture.py`, `Service.py` | Already enforced by `test_no_pyside6_import_outside_allowlist`; keeping Qt contained also keeps the headless-test path open on Windows CI |
+| **New dependencies go in `requirements.txt` or `requirements-rpa.txt`** — never silently assumed present | PyInstaller must be able to enumerate all imports; hidden imports break the frozen build |
+| **No `brew`-installed binary assumptions** — `tesseract`, `ffmpeg`, etc. must be either bundled or gracefully absent | Homebrew does not exist on Windows |
+
+### What to check before any new feature touches system interfaces
+
+Before writing code that touches files, processes, sockets, or system paths, ask:
+
+1. Does this work on Windows without modification?
+2. If it calls an external binary, can that binary be bundled in `bin/OS/win32/`?
+3. Does `Code.path_resource()` cover the paths, or do I need to add a case?
+4. Is the dependency in `requirements.txt`? Will PyInstaller find it?
+
+---
+
 ## 1. Getting Known
 
 The engineering is done when the feature works. Getting known requires different work entirely.
@@ -14,6 +77,9 @@ The engineering is done when the feature works. Getting known requires different
 Nobody can use Caissa today. There is no release, no installer, no download for a non-developer.
 Lucas Chess has a Windows installer. Caissa requires cloning a repo and setting up a Python venv.
 That is a complete barrier for the chess community, which skews older and non-technical.
+
+This is a packaging gap, not a code gap. The Windows path is fully open — see §0 above.
+The Python code runs on Windows without modification; it just has not been packaged yet.
 
 ### Minimum viable launch (in order)
 

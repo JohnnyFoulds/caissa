@@ -167,7 +167,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 3 — Targets + Object Resolver ⬜
+## Phase 3 — Targets + Object Resolver ✅
 
 **Branch:** `feat/rpa-targets`
 **Docs shipped (Gate H):** `docs/rpa/selectors.md`

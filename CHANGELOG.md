@@ -16,6 +16,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 3 (targets + object resolver)**: `bin/Code/Rpa/Targets.py` —
+  `Selector` (9 fields, two wire forms: JSON + compact string, `SelectorError` on missing
+  discriminating field) and `Target` (selector + anchor/direction/distance/timeout).
+  `bin/Code/Rpa/Resolve.py` — `TargetResolver` with object-tier confidence table
+  (exact object_name=1.00, exact text=0.95, substring=0.80, class-only=0.60), anchor
+  filtering by direction and distance, `AmbiguousMatchError` on ties, image/OCR tier
+  stubs raising `VisionUnavailableError` (Phase 7). 31 unit tests in
+  `tests/unit/rpa/test_targets.py`, all passing.
+
 - **RPA layer — Phase 0 (documentation & process)**: SDD/TDD artefacts and product
   documentation foundation for the Caissa closed-loop automation engine. Includes:
   - `docs/process/sdd-workflow.md` — the SDD/TDD routine with 8-gate checklist

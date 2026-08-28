@@ -440,69 +440,105 @@ def render_eval_line(out_dir: Path, variant: str, width: int) -> Path:
 
 # ── scene: nag_row ────────────────────────────────────────────────────────────
 
+def _make_nag_toolbar(variant: str, parent=None):
+    """Build the two-row Fritz NAG toolbar widget.
+
+    Row 1 — piece-insertion buttons (wP bP wB bB wN bN wR bR wQ bQ).
+            Fritz uses rendered piece icons; we use short labels for the mockup.
+    Row 2 — navigation (↑ X ]) + tactical (!! ! !? ?! ? ??) +
+             positional (+- +/- -/+ = ~).
+
+    Lives at the bottom of the notation pane, not as a separate pane.
+    Sized to fit inside a 420 px column.
+    """
+    from PySide6 import QtWidgets
+
+    bg     = "#2d2d2d" if variant == "dark" else "#e8eef4"
+    btn_bg = "#3a3a3a" if variant == "dark" else "#dce8f4"
+    border = "#505050" if variant == "dark" else "#a0b4c8"
+    tc     = "#cccccc" if variant == "dark" else "#222222"
+
+    # Symbols with dedicated colours (NAG semantics)
+    NAG_COLORS = {
+        "!!": "#55cc55", "!":  "#88cc44", "!?": "#aaaa33",
+        "?!": "#ccaa22", "?":  "#cc7733", "??": "#cc3333",
+        "+-": "#cc5555", "+/-":"#88bb44", "-/+":"#5588cc",
+        "=":  "#888888", "~":  "#9977aa",
+    }
+
+    w = QtWidgets.QWidget(parent)
+    w.setObjectName("WFritzNagToolbar")
+    w.setStyleSheet(f"background:{bg}; border-top:1px solid {border};")
+    vly = QtWidgets.QVBoxLayout(w)
+    vly.setContentsMargins(3, 2, 3, 2)
+    vly.setSpacing(2)
+
+    def _btn(text, color=None, w_px=24, h_px=22):
+        from PySide6 import QtCore
+        b = QtWidgets.QLabel(text)
+        b.setFixedSize(w_px, h_px)
+        b.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        col = color or tc
+        b.setStyleSheet(
+            f"QLabel {{ background:{btn_bg}; color:{col}; "
+            f"font-size:10px; font-weight:bold; "
+            f"border:1px solid {border}; border-radius:2px; }}"
+        )
+        return b
+
+    def _sep():
+        s = QtWidgets.QFrame()
+        s.setFrameShape(QtWidgets.QFrame.Shape.VLine)
+        s.setFixedWidth(5)
+        s.setStyleSheet(f"color:{border};")
+        return s
+
+    # Row 1 — piece pair buttons  (10 × 22px + 9 × 2px = 238px → fits)
+    r1 = QtWidgets.QHBoxLayout(); r1.setSpacing(2)
+    for label in ["wP", "bP", "wB", "bB", "wN", "bN", "wR", "bR", "wQ", "bQ"]:
+        r1.addWidget(_btn(label, tc))
+    r1.addStretch()
+    vly.addLayout(r1)
+
+    # Row 2 — nav (3) + sep + tactical (6) + sep + positional (5)
+    # 14 buttons × 22px + 13 × 2px + 2 seps × 5px = 308 + 26 + 10 = 344px → fits
+    r2 = QtWidgets.QHBoxLayout(); r2.setSpacing(2)
+    for sym in ["<<", "X", "]"]:
+        r2.addWidget(_btn(sym, tc))
+    r2.addWidget(_sep())
+    for sym in ["!!", "!", "!?", "?!", "?", "??"]:
+        r2.addWidget(_btn(sym, NAG_COLORS.get(sym, tc)))
+    r2.addWidget(_sep())
+    for sym in ["+-", "+/-", "-/+", "=", "~"]:
+        r2.addWidget(_btn(sym, NAG_COLORS.get(sym, tc), w_px=28))
+    r2.addStretch()
+    vly.addLayout(r2)
+
+    return w
+
+
 @scene("nag_row")
 def render_nag_row(out_dir: Path, variant: str, width: int) -> Path:
-    """Two rows of NAG annotation symbol buttons (Phase 5 design)."""
+    """Fritz NAG toolbar as it appears inside the notation pane (Phase 5 design).
+
+    Two rows: piece figurines on top, navigation + annotation symbols below.
+    In the real layout this sits at the bottom of the notation pane — not a
+    separate pane.
+    """
     from PySide6 import QtWidgets
 
     qss = _load_qss(variant)
-
-    # NAG symbols in standard two-row Fritz layout.
-    # Row 1: tactical/evaluation  Row 2: positional
-    ROW1 = ["‼", "!", "!?", "?!", "?", "??"]
-    ROW2 = ["+−", "±", "∓", "=", "∞", "⩱", "⩲"]
-
     container = QtWidgets.QWidget()
     container.setObjectName("WFritzNagDemo")
     bg = "#1e1e1e" if variant == "dark" else "#f0f0f0"
-    container.setStyleSheet(f"background:{bg}; padding:8px;")
-
+    container.setStyleSheet(f"background:{bg};")
     vly = QtWidgets.QVBoxLayout(container)
-    vly.setContentsMargins(8, 8, 8, 8)
-    vly.setSpacing(4)
-
-    # NAG → (tooltip, colour)
-    NAG_COLORS = {
-        "‼": ("#66cc66", "Brilliant move"),
-        "!":  ("#88cc44", "Good move"),
-        "!?": ("#aabb44", "Interesting move"),
-        "?!": ("#ccaa44", "Dubious move"),
-        "?":  ("#cc7744", "Mistake"),
-        "??": ("#cc4444", "Blunder"),
-        "+−": ("#cc6666", "White is winning"),
-        "±":  ("#99cc66", "White is better"),
-        "∓":  ("#6699cc", "Black is better"),
-        "=":  ("#888888", "Equal"),
-        "∞":  ("#9988aa", "Unclear"),
-        "⩱":  ("#88aacc", "White is slightly better"),
-        "⩲":  ("#ccaa88", "Black is slightly better"),
-    }
-
-    btn_bg    = "#3c3c3c" if variant == "dark" else "#e0e8f0"
-    btn_hover = "#505060" if variant == "dark" else "#c8d8e8"
-
-    for row_syms in [ROW1, ROW2]:
-        row_ly = QtWidgets.QHBoxLayout()
-        row_ly.setSpacing(4)
-        for sym in row_syms:
-            color, tip = NAG_COLORS.get(sym, ("#888888", sym))
-            btn = QtWidgets.QToolButton()
-            btn.setText(sym)
-            btn.setToolTip(tip)
-            btn.setFixedSize(36, 28)
-            btn.setStyleSheet(
-                f"QToolButton {{ background:{btn_bg}; color:{color}; "
-                f"font-family:Arial; font-size:13px; font-weight:bold; "
-                f"border:1px solid #555; border-radius:3px; }}"
-                f"QToolButton:hover {{ background:{btn_hover}; }}"
-            )
-            row_ly.addWidget(btn)
-        row_ly.addStretch()
-        vly.addLayout(row_ly)
-
+    vly.setContentsMargins(0, 0, 0, 0)
+    vly.setSpacing(0)
+    vly.addWidget(_make_nag_toolbar(variant))
     vly.addStretch()
 
-    px = _grab(container, width, 110, qss)
+    px = _grab(container, width, 68, qss)
     out = out_dir / f"nag_row_{variant}.png"
     _save(px, out)
     return out
@@ -510,14 +546,92 @@ def render_nag_row(out_dir: Path, variant: str, width: int) -> Path:
 
 # ── scene: notation_tabs ──────────────────────────────────────────────────────
 
+def _make_notation_content(variant: str) -> "QtWidgets.QWidget":
+    """Build the flowing-text notation content area + embedded NAG toolbar.
+
+    Matches the real Fritz Notation tab layout:
+      ┌─────────────────────────────┐
+      │  flowing move text          │ ← inline moves, current highlighted
+      │  (variations indented)      │
+      │  commentary in italics      │
+      │─────────────────────────────│
+      │  figurine row               │ ← NAG toolbar row 1
+      │  nav + annotation symbols   │ ← NAG toolbar row 2
+      └─────────────────────────────┘
+    The Score sheet tab would instead show a Move/White/Black grid — this is
+    the Notation tab view only.
+    """
+    from PySide6 import QtCore, QtGui, QtWidgets
+
+    bg_content = "#ffffff" if variant == "light" else "#1e1e1e"
+    tc         = "#1a1a1a" if variant == "light" else "#d4d4d4"
+    tc_dim     = "#5a6570" if variant == "light" else "#858585"
+    hi_bg      = "#1a5276" if variant == "dark"  else "#cce4ff"
+    hi_fg      = "#ffffff" if variant == "dark"  else "#000000"
+    var_col    = "#7a9bbf" if variant == "dark"  else "#1a5276"
+
+    outer = QtWidgets.QWidget()
+    outer.setObjectName("WFritzNotationContent")
+    outer.setStyleSheet(f"background:{bg_content};")
+    vly = QtWidgets.QVBoxLayout(outer)
+    vly.setContentsMargins(0, 0, 0, 0)
+    vly.setSpacing(0)
+
+    # ── Flowing notation text area ────────────────────────────────────────────
+    text_area = QtWidgets.QTextBrowser()
+    text_area.setObjectName("WFritzNotationText")
+    text_area.setStyleSheet(
+        f"QTextBrowser {{ background:{bg_content}; color:{tc}; "
+        f"border:none; font-size:11px; }}"
+    )
+    text_area.setOpenLinks(False)
+    text_area.setReadOnly(True)
+
+    # Build rich-text notation mimicking Fritz inline move display.
+    hi_span  = f'<span style="background:{hi_bg}; color:{hi_fg}; padding:0 3px; border-radius:2px;">'
+    dim_span = f'<span style="color:{tc_dim}; font-size:10px;">'
+    var_span = f'<span style="color:{var_col}; font-size:10px;">'
+
+    html = (
+        f'<p style="margin:4px 6px; color:{tc_dim}; font-size:10px;">'
+        f'Paulsen,L – Morphy,P  C48  New York 1857</p>'
+        f'<p style="margin:4px 6px;">'
+        # variation line above current
+        f'{var_span}( 20.Qe2 Bb6 21.Bg4 Rxe3 22.Bxf5 Rxe2 23.Bxd7= )</span><br>'
+        f'{var_span}( 20.Qa5? Rg6 21.Kh1 Qxf3 22.gxf3 Bc6-+ )</span><br>'
+        f'<span style="color:{tc};">20...Bd6 &nbsp; 21.c4± &nbsp; </span>'
+        # current move highlighted
+        f'{hi_span}16...Rae8</span>'
+        f'<span style="color:{tc};"> &nbsp; 17.Qa6 </span>'
+        f'{dim_span}[#]</span>'
+        f'<br>'
+        f'{var_span}[ 17.Qd1 &nbsp; c5 &nbsp; ♗s...♟d7-b5 ]</span><br>'
+        f'<span style="color:{tc};">18.♗xg5± &nbsp; ♛a5 &nbsp; </span>'
+        f'{dim_span}1.50/13</span>'
+        f'</p>'
+        f'<p style="margin:4px 6px; color:{tc_dim}; font-style:italic; font-size:10px;">'
+        f'Johnson,C.F.: "Morphy deliberated half an hour"'
+        f'</p>'
+    )
+    text_area.setHtml(html)
+
+    vly.addWidget(text_area, 1)
+
+    # ── NAG toolbar (embedded at bottom of notation pane) ─────────────────────
+    vly.addWidget(_make_nag_toolbar(variant))
+
+    return outer
+
+
 @scene("notation_tabs")
 def render_notation_tabs(out_dir: Path, variant: str, width: int) -> Path:
-    """Fritz notation tab strip mock (Phase 5 design).
+    """Fritz notation pane mock (Phase 5 design).
 
-    Six tabs: Notation / Training / Score sheet / LiveBook / Openings Book / My Moves
-    Uses a bare QTabBar (not QTabWidget) to match the Phase 5 implementation.
+    Tab strip (bare QTabBar, not QTabWidget) over a flowing-text notation area
+    with the NAG annotation toolbar embedded at the bottom.  The Score sheet
+    tab would show a grid; only the Notation tab is mocked here.
     """
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtWidgets
 
     qss = _load_qss(variant)
 
@@ -525,7 +639,7 @@ def render_notation_tabs(out_dir: Path, variant: str, width: int) -> Path:
 
     container = QtWidgets.QWidget()
     container.setObjectName("WFritzNotationDemo")
-    bg = "#1e1e1e" if variant == "dark" else "#f0f0f0"
+    bg = "#1e1e1e" if variant == "dark" else "#f4f8fc"
     container.setStyleSheet(f"background:{bg};")
 
     vly = QtWidgets.QVBoxLayout(container)
@@ -540,39 +654,10 @@ def render_notation_tabs(out_dir: Path, variant: str, width: int) -> Path:
         tabbar.addTab(tab)
     tabbar.setCurrentIndex(0)
 
-    # Notation content area mock
-    content = QtWidgets.QWidget()
-    content.setObjectName("WFritzNotationContent")
-    clr = "#2d2d2d" if variant == "dark" else "#ffffff"
-    content.setStyleSheet(f"background:{clr}; border:1px solid #505050;")
-
-    # Placeholder move grid rows
-    grid_ly = QtWidgets.QGridLayout(content)
-    grid_ly.setContentsMargins(4, 4, 4, 4)
-    grid_ly.setSpacing(2)
-    moves = [
-        ("1.", "e4",  "e5"),
-        ("2.", "Nf3", "Nc6"),
-        ("3.", "Bc4", "Bc5"),
-        ("4.", "O-O", "Nf6"),
-        ("5.", "d3",  "d6"),
-    ]
-    tc = "#d4d4d4" if variant == "dark" else "#1a1a1a"
-    hi = "#094771" if variant == "dark" else "#cce4ff"
-    for r, (num, white, black) in enumerate(moves):
-        for c, text in enumerate([num, white, black]):
-            lbl = QtWidgets.QLabel(text)
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            style = f"color:{tc}; font-size:11px; padding:2px 4px;"
-            if r == 1 and c == 1:  # highlight current move
-                style += f" background:{hi}; border-radius:2px;"
-            lbl.setStyleSheet(style)
-            grid_ly.addWidget(lbl, r, c)
-
     vly.addWidget(tabbar)
-    vly.addWidget(content, 1)
+    vly.addWidget(_make_notation_content(variant), 1)
 
-    px = _grab(container, width, 200, qss)
+    px = _grab(container, width, 260, qss)
     out = out_dir / f"notation_tabs_{variant}.png"
     _save(px, out)
     return out
@@ -864,36 +949,45 @@ def render_full(out_dir: Path, variant: str, width: int) -> Path:
     ab.addStretch()
     rly.addWidget(_pane("Engine: Fritz 18 Popcnt", analysis_body, 80))
 
-    # NAG row — same symbols and colours as the dedicated nag_row scene
-    _NAG_ROWS = [
-        ["‼", "!", "!?", "?!", "?", "??"],
-        ["+−", "±", "∓", "=", "∞", "⩱", "⩲"],
-    ]
-    _NAG_COLORS = {
-        "‼": "#66cc66", "!": "#88cc44", "!?": "#aabb44", "?!": "#ccaa44",
-        "?": "#cc7744", "??": "#cc4444", "+−": "#cc6666", "±": "#99cc66",
-        "∓": "#6699cc", "=": "#888888", "∞": "#9988aa", "⩱": "#88aacc", "⩲": "#ccaa88",
-    }
-    nag_body = QtWidgets.QWidget()
-    nl = QtWidgets.QVBoxLayout(nag_body)
-    nl.setContentsMargins(4, 2, 4, 2); nl.setSpacing(2)
-    btn_bg = "#3c3c3c" if variant == "dark" else "#e0e8f0"
-    for row_syms in _NAG_ROWS:
-        row_hl = QtWidgets.QHBoxLayout(); row_hl.setSpacing(3)
-        for sym in row_syms:
-            color = _NAG_COLORS.get(sym, tc)
-            b = QtWidgets.QToolButton()
-            b.setText(sym); b.setFixedSize(30, 22)
-            b.setStyleSheet(f"QToolButton{{background:{btn_bg}; color:{color};"
-                            f"font-family:Arial; font-size:11px; font-weight:bold;"
-                            f"border:1px solid #555; border-radius:2px;}}"
-                            f"QToolButton:hover{{background:{accent}; color:#fff;}}")
-            row_hl.addWidget(b)
-        row_hl.addStretch()
-        nl.addLayout(row_hl)
-    rly.addWidget(_pane("", nag_body, 56))
+    # Eval profile pane — bar chart of evaluation over move history
+    class _EvalGraph(QtWidgets.QWidget):
+        def paintEvent(self, _ev):
+            import math
+            p = QtGui.QPainter(self)
+            p.fillRect(self.rect(), QtGui.QColor(surface.replace(";", "")))
+            W, H = self.width(), self.height()
+            mid = H // 2
+            # draw centre line
+            p.setPen(QtGui.QColor(border))
+            p.drawLine(0, mid, W, mid)
+            # synthetic eval curve (cp values over ~40 moves)
+            import math
+            cps = [
+                0, 10, 25, 15, -20, -35, -15, 5, 30, 45, 60, 40, 20, 55, 80,
+                65, 90, 120, 100, 85, 110, 95, 130, 150, 140, 120, 100, 80,
+                60, 40, 20, 0, -10, -30, -20, 10, 30, 50, 40, 20,
+            ]
+            bar_w = max(2, W // len(cps))
+            cap = 250  # cap at ±250 cp → full half-height
+            white_col = QtGui.QColor("#99cc66")
+            black_col = QtGui.QColor("#6699cc")
+            for i, cp in enumerate(cps):
+                bh = max(1, int(abs(cp) / cap * (mid - 2)))
+                x = i * bar_w
+                if cp >= 0:
+                    p.fillRect(x, mid - bh, bar_w - 1, bh, white_col)
+                else:
+                    p.fillRect(x, mid, bar_w - 1, bh, black_col)
+            # current position marker
+            last_x = len(cps) * bar_w
+            p.setPen(QtGui.QColor(accent))
+            p.drawLine(last_x, 0, last_x, H)
+            p.end()
 
-    # Notation pane with tabs
+    eval_graph_body = _EvalGraph()
+    rly.addWidget(_pane("Eval profile", eval_graph_body, 80))
+
+    # Notation pane — tab strip + flowing text + NAG toolbar embedded at bottom
     notation_body = QtWidgets.QWidget()
     nb = QtWidgets.QVBoxLayout(notation_body)
     nb.setContentsMargins(0, 0, 0, 0); nb.setSpacing(0)
@@ -901,23 +995,8 @@ def render_full(out_dir: Path, variant: str, width: int) -> Path:
     tabbar.setExpanding(False); tabbar.setDrawBase(False)
     for t in ["Notation", "Training", "Score sheet", "LiveBook", "Openings Book", "My Moves"]:
         tabbar.addTab(t)
-    grid = QtWidgets.QWidget()
-    gl = QtWidgets.QGridLayout(grid)
-    gl.setContentsMargins(4, 2, 4, 2); gl.setSpacing(1)
-    moves = [("1.", "e4", "e5"), ("2.", "Nf3", "Nc6"), ("3.", "Bc4", "Bc5"),
-             ("4.", "O-O", "Nf6"), ("5.", "d3", "d6"), ("6.", "c3", "Be7"),
-             ("7.", "Nbd2", "O-O"), ("8.", "Re1", "d5")]
-    for r, (num, wm, bm) in enumerate(moves):
-        for c, text in enumerate([num, wm, bm]):
-            lbl = QtWidgets.QLabel(text)
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            st = f"color:{tc}; font-size:10px; padding:1px 3px;"
-            if r == 1 and c == 1:
-                st += f" background:{hi}; border-radius:2px;"
-            lbl.setStyleSheet(st)
-            gl.addWidget(lbl, r, c)
     nb.addWidget(tabbar)
-    nb.addWidget(grid, 1)
+    nb.addWidget(_make_notation_content(variant), 1)
     rly.addWidget(_pane("Notation + Openings Book", notation_body), 1)
 
     # ── outer window ──────────────────────────────────────────────────────────

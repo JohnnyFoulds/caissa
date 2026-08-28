@@ -262,27 +262,33 @@ def render_clocks(out_dir: Path, variant: str, width: int) -> Path:
     class _LCD(QtWidgets.QWidget):
         """Seven-segment LCD clock widget (prototype for WFritzLCD)."""
 
-        LIT  = QtGui.QColor("#30ff70")
-        DIM  = QtGui.QColor("#103a18")
-        BG   = QtGui.QColor("#000000")
-        THICK = 4   # segment bar thickness
-        GAP   = 2   # gap between segments
+        LIT   = QtGui.QColor("#30ff70")
+        DIM   = QtGui.QColor("#0a2010")
+        BG    = QtGui.QColor("#000000")
+        THICK = 9    # segment bar thickness — large enough to read
+        GAP   = 3    # gap between segments
 
-        def __init__(self, text: str = "00:00"):
+        def __init__(self, text: str = "0:05:00"):
             super().__init__()
             self.setObjectName("WFritzLCDMock")
             self._text = text
-            box_w = self._text_width(text)
-            self.setFixedSize(box_w + 16, 48)
+            dh = self._digit_h()
+            box_w = self._text_width(text) + 20
+            box_h = dh + 20
+            self.setFixedSize(box_w, box_h)
+
+        def _digit_h(self) -> int:
+            # height of one digit cell = 2 * THICK + 3 * GAP (top, middle, bottom bars + gaps)
+            return self.THICK * 2 + self.GAP * 4
 
         def _digit_w(self) -> int:
-            return self.THICK * 2 + self.GAP * 3
+            return self.THICK + self.GAP * 2
 
         def _text_width(self, text: str) -> int:
             w = 0
             for ch in text:
                 if ch == ":":
-                    w += self.THICK + self.GAP
+                    w += self.THICK + self.GAP * 2
                 else:
                     w += self._digit_w() + self.GAP
             return w
@@ -290,22 +296,23 @@ def render_clocks(out_dir: Path, variant: str, width: int) -> Path:
         def _seg_path(self, sx: int, sy: int, seg: int) -> QtGui.QPainterPath:
             t = self.THICK
             g = self.GAP
-            h = self._digit_w()  # digit height = digit width for square cells
+            dw = self._digit_w()
+            dh = self._digit_h()
             path = QtGui.QPainterPath()
             if seg == 0:   # top horizontal
-                path.addRect(sx + g, sy, h - 2*g, t)
+                path.addRect(sx + g, sy, dw - 2*g, t)
             elif seg == 6: # bottom horizontal
-                path.addRect(sx + g, sy + h - t, h - 2*g, t)
+                path.addRect(sx + g, sy + dh - t, dw - 2*g, t)
             elif seg == 3: # middle horizontal
-                path.addRect(sx + g, sy + (h - t)//2, h - 2*g, t)
+                path.addRect(sx + g, sy + (dh - t)//2, dw - 2*g, t)
             elif seg == 1: # top-left vertical
-                path.addRect(sx, sy + g, t, (h - t)//2 - g)
+                path.addRect(sx, sy + g, t, dh//2 - g - 1)
             elif seg == 2: # top-right vertical
-                path.addRect(sx + h - t, sy + g, t, (h - t)//2 - g)
+                path.addRect(sx + dw - t, sy + g, t, dh//2 - g - 1)
             elif seg == 4: # bot-left vertical
-                path.addRect(sx, sy + (h + t)//2, t, (h - t)//2 - g)
+                path.addRect(sx, sy + dh//2 + 1, t, dh//2 - g - 1)
             elif seg == 5: # bot-right vertical
-                path.addRect(sx + h - t, sy + (h + t)//2, t, (h - t)//2 - g)
+                path.addRect(sx + dw - t, sy + dh//2 + 1, t, dh//2 - g - 1)
             return path
 
         def paintEvent(self, _event):
@@ -313,53 +320,56 @@ def render_clocks(out_dir: Path, variant: str, width: int) -> Path:
             p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
             p.fillRect(self.rect(), self.BG)
 
-            x = 8
-            y = (self.height() - self._digit_w()) // 2
+            dh = self._digit_h()
             dw = self._digit_w()
+            x = 10
+            y = (self.height() - dh) // 2
 
             for ch in self._text:
                 segs = _SEGS.get(ch)
-                if segs is None:  # colon
-                    dot_r = self.THICK // 2
+                if segs is None:  # colon — two square dots
+                    t = self.THICK
+                    g = self.GAP
+                    dot_sz = max(3, t // 2)
                     p.setBrush(self.LIT)
                     p.setPen(QtCore.Qt.PenStyle.NoPen)
-                    cx = x + self.THICK // 2
-                    p.drawEllipse(cx, y + dw // 3, dot_r, dot_r)
-                    p.drawEllipse(cx, y + 2 * dw // 3, dot_r, dot_r)
-                    x += self.THICK + self.GAP
+                    cx = x + g
+                    p.fillRect(cx, y + dh // 3 - dot_sz // 2, dot_sz, dot_sz, self.LIT)
+                    p.fillRect(cx, y + 2 * dh // 3 - dot_sz // 2, dot_sz, dot_sz, self.LIT)
+                    x += t + g * 2
                 else:
+                    # draw all 7 segments (lit or dim)
                     for seg_i in range(7):
                         path = self._seg_path(x, y, seg_i)
-                        lit = seg_i in segs
-                        p.setBrush(self.LIT if lit else self.DIM)
+                        p.setBrush(self.LIT if seg_i in segs else self.DIM)
                         p.setPen(QtCore.Qt.PenStyle.NoPen)
                         p.drawPath(path)
                     x += dw + self.GAP
 
             p.end()
 
+    # Fritz layout: each player row has TWO black LCD boxes side by side
+    # (main time left, increment/move time right), no player label in the clock pane
     container = QtWidgets.QWidget()
     container.setObjectName("WFritzClocksDemo")
-    bg = "#1e1e1e" if variant == "dark" else "#f0f0f0"
+    bg = "#1e1e1e" if variant == "dark" else "#d0d8e0"
     container.setStyleSheet(f"background:{bg};")
     vly = QtWidgets.QVBoxLayout(container)
-    vly.setContentsMargins(16, 16, 16, 16)
-    vly.setSpacing(12)
+    vly.setContentsMargins(12, 12, 12, 12)
+    vly.setSpacing(8)
 
-    # Two clocks: black player (top) and white player (bottom)
-    for side, time_str in [("Black  ♛  Stockfish 18", "01:27"), ("White  ♙  You", "04:55")]:
+    # Black on top, White on bottom — two boxes per row
+    for main_t, inc_t in [("0:05:00", "0:00:16"), ("0:05:00", "0:00:00")]:
         row = QtWidgets.QHBoxLayout()
-        label = QtWidgets.QLabel(side)
-        fc = "#d4d4d4" if variant == "dark" else "#1a1a1a"
-        label.setStyleSheet(f"color:{fc}; font-size:11px;")
-        lcd = _LCD(time_str)
-        row.addWidget(label, 1)
-        row.addWidget(lcd)
+        row.setSpacing(8)
+        row.addWidget(_LCD(main_t))
+        row.addWidget(_LCD(inc_t))
+        row.addStretch()
         vly.addLayout(row)
 
     vly.addStretch()
 
-    px = _grab(container, width, 150, qss)
+    px = _grab(container, width, 160, qss)
     out = out_dir / f"clocks_{variant}.png"
     _save(px, out)
     return out

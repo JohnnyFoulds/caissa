@@ -137,7 +137,7 @@ is completed.
 
 ---
 
-## Phase 1 — Recon Spike (GO / KILL) ⬜
+## Phase 1 — Recon Spike (GO / KILL) ✅
 
 **Branch:** `spike/retro-recon`  
 **Docs shipped (Gate H):** `docs/features/retro-engine/recon_findings.md` (new)
@@ -171,7 +171,7 @@ is completed.
 
 ---
 
-## Phase 2 — Foundations ⬜
+## Phase 2 — Foundations ✅
 
 **Branch:** `chore/retro-foundations`  
 **Docs shipped (Gate H):** `docs/retro/testing.md` (complete)
@@ -214,7 +214,7 @@ is completed.
 
 ---
 
-## Phase 3 — ROM Manifest + Containers ⬜
+## Phase 3 — ROM Manifest + Containers ✅
 
 **Branch:** `feat/retro-rom`  
 **Docs shipped (Gate H):** `docs/retro/rom-setup.md` (complete)
@@ -252,7 +252,7 @@ is completed.
 
 ---
 
-## Phase 4 — CPU Seam + FakeCpu ⬜
+## Phase 4 — CPU Seam + FakeCpu ✅
 
 **Branch:** `feat/retro-cpu`  
 **Docs shipped (Gate H):** none (internal architecture; covered by testing.md)
@@ -287,7 +287,7 @@ is completed.
 
 ---
 
-## Phase 5 — Traps + Virtual Clock ⬜
+## Phase 5 — Traps + Virtual Clock ✅
 
 **Branch:** `feat/retro-traps`  
 **Docs shipped (Gate H):** `docs/retro/uci-options.md` (`EmuClockRate`, `EmuStrictOriginal`)
@@ -315,7 +315,7 @@ is completed.
 
 ---
 
-## Phase 6 — Board Bridge ⬜
+## Phase 6 — Board Bridge ✅
 
 **Branch:** `feat/retro-bridge`  
 **Docs shipped (Gate H):** `docs/retro/reverse-engineering.md` updated with struct layout
@@ -341,7 +341,7 @@ is completed.
 
 ---
 
-## Phase 7 — Think Orchestrator + Oracle ⬜
+## Phase 7 — Think Orchestrator + Oracle ✅
 
 **Branch:** `feat/retro-think`  
 **Docs shipped (Gate H):** `docs/retro/README.md` updated with end-to-end flow
@@ -376,7 +376,7 @@ is completed.
 
 ---
 
-## Phase 8 — UCI Shim ⬜
+## Phase 8 — UCI Shim ✅
 
 **Branch:** `feat/retro-uci`  
 **Docs shipped (Gate H):** `docs/retro/uci-options.md` (complete), `docs/retro/rom-setup.md` updated
@@ -412,7 +412,7 @@ is completed.
 
 ---
 
-## Phase 9 — DOS x86 Second Target ⬜
+## Phase 9 — DOS x86 Second Target ✅
 
 **Branch:** `feat/retro-dos`  
 **Docs shipped (Gate H):** `docs/retro/divergences.md` (new); `docs/retro/reverse-engineering.md` updated
@@ -441,7 +441,7 @@ is completed.
 
 ---
 
-## Phase 10 — Production Readiness ⬜
+## Phase 10 — Production Readiness ✅
 
 **Branch:** `chore/retro-production`  
 **Docs shipped (Gate H):** all `docs/retro/` pages complete; `production_readiness.md`

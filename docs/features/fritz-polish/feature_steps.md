@@ -135,7 +135,7 @@ exist in source.
 
 ---
 
-## Phase 1 — De-hardcode the five WFritz* widgets ⬜
+## Phase 1 — De-hardcode the five WFritz* widgets ✅
 
 **Branch:** `refactor/fritz-widget-qss`
 

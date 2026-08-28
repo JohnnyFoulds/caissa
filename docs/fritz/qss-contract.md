@@ -1,5 +1,5 @@
 ---
-**Status:** Living — updated through Phase 3
+**Status:** Living — updated through Phase 4
 **Implements:** E1-E4 ``qproperty-`` contract for all Fritz custom-painted widgets
 **Audience:** Widget authors, theme authors, ``test_qproperty_contract.py`` maintainers
 **See also:** ``docs/standards/ui-design-process.md`` §7, ``Resources/Styles/Modern Fritz.qss``
@@ -67,11 +67,83 @@ so QSS `background-color` / `border-radius` render beneath the gradient.
 
 ---
 
+---
+
+## WFritzLCD
+
+File: `bin/Code/Fritz/WFritzLCD.py`  
+Phase: 4 (`feat/fritz-clocks-eval`)  
+Selector: `WFritzLCD`
+
+| Property | Type | Default | Purpose |
+|---|---|---|---|
+| `qproperty-litColor` | `QColor` | `#00ff88` | Colour of lit (on) segments |
+| `qproperty-dimColor` | `QColor` | `#103a18` | Colour of dim (off) segments |
+| `qproperty-boxHeight` | `int` | `34` | Fixed height in px; setter calls `setFixedHeight` |
+| `qproperty-boxWidth` | `int` | `108` | Fixed width in px; setter calls `setFixedWidth` |
+| `qproperty-segmentThickness` | `int` | `4` | Segment bar thickness in px (scaled to actual height at paint time) |
+
+The box background and border-radius come from QSS `background-color` / `border-radius` (E2).
+Font properties are accepted via E3 but the widget does not use `self.font()` in painting —
+segment geometry is computed from `boxWidth`/`boxHeight` only.
+
+```qss
+WFritzLCD
+{
+qproperty-litColor: #00ff88;
+qproperty-dimColor: #103a18;
+qproperty-boxHeight: 34;
+qproperty-boxWidth: 108;
+qproperty-segmentThickness: 4;
+background-color: #000000;
+border-radius: 2px;
+}
+```
+
+**Input forms accepted by `set_time_text`:**
+
+- `MM:SS` — plain clock string
+- `H:MM:SS` — hours shown
+- `MM:SS<br><FONT SIZE="-4">…` — HTML two-line form from `WBase.set_clock_white/black`
+
+Parsing is delegated to `ClockModel.parse` + `ClockModel.digits`; on parse failure the
+widget falls back to the first five printable characters of the stripped string.
+
+**E2 note:** `WA_StyledBackground` is set in `__init__` and `drawPrimitive(PE_Widget)` is
+called first in `paintEvent` so QSS `background-color` renders beneath the segments.
+
+---
+
+## `#WFritzEvalSummary`
+
+Widget: `QtWidgets.QLabel` child of `WFritzAnalysisTable`  
+Phase: 4 (`feat/fritz-clocks-eval`)  
+Selector: `#WFritzEvalSummary`
+
+This label is a plain `QLabel` — no custom painting, no `qproperty-` contract.
+All styling is via standard QSS properties.
+
+```qss
+#WFritzEvalSummary
+{
+font-size: 8pt;
+color: #cccccc;
+padding: 2px 8px;
+}
+```
+
+Format produced by `WFritzAnalysisTable._update_eval_summary`:
+
+```
+White is slightly better: ⩲ (+0.42) Depth: 24/45 00:00:16 51157kN
+```
+
+---
+
 ## Planned widgets (future phases)
 
 | Widget | Phase | Properties to be declared |
 |---|---|---|
-| `WFritzLCD` | 4 | `litColor`, `dimColor`, `boxHeight`, `boxWidth`, `segmentThickness` |
 | `WRibbon` | 7 | `ribbonHeight` |
 | `WRibbonTabBar` | 7 | `tabActiveTop`, `tabActiveBottom`, `tabInactiveTop`, `tabInactiveBottom` |
 

@@ -1,0 +1,182 @@
+{
+  "version": "1",
+  "captured_at": "2026-08-28",
+  "notes": "Golden wire contract for RemoteControl — all 25 dispatch-table verbs. Recorded against the pre-Phase-2 binary. The contract covers response KEY SETS only (not exact values), so tests remain green across config/theme/game state changes while still catching structural regressions introduced by the Phase-2 refactor.",
+  "probes": [
+    {
+      "id": "ping",
+      "cmd": "ping",
+      "keys": ["ok"],
+      "requires_game": false,
+      "notes": "Always ok; no app state required"
+    },
+    {
+      "id": "info",
+      "cmd": "info",
+      "keys": ["caissa_theme", "style_mode", "icons", "style"],
+      "requires_game": false,
+      "notes": "Returns current theme/style config"
+    },
+    {
+      "id": "themes",
+      "cmd": "themes",
+      "keys": ["themes"],
+      "requires_game": false,
+      "notes": "Lists available theme names"
+    },
+    {
+      "id": "theme",
+      "cmd": "theme Midnight",
+      "keys": ["ok", "theme"],
+      "requires_game": false,
+      "notes": "Applies a theme; uses Midnight (no-op if already active)"
+    },
+    {
+      "id": "screenshot",
+      "cmd": "screenshot /tmp/caissa-rc-contract-check.png",
+      "keys": ["ok", "path"],
+      "requires_game": false,
+      "notes": "Saves a screenshot and returns the path"
+    },
+    {
+      "id": "menu",
+      "cmd": "menu __nonexistent_rc_contract__",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — unknown menu key"
+    },
+    {
+      "id": "action",
+      "cmd": "action __nonexistent_rc_contract__",
+      "keys": ["ok", "key"],
+      "requires_game": false,
+      "notes": "action silently ignores unknown keys; always returns ok+key when procesador is live"
+    },
+    {
+      "id": "toolbar_info",
+      "cmd": "toolbar_info",
+      "keys": ["count", "toolbar_size", "device_pixel_ratio", "buttons"],
+      "requires_game": false,
+      "notes": "Returns main toolbar button list and dimensions"
+    },
+    {
+      "id": "list_windows",
+      "cmd": "list_windows",
+      "keys": ["windows"],
+      "requires_game": false,
+      "notes": "Returns all top-level visible windows"
+    },
+    {
+      "id": "dump_ui",
+      "cmd": "dump_ui 1",
+      "keys": ["roots"],
+      "requires_game": false,
+      "notes": "Returns widget tree at depth 1"
+    },
+    {
+      "id": "find_widget",
+      "cmd": "find_widget __xyzzy_rc_contract__",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no widget matching the sentinel query"
+    },
+    {
+      "id": "click_widget",
+      "cmd": "click_widget __xyzzy_rc_contract__",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no widget matching the sentinel query"
+    },
+    {
+      "id": "click_toolbar",
+      "cmd": "click_toolbar __xyzzy_rc_contract__",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no toolbar action matching the sentinel text"
+    },
+    {
+      "id": "click_tab",
+      "cmd": "click_tab __xyzzy_rc_contract__",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no QTabWidget tab matching the sentinel text"
+    },
+    {
+      "id": "set_field",
+      "cmd": "set_field",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Usage error — missing arguments (error key present)"
+    },
+    {
+      "id": "combo_select",
+      "cmd": "combo_select",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Usage error — missing arguments"
+    },
+    {
+      "id": "dialog_info",
+      "cmd": "dialog_info",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no modal dialog open at home screen"
+    },
+    {
+      "id": "dialog_accept",
+      "cmd": "dialog_accept",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no modal dialog open at home screen"
+    },
+    {
+      "id": "dialog_cancel",
+      "cmd": "dialog_cancel",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no modal dialog open at home screen"
+    },
+    {
+      "id": "set_config",
+      "cmd": "set_config __nonexistent_rc_contract__ value",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — unknown config key"
+    },
+    {
+      "id": "open_config",
+      "cmd": "open_config",
+      "keys": ["ok"],
+      "requires_game": false,
+      "notes": "Opens config dialog asynchronously; always ok when procesador is live"
+    },
+    {
+      "id": "force_cancel",
+      "cmd": "force_cancel",
+      "keys": ["ok"],
+      "requires_game": false,
+      "notes": "Always ok; idempotent — safe to call at home or mid-game"
+    },
+    {
+      "id": "startgame",
+      "cmd": "startgame engine=irina depth=1 side=white",
+      "keys": ["ok", "engine", "depth", "side"],
+      "requires_game": false,
+      "notes": "Starts game vs irina; needs clean home state (use force_cancel setup)"
+    },
+    {
+      "id": "make_move",
+      "cmd": "make_move e2e4",
+      "keys": ["ok", "move"],
+      "requires_game": true,
+      "notes": "Injects e2e4; requires an active game with human to move"
+    },
+    {
+      "id": "game_info",
+      "cmd": "game_info",
+      "keys": ["manager_class", "fen", "moves", "move_count", "turn", "result", "is_human_side_white", "human_is_playing", "toolbar"],
+      "requires_game": true,
+      "notes": "Returns full game state; game-specific keys only present when a game is active"
+    }
+  ]
+}

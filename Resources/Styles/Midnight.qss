@@ -726,3 +726,158 @@ QHeaderView[type="102"]::section
     border-bottom: 1px solid #475569;
     font-weight: bold;
 }
+
+/* TOOLBAR --------------------------------------------------------------------*/
+QToolBar
+{
+    background-color: #1e293b;
+    border-bottom: 1px solid #475569;
+    padding: 2px;
+    spacing: 2px;
+}
+QToolBar::separator
+{
+    background: #475569;
+    width: 1px;
+    margin: 4px 4px;
+}
+
+/* MENU BAR -------------------------------------------------------------------*/
+QMenuBar
+{
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-bottom: 1px solid #475569;
+}
+QMenuBar::item
+{
+    padding: 4px 10px;
+    background: transparent;
+}
+QMenuBar::item:selected
+{
+    background: #334155;
+    border-radius: 4px;
+}
+QMenuBar::item:pressed
+{
+    background: #6366f1;
+    color: #ffffff;
+    border-radius: 4px;
+}
+
+/* DIALOG ---------------------------------------------------------------------*/
+QDialog
+{
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+/* FRAME ----------------------------------------------------------------------*/
+QFrame[frameShape="4"]
+{
+    border: none;
+    border-top: 1px solid #475569;
+}
+QFrame[frameShape="5"]
+{
+    border: none;
+    border-left: 1px solid #475569;
+}
+
+/* SPLITTER -------------------------------------------------------------------*/
+QSplitter
+{
+    background: #0f172a;
+}
+QSplitter::handle
+{
+    background: #334155;
+}
+QSplitter::handle:horizontal
+{
+    width: 3px;
+}
+QSplitter::handle:vertical
+{
+    height: 3px;
+}
+QSplitter::handle:hover
+{
+    background: #6366f1;
+}
+
+/* RADIO BUTTON ---------------------------------------------------------------*/
+QRadioButton
+{
+    color: #e2e8f0;
+    spacing: 6px;
+    background: transparent;
+}
+QRadioButton::indicator
+{
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    border: 1px solid #475569;
+    background: #1e293b;
+}
+QRadioButton::indicator:checked
+{
+    background: #6366f1;
+    border: 1px solid #6366f1;
+}
+QRadioButton::indicator:hover
+{
+    border: 1px solid #6366f1;
+}
+QRadioButton:disabled
+{
+    color: #475569;
+}
+
+/* SLIDER ---------------------------------------------------------------------*/
+QSlider::groove:horizontal
+{
+    height: 4px;
+    background: #334155;
+    border-radius: 2px;
+}
+QSlider::handle:horizontal
+{
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+    background: #6366f1;
+    border: none;
+}
+QSlider::handle:horizontal:hover
+{
+    background: #818cf8;
+}
+QSlider::sub-page:horizontal
+{
+    background: #6366f1;
+    border-radius: 2px;
+}
+QSlider::groove:vertical
+{
+    width: 4px;
+    background: #334155;
+    border-radius: 2px;
+}
+QSlider::handle:vertical
+{
+    width: 14px;
+    height: 14px;
+    margin: 0 -5px;
+    border-radius: 7px;
+    background: #6366f1;
+    border: none;
+}
+QSlider::sub-page:vertical
+{
+    background: #6366f1;
+    border-radius: 2px;
+}

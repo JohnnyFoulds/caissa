@@ -303,7 +303,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 6 — Service + `rpa_*` Verbs + Client/CLI ⬜
+## Phase 6 — Service + `rpa_*` Verbs + Client/CLI ✅
 
 **Branch:** `feat/rpa-service`
 **Docs shipped (Gate H):** `docs/rpa/wire-protocol.md`, `docs/rpa/cli.md`, `docs/rpa/quickstart.md`

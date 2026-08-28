@@ -16,6 +16,18 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 6 (service + rpa_* verbs + client/CLI)**: `bin/Code/Rpa/Service.py` —
+  `RpaService` with run registry, 10 `rpa_*` verb handlers (`rpa_capabilities`,
+  `rpa_state`, `rpa_find`, `rpa_run`, `rpa_status`, `rpa_journal`, `rpa_cancel`,
+  `rpa_converge`, `rpa_act`, `rpa_workflows`), `generate_run_id()`, and `_start_pump=False`
+  for unit-test mode. `RemoteControl.py` updated with lazy `_rpa()` accessor, `CAISSA_RPA=0`
+  kill switch, and single `rpa_*` dispatch block. `tests/ui/rpa_client.py` — `CaissaRpaClient`
+  with `run_and_wait()` polling every 250 ms. `tools/caissa-rpa` — CLI with `run`, `status`,
+  `journal`, `find`, `cancel`, `workflows`, `doctor` subcommands. 25 unit tests in
+  `tests/unit/rpa/test_service.py`. `tests/ui/test_rpa_service.py` — integration test stubs
+  (`rpa_ui` marker). Gate H docs: `docs/rpa/wire-protocol.md`, `docs/rpa/cli.md`,
+  `docs/rpa/quickstart.md`.
+
 - **RPA layer — Phase 5 (runner + journal + activities)**: The step-pumped closed-loop state
   machine. `bin/Code/Rpa/Runner.py` — 14-sub-state machine (`SubState` enum), `RunStatus`
   enum (PENDING/RUNNING/CANCELLING/SUCCEEDED/FAILED/CANCELLED/TIMED_OUT), `Frame` dataclass

@@ -16,6 +16,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 8 (Workflows + Regression Suite)**: `bin/Code/Rpa/Workflows/` —
+  `Registry.py` (`register`, `get`, `all_names`); four built-in workflows:
+  `smoke_home` (converge + assert HOME), `classical_invariant` (assert toolbar;
+  open/close Config), `play_a_game` (trigger new game; assert PLAYING), and
+  `config_roundtrip` (open config; write player name; accept; reopen; verify).
+  `Service.py` updated to delegate `_WORKFLOW_REGISTRY` to `Workflows.Registry`
+  and load built-ins on init. 6 unit tests in `tests/unit/rpa/test_workflows.py`;
+  4 integration stubs in `tests/ui/test_rpa_workflows.py` (`rpa_ui`).
+  Gate H docs: `docs/rpa/authoring-workflows.md`, `docs/rpa/testing.md`.
 - **RPA layer — Phase 7 (Vision)**: `bin/Code/Rpa/Vision/` — `Availability.probe()`
   (cached capability probe, never raises), `Capture.grab()` (QWidget → Screenshot with
   `bytesPerLine()` padding fix and RGB channel order), `Screenshot.logical()` (DPR-1

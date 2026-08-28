@@ -21,7 +21,8 @@ from Code.Rpa.Activities import Activity
 from Code.Rpa.AppState import HOME
 from Code.Rpa.Fakes import FakeClock, FakeDriver, World
 from Code.Rpa.Runner import RunStatus
-from Code.Rpa.Service import RpaService, generate_run_id, register_workflow, _WORKFLOW_REGISTRY
+from Code.Rpa.Service import RpaService, generate_run_id, register_workflow
+from Code.Rpa.Workflows.Registry import _REGISTRY as _WORKFLOW_REGISTRY
 
 
 # ---------------------------------------------------------------------------

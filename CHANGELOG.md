@@ -11,6 +11,19 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
+### Added
+- **Fritz Polish — Phase D (Documentation + process, Gate A)**: complete SDD artefact set in
+  `docs/features/fritz-polish/` (`initial_idea.md`, `feature_spec.md`, `feature_steps.md`,
+  `implementation_plan.md`). Design-time product docs in `docs/fritz/` (`README.md`,
+  `concepts.md`, `glossary.md`, `decisions.md`, `design-approval.md`). Two new engineering
+  standards: `docs/standards/ui-design-process.md` (PySide6-in-shipping-medium design loop,
+  E1-E4 `qproperty-` contract, Qt escalation ladder, approval gate) and
+  `docs/standards/architecture.md` (feature-package convention, purity tiers, AST purity test,
+  strangler-fig scope limit, characterisation-test-first refactor procedure). `CLAUDE.md` gains
+  Purity tiers subsection, two new standards in the summary, and a Development Commands section.
+  `docs/modern-fritz.md` superseded via `git mv` to `docs/fritz/_modern-fritz-archived.md` with
+  three drifted claims documented.
+
 ### Fixed
 - **Mode toolbar escape hatch**: added `caissa:switch_mode` to `toolbar_inject` for Analyse, Coach, Compete, Just Play, and Train modes — every mode now has a one-click toolbar button to switch back to Classical or another mode
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified

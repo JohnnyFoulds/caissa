@@ -26,10 +26,16 @@ bin/Code/
 │  ├─ Driver.py           # Driver base + QtDriver (only Qt-touching class in Rpa/)
 │  ├─ Runner.py           # Step-pumped state machine
 │  └─ ...                 # See docs/rpa/ for the full architecture
+└─ Fritz/                 # Fritz visual layer (fixed window, panes, LCD clocks, ribbon)
+   ├─ Types.py            # Frozen dataclasses (zero third-party imports)
+   ├─ Errors.py           # FritzError(CaissaError) hierarchy
+   ├─ QssRules.py         # scan_qss / template_gaps / qproperties — pure
+   └─ ...                 # See docs/fritz/ for the full architecture
 
 Resources/
 ├─ Modes/                 # Mode JSON files (classical, Coach, Analyse, Train, Compete, Just Play)
 ├─ Styles/                # QSS themes + optional <name>.ui.json overlays
+├─ Ribbons/               # Ribbon content maps (<name>.json, one per Fritz mode)
 └─ Rpa/                   # RPA assets: Templates/, Reference/, Fixtures/
 
 docs/
@@ -39,7 +45,9 @@ docs/
 ├─ process/
 │  └─ sdd-workflow.md     # SDD/TDD workflow — THE ROUTINE + 8 gates
 ├─ features/              # Per-feature SDD artefacts
-│  └─ rpa-layer/          # RPA layer spec, steps, implementation plan
+│  ├─ rpa-layer/          # RPA layer spec, steps, implementation plan
+│  └─ fritz-polish/       # Fritz Polish spec, steps, implementation plan
+├─ fritz/                 # Fritz layer product documentation
 ├─ rpa/                   # RPA layer product documentation
 └─ templates/             # SDD artefact templates
 ```
@@ -64,6 +72,19 @@ docs/
 - Mode-owned config section: `config_section` key in mode JSON appends a mode-owned tab
 - Mode UI hooks: `bin/Code/UIModes/actions/<mode>_ui.py` with optional `patch_config_form`
 - See `docs/theme-mode-system.md` for the full spec
+
+### Purity Tiers
+
+New Caissa code lives in a flat feature package under `bin/Code/` (e.g. `bin/Code/Fritz/`, `bin/Code/Rpa/`). Every module declares a purity tier:
+
+| Tier | May import | Examples |
+|---|---|---|
+| Dependency-free | stdlib only | `Types.py`, `Errors.py` |
+| Pure | stdlib + dependency-free + Qt-free upstream | `BoardFit.py`, `QssRules.py` |
+| Adapter | upstream `Code.*` + pure + stdlib | `ThemeGateway.py`, `ModeGateway.py` |
+| Qt allowlist | Qt + everything above | `WFritzPane.py`, `WRibbon.py` |
+
+Enforced by `tests/unit/<feature>/test_completeness.py` using transitive AST import resolution. See `docs/standards/architecture.md` for the full rules.
 
 ### Config Keys
 - `x_ui_mode` — active Mode (feature-set filter)
@@ -114,6 +135,16 @@ Prompt library: `docs/claude_code/prompts.md`.
 
 Existing flat specs (grandfathered): `docs/theme-mode-system.md`, `docs/ui-testing.md`.
 
+### UI Design Process
+Design in the shipping medium (PySide6 + real `.qss`), never in a design tool. A two-round mockup
+approval gate must pass before any visual phase begins. Custom-painted widgets take their design
+values from the `.qss` via the E1-E4 `qproperty-` contract. See `docs/standards/ui-design-process.md`.
+
+### Architecture
+New Caissa code goes in a flat feature package under `bin/Code/`, pure by default, with Qt confined
+to a named allowlist and purity enforced by an AST test. Seams are plain base classes; no `abc.ABC`
+and no `typing.Protocol`. See `docs/standards/architecture.md`.
+
 ### Docstrings
 RST/Sphinx style for all new public modules, classes, and functions.
 See `docs/standards/docstring-standards.md`.
@@ -149,6 +180,35 @@ Rules:
 - No banner-style comment dividers — use `#region` / `#endregion`
 - No default comments — only add when the WHY is non-obvious
 - See `docs/standards/coding-standards.md`
+
+---
+
+## Development Commands
+
+Run from the repo root so `from tests.helpers import …` resolves.
+
+```bash
+make lint        # ruff check --config ruff.toml  (mandatory --config, never bare ruff)
+make test        # -m "unit or rpa"               default suite, no Qt
+make test-all    # by path                         cross-checks markers vs filesystem
+make cov         # branch coverage, --cov-fail-under=90
+make docs        # sphinx -W --keep-going          zero warnings required at Gates H and E
+make test-ui     # -m "ui or rpa_ui"               launches the real app out-of-process
+```
+
+Order to run: `make test` (seconds, no Qt) → `make test-all` → `make test-ui` (minutes, real app).
+
+**Pytest markers** — every collected test declares exactly one as a module-level `pytestmark`:
+
+| Marker | What it covers |
+|---|---|
+| `unit` | fast, no Qt, no I/O |
+| `ui` | in-process Qt, `QT_QPA_PLATFORM=offscreen` |
+| `rpa` | out-of-process, bare remote-control verbs |
+| `rpa_ui` | out-of-process, widget-level verbs |
+| `rpa_cv` | out-of-process, CV template assertions; auto-skips when `cv2` missing |
+
+Config files: `ruff.toml` (lint), `requirements-dev.txt` (dev deps), `.coveragerc` (coverage omit list + 90% gate).
 
 ---
 

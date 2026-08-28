@@ -11,6 +11,18 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
+### Added
+- **Retro Engine — Phase 0 (Documentation & Process)**: full SDD artefact set for
+  the Retro Engine feature (`docs/features/retro-engine/`): `initial_idea.md` (FROZEN),
+  `feature_spec.md` (Gate A satisfied), `feature_steps.md` (all test names for all
+  10 phases, Phase 1–10 as `xfail(strict=True)` stubs), `implementation_plan.md`
+  (Phase 0 + Phase 1 sessions in full; Phases 2–10 stubs), `decisions.md`. Product
+  documentation in `docs/retro/`: `README.md`, `legal.md` (ROM / copyright policy),
+  `rom-setup.md`, `uci-options.md`, `reverse-engineering.md`, `testing.md`,
+  `troubleshooting.md`. Resource directory placeholders: `Resources/Retro/`,
+  `Resources/Retro/Corpus/`. `.gitignore` updated to exclude `Resources/Retro/Fixtures/`
+  and `UserData/Retro/` (user ROM and trace paths).
+
 ### Fixed
 - **Mode toolbar escape hatch**: added `caissa:switch_mode` to `toolbar_inject` for Analyse, Coach, Compete, Just Play, and Train modes — every mode now has a one-click toolbar button to switch back to Classical or another mode
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified

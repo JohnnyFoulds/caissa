@@ -13,3 +13,7 @@ bin/OS/linux/Engines/fractal/chesslog
 docs/_tmp/
 docs/rpa/api/
 docs/_build/
+
+# Retro Engine — never commit user ROMs or full traces
+Resources/Retro/Fixtures/
+UserData/Retro/

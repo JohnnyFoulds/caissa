@@ -39,9 +39,14 @@ class LCDialog(QtWidgets.QDialog):
             self.liGrids.append(grid)
 
     def register_splitter(self, splitter: QtWidgets.QSplitter, name: str) -> None:
-        """Register a splitter to save its state."""
+        """Register a splitter to save its state, replacing any prior entry with the same name."""
         if splitter and name:
+            self.liSplitters = [(sp, nm) for sp, nm in self.liSplitters if nm != name]
             self.liSplitters.append((splitter, name))
+
+    def unregister_splitter(self, name: str) -> None:
+        """Remove a previously registered splitter by name."""
+        self.liSplitters = [(sp, nm) for sp, nm in self.liSplitters if nm != name]
 
     def save_video(self, dic_extended: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         dic = dic_extended if dic_extended is not None else {}
@@ -119,7 +124,7 @@ class LCDialog(QtWidgets.QDialog):
             for sp, name in self.liSplitters:
                 k = f"SP_{name}"
                 li_sp = dic.get(k)
-                if li_sp and isinstance(li_sp, list) and len(li_sp) == 2 and isinstance(li_sp[0], int):
+                if li_sp and isinstance(li_sp, list) and len(li_sp) == sp.count() and isinstance(li_sp[0], int):
                     try:
                         sp.setSizes(li_sp)
                     except (TypeError, ValueError):

@@ -307,9 +307,10 @@ class Information(QtWidgets.QWidget):
     def activate(self, to_activate):
         if to_activate:
             if not self.w_parent.isMaximized():
-                if self.width_saved:
-                    self.w_parent.resize(self.parent_width_saved, self.w_parent.height())
-                    self.resize(self.width_saved, self.height())
+                if not getattr(self.w_parent, "_fit_board", False):
+                    if self.width_saved:
+                        self.w_parent.resize(self.parent_width_saved, self.w_parent.height())
+                        self.resize(self.width_saved, self.height())
             self.show()
         else:
             self.hide()

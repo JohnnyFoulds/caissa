@@ -177,6 +177,48 @@
       "keys": ["manager_class", "fen", "moves", "move_count", "turn", "result", "is_human_side_white", "human_is_playing", "toolbar"],
       "requires_game": true,
       "notes": "Returns full game state; game-specific keys only present when a game is active"
+    },
+    {
+      "id": "window_info",
+      "cmd": "window_info",
+      "keys": ["x", "y", "w", "h", "maximized", "fullscreen", "min_w", "min_h", "normal_w", "normal_h", "fit_board", "key_video", "ui_mode"],
+      "requires_game": false,
+      "notes": "Success path — returns main window geometry, state flags, and Fritz mode flags"
+    },
+    {
+      "id": "board_info",
+      "cmd": "board_info",
+      "keys": ["ancho", "width_piece", "is_white_bottom"],
+      "requires_game": false,
+      "notes": "Success path — returns main board dimensions and piece-size config"
+    },
+    {
+      "id": "resize_window",
+      "cmd": "resize_window 1000 700",
+      "keys": ["x", "y", "w", "h", "maximized", "fullscreen", "min_w", "min_h", "normal_w", "normal_h", "fit_board", "key_video", "ui_mode"],
+      "requires_game": false,
+      "notes": "Success path — resizes window and returns window_info payload"
+    },
+    {
+      "id": "set_window_state",
+      "cmd": "set_window_state normal",
+      "keys": ["x", "y", "w", "h", "maximized", "fullscreen", "min_w", "min_h", "normal_w", "normal_h", "fit_board", "key_video", "ui_mode"],
+      "requires_game": false,
+      "notes": "Success path — sets window to normal state and returns window_info payload"
+    },
+    {
+      "id": "set_splitter_sizes",
+      "cmd": "set_splitter_sizes __nonexistent_rc_contract__ 100,200",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — unknown splitter name returns error"
+    },
+    {
+      "id": "click_tabbar",
+      "cmd": "click_tabbar __xyzzy_rc_contract__ 0",
+      "keys": ["error"],
+      "requires_game": false,
+      "notes": "Error path — no QTabBar matching the sentinel query"
     }
   ]
 }

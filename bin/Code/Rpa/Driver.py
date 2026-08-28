@@ -435,6 +435,208 @@ class QtDriver(Driver):
         }
 
     # ------------------------------------------------------------------
+    # Fixed-window verbs (Phase 2)
+    # ------------------------------------------------------------------
+
+    def window_info(self) -> dict:
+        """Return the main window's current geometry, state, and Fritz flags.
+
+        :returns: Dict with keys ``x``, ``y``, ``w``, ``h``, ``maximized``,
+                  ``fullscreen``, ``min_w``, ``min_h``, ``normal_w``,
+                  ``normal_h``, ``fit_board``, ``key_video``, ``ui_mode``.
+        :spec: §2.8, Phase 2 (feature_spec.md)
+        """
+        import Code
+        proc = Code.procesador
+        if not proc or not hasattr(proc, "main_window"):
+            return {"error": "no main window"}
+        mw = proc.main_window
+        g = mw.geometry()
+        min_size = mw.minimumSize()
+        normal = mw.normalGeometry()
+        return {
+            "x": g.x(),
+            "y": g.y(),
+            "w": g.width(),
+            "h": g.height(),
+            "maximized": mw.isMaximized(),
+            "fullscreen": mw.isFullScreen(),
+            "min_w": min_size.width(),
+            "min_h": min_size.height(),
+            "normal_w": normal.width(),
+            "normal_h": normal.height(),
+            "fit_board": getattr(mw, "_fit_board", False),
+            "key_video": getattr(mw, "key_video", None),
+            "ui_mode": getattr(Code.configuration, "x_ui_mode", None),
+        }
+
+    def board_info(self) -> dict:
+        """Return the main board's current dimensions and piece-size config.
+
+        :returns: Dict with keys ``ancho``, ``width_piece``, ``is_white_bottom``.
+        :spec: §2.8, Phase 2 (feature_spec.md)
+        """
+        import Code
+        proc = Code.procesador
+        if not proc or not hasattr(proc, "main_window"):
+            return {"error": "no main window"}
+        mw = proc.main_window
+        board = getattr(getattr(mw, "base", None), "board", None)
+        if board is None:
+            board = getattr(mw, "board", None)
+        if board is None:
+            return {"error": "no board found"}
+        return {
+            "ancho": board.ancho,
+            "width_piece": board.width_piece,
+            "is_white_bottom": getattr(board, "is_white_bottom", True),
+        }
+
+    def resize_window(self, w: int, h: int) -> dict:
+        """Resize the main window and return the resulting geometry.
+
+        Un-maximizes/un-fullscreens first so the resize takes effect.
+        Calls ``processEvents`` so the reported geometry reflects the
+        completed resize.
+
+        :param w: Target width in pixels.
+        :param h: Target height in pixels.
+        :returns: :meth:`window_info` payload, or error dict.
+        :spec: §2.8, Phase 2 (feature_spec.md)
+        """
+        import Code
+        from PySide6 import QtWidgets
+        proc = Code.procesador
+        if not proc or not hasattr(proc, "main_window"):
+            return {"error": "no main window"}
+        mw = proc.main_window
+        if mw.isMaximized() or mw.isFullScreen():
+            mw.showNormal()
+            QtWidgets.QApplication.processEvents()
+        mw.resize(w, h)
+        QtWidgets.QApplication.processEvents()
+        return self.window_info()
+
+    def set_window_state(self, state: str) -> dict:
+        """Apply a named window state and return the resulting geometry.
+
+        :param state: One of ``"normal"``, ``"maximized"``, ``"fullscreen"``.
+        :returns: :meth:`window_info` payload after the state change.
+        :spec: §2.8, Phase 2 (feature_spec.md)
+        """
+        import Code
+        from PySide6 import QtWidgets
+        proc = Code.procesador
+        if not proc or not hasattr(proc, "main_window"):
+            return {"error": "no main window"}
+        mw = proc.main_window
+        s = state.lower()
+        if s == "normal":
+            mw.showNormal()
+        elif s == "maximized":
+            mw.showMaximized()
+        elif s == "fullscreen":
+            mw.showFullScreen()
+        else:
+            return {"error": f"unknown state {state!r}; expected normal|maximized|fullscreen"}
+        QtWidgets.QApplication.processEvents()
+        return self.window_info()
+
+    def set_splitter_sizes(self, name: str, sizes_str: str) -> dict:
+        """Set sizes on a splitter found by registered name or ``objectName``.
+
+        Search order: ``liSplitters`` on the main window (and its ``base``
+        widget), then all visible ``QSplitter`` widgets whose ``objectName``
+        matches *name* (case-insensitive substring).  This lets callers
+        address the Fritz right-column splitter by
+        ``objectName="WFritzRightCol"`` even though it is not registered.
+
+        :param name: Registered splitter name **or** widget objectName
+                     (case-insensitive substring match).
+        :param sizes_str: Comma-separated integer sizes, e.g. ``"300,200,150"``.
+        :returns: Response dict with ``ok``, ``name``, ``actual_sizes``.
+        :spec: §2.8, Phase 2 (feature_spec.md)
+        """
+        import Code
+        from PySide6 import QtWidgets
+        from shiboken6 import isValid
+        proc = Code.procesador
+        if not proc or not hasattr(proc, "main_window"):
+            return {"error": "no main window"}
+        mw = proc.main_window
+        try:
+            sizes = [int(s.strip()) for s in sizes_str.split(",") if s.strip()]
+        except ValueError:
+            return {"error": f"invalid sizes {sizes_str!r}; expected comma-separated integers"}
+        sp = None
+        # 1. Search liSplitters by registered name (exact)
+        for candidate, nm in getattr(mw, "liSplitters", []):
+            if nm == name and isValid(candidate):
+                sp = candidate
+                break
+        if sp is None:
+            base = getattr(mw, "base", None)
+            for candidate, nm in getattr(base, "liSplitters", []):
+                if nm == name and isValid(candidate):
+                    sp = candidate
+                    break
+        # 2. Fall back: search all visible QSplitters by objectName substring
+        if sp is None:
+            q = name.lower()
+            for w in self.all_visible_widgets():
+                if isinstance(w, QtWidgets.QSplitter) and q in (w.objectName() or "").lower():
+                    sp = w
+                    break
+        if sp is None:
+            return {"error": f"no live splitter named or objectName-matching {name!r}"}
+        try:
+            sp.setSizes(sizes)
+        except Exception as exc:
+            return {"error": f"setSizes failed: {exc}"}
+        try:
+            actual = list(sp.sizes())
+        except Exception:
+            actual = sizes
+        return {"ok": True, "name": name, "actual_sizes": actual}
+
+    def click_tabbar(self, query: str, target: str) -> dict:
+        """Click a tab on a bare ``QTabBar`` found by *query*.
+
+        Use this verb for bare ``QTabBar`` widgets — the ribbon tab strip
+        (Phase 7) and the notation strip (Phase 5) — where :meth:`click_tab`
+        (which matches only ``QTabWidget``) does not apply.
+
+        :param query: Case-insensitive substring matching the ``QTabBar``'s
+                      ``objectName``, its parent's ``objectName``, or its
+                      parent's class name.  Pass ``"qtabbar"`` to match the
+                      first visible ``QTabBar`` regardless of name.
+        :param target: Tab label (partial, case-insensitive) or integer index
+                       string.
+        :returns: Response dict with ``ok``, ``tab``, ``index``.
+        :spec: §2.8, Phase 2 (feature_spec.md)
+        """
+        from PySide6 import QtWidgets
+        q = query.lower()
+        for w in self.all_visible_widgets():
+            if not isinstance(w, QtWidgets.QTabBar):
+                continue
+            if q != "qtabbar":
+                parent = w.parent()
+                parent_name = (parent.objectName() or "").lower() if parent else ""
+                parent_class = type(parent).__name__.lower() if parent else ""
+                own_name = (w.objectName() or "").lower()
+                if q not in own_name and q not in parent_name and q not in parent_class:
+                    continue
+            t_lower = target.lower()
+            for i in range(w.count()):
+                tab_text = w.tabText(i)
+                if t_lower == str(i) or (tab_text and t_lower in tab_text.lower()):
+                    w.setCurrentIndex(i)
+                    return {"ok": True, "tab": tab_text, "index": i}
+            return {"error": f"no tab matching {target!r} in QTabBar {w.objectName()!r}"}
+        return {"error": f"no visible QTabBar matching {query!r}"}
+
+    # ------------------------------------------------------------------
     # UI interaction helpers (extracted from RemoteControl)
     # ------------------------------------------------------------------
 
@@ -912,6 +1114,10 @@ class QtDriver(Driver):
     def open_config(self) -> dict:
         """Open the General Configuration dialog asynchronously.
 
+        Bypasses the options QMenu (which pops up at the cursor position and
+        may appear on a different monitor) and calls WindowConfig.options
+        directly so the dialog reliably appears parented to the main window.
+
         :returns: ``{"ok": True}`` immediately; dialog opens after the current
                   dispatch returns.
         """
@@ -920,10 +1126,25 @@ class QtDriver(Driver):
         proc = Code.procesador
         if not proc:
             return {"error": "no procesador"}
+        mw = getattr(proc, "main_window", None)
+        if not mw:
+            return {"error": "no main window"}
+
+        def _open():
+            try:
+                from Code.Config import WindowConfig
+                from Code.Main import InitApp
+                dic_previo = Code.configuration.read_dic_x()
+                if WindowConfig.options(mw, Code.configuration):
+                    Code.configuration.graba()
+                    InitApp.apply_live_style(Code.configuration)
+                    if Code.configuration.needs_reinit(dic_previo):
+                        proc.reiniciar()
+            except Exception as exc:
+                logger.error("open_config _open callback failed: %s", exc, exc_info=True)
+
         try:
-            if not getattr(proc, "main_window", None):
-                return {"error": "no main window"}
-            QtCore.QTimer.singleShot(0, proc.menu_options)
+            QtCore.QTimer.singleShot(0, _open)
             return {"ok": True}
         except Exception as exc:
             return {"error": str(exc)}

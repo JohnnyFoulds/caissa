@@ -31,6 +31,13 @@ Commands (newline-terminated, sent to /tmp/caissa-control.sock):
   set_config <key> <value>          → set one configuration attribute (bool/int/str) + save
   open_config                       → open General Configuration dialog (async)
 
+  window_info                       → main window geometry, state, fit_board, key_video, ui_mode
+  board_info                        → main board ancho, width_piece, is_white_bottom
+  resize_window <w> <h>             → resize window and return window_info
+  set_window_state <normal|maximized|fullscreen>  → set window state and return window_info
+  set_splitter_sizes <name> <a,b,…> → set sizes on a splitter by registered name or objectName
+  click_tabbar <query> <label|idx>  → click a bare QTabBar tab (ribbon, notation strip)
+
 All responses are JSON + newline.
 """
 
@@ -284,6 +291,38 @@ class RemoteControl(QtCore.QObject):
 
         if verb == "open_config":
             return self._qt.open_config()
+
+        # Fixed-window verbs (Phase 2)
+        if verb == "window_info":
+            return self._qt.window_info()
+
+        if verb == "board_info":
+            return self._qt.board_info()
+
+        if verb == "resize_window":
+            sub_parts = arg.split(None, 1)
+            if len(sub_parts) < 2:
+                return {"error": "usage: resize_window <w> <h>"}
+            try:
+                rw, rh = int(sub_parts[0]), int(sub_parts[1])
+            except ValueError:
+                return {"error": "usage: resize_window <w> <h> (integers required)"}
+            return self._qt.resize_window(rw, rh)
+
+        if verb == "set_window_state":
+            return self._qt.set_window_state(arg)
+
+        if verb == "set_splitter_sizes":
+            sub_parts = arg.split(None, 1)
+            if len(sub_parts) < 2:
+                return {"error": "usage: set_splitter_sizes <name> <a,b,...>"}
+            return self._qt.set_splitter_sizes(sub_parts[0], sub_parts[1])
+
+        if verb == "click_tabbar":
+            sub_parts = arg.split(None, 1)
+            if len(sub_parts) < 2:
+                return {"error": "usage: click_tabbar <query> <label|index>"}
+            return self._qt.click_tabbar(sub_parts[0], sub_parts[1])
 
         # ------------------------------------------------------------------
         # rpa_* verbs — all delegate to RpaService; none block _drain

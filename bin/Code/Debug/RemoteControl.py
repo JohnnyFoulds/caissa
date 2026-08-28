@@ -75,6 +75,10 @@ class RemoteControl(QtCore.QObject):
         from Code.Rpa.Driver import QtDriver
         self._qt = QtDriver()
 
+        # RPA service — lazily created on first rpa_* verb (None if CAISSA_RPA=0)
+        self._rpa_service = None
+        self._rpa_disabled = os.environ.get("CAISSA_RPA", "1") == "0"
+
         self._timer = QtCore.QTimer(self)
         self._timer.timeout.connect(self._drain)
         self._timer.start(50)
@@ -86,6 +90,20 @@ class RemoteControl(QtCore.QObject):
         _enable_faulthandler()
         t = threading.Thread(target=self._serve, daemon=True)
         t.start()
+
+    def _rpa(self):
+        """Return the lazily-created RpaService instance, or None if disabled.
+
+        Code.Rpa is never imported until an rpa_* verb arrives — zero cost
+        for sessions that never use the RPA layer.  CAISSA_RPA=0 disables it.
+        """
+        if self._rpa_disabled:
+            return None
+        if self._rpa_service is None:
+            from Code.Rpa.Service import RpaService
+            self._rpa_service = RpaService(driver=self._qt, _start_pump=False)
+            logger.debug("RpaService initialised (pump driven by _drain timer)")
+        return self._rpa_service
 
     def _heartbeat(self):
         self._heartbeat_seq += 1
@@ -152,6 +170,10 @@ class RemoteControl(QtCore.QObject):
         self._draining = True
         logger.debug("DRAIN enter")
         try:
+            # Pump the RPA runner (one step per drain cycle, separate from dispatch)
+            if self._rpa_service is not None:
+                self._rpa_service.pump_once()
+
             while True:
                 try:
                     cmd, result_holder, done = self._queue.get_nowait()
@@ -262,5 +284,21 @@ class RemoteControl(QtCore.QObject):
 
         if verb == "open_config":
             return self._qt.open_config()
+
+        # ------------------------------------------------------------------
+        # rpa_* verbs — all delegate to RpaService; none block _drain
+        # ------------------------------------------------------------------
+        if verb.startswith("rpa_"):
+            svc = self._rpa()
+            if svc is None:
+                return {"error": "RPA layer disabled (CAISSA_RPA=0)"}
+            handler = getattr(svc, verb, None)
+            if handler is None:
+                return {"error": f"unknown rpa verb: {verb!r}"}
+            try:
+                return handler(arg)
+            except Exception as exc:
+                logger.error("rpa verb %r raised: %s", verb, exc, exc_info=True)
+                return {"error": str(exc)}
 
         return {"error": f"unknown command: {verb!r}"}

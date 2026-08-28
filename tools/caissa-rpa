@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""
+caissa-rpa — Command-line client for the Caissa RPA layer.
+
+Usage::
+
+    caissa-rpa run <workflow>           Start a workflow (returns run_id)
+    caissa-rpa run <workflow> --wait    Start and poll until complete
+    caissa-rpa status <run_id>          Check run status
+    caissa-rpa journal <run_id>         Print the full run journal (JSON)
+    caissa-rpa find <selector_json>     Resolve a selector against the live UI
+    caissa-rpa state                    Print the current app state
+    caissa-rpa cancel [<run_id>]        Cancel the active (or named) run
+    caissa-rpa workflows                List registered workflow names
+    caissa-rpa doctor                   Print capability probe + install hints
+
+Examples::
+
+    caissa-rpa state
+    caissa-rpa run smoke_home
+    caissa-rpa run smoke_home --wait
+    caissa-rpa find '{"cls":"QPushButton","scope":"toolbar"}'
+    caissa-rpa doctor
+
+The socket path defaults to /tmp/caissa-control.sock.  Override with
+CAISSA_SOCK.
+"""
+
+import json
+import os
+import sys
+
+# Resolve the bin directory so we can import test helpers
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_TESTS = os.path.join(_REPO, "tests")
+if _TESTS not in sys.path:
+    sys.path.insert(0, _TESTS)
+
+from ui.client import CaissaClient, CaissaClientError
+from ui.rpa_client import CaissaRpaClient, CaissaRpaError
+
+_SOCK = os.environ.get("CAISSA_SOCK", "/tmp/caissa-control.sock")
+
+
+def _die(msg: str, code: int = 1) -> None:
+    print(f"error: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def _json_out(data) -> None:
+    print(json.dumps(data, indent=2))
+
+
+def cmd_state(rpa: CaissaRpaClient, _args: list[str]) -> None:
+    """Print the current app state."""
+    resp = rpa.state()
+    print(resp["state"])
+
+
+def cmd_run(rpa: CaissaRpaClient, args: list[str]) -> None:
+    """Start a workflow; optionally wait for completion."""
+    if not args:
+        _die("usage: caissa-rpa run <workflow> [--wait]")
+    workflow = args[0]
+    wait = "--wait" in args
+    try:
+        if wait:
+            stat = rpa.run_and_wait(workflow)
+            _json_out(stat)
+        else:
+            run_id = rpa.start(workflow)
+            print(run_id)
+    except CaissaRpaError as exc:
+        _die(str(exc))
+    except TimeoutError as exc:
+        _die(str(exc))
+
+
+def cmd_status(rpa: CaissaRpaClient, args: list[str]) -> None:
+    """Print the status of a run."""
+    if not args:
+        _die("usage: caissa-rpa status <run_id>")
+    try:
+        stat = rpa.status(args[0])
+        _json_out(stat)
+    except CaissaRpaError as exc:
+        _die(str(exc))
+
+
+def cmd_journal(rpa: CaissaRpaClient, args: list[str]) -> None:
+    """Print the full journal for a completed run."""
+    if not args:
+        _die("usage: caissa-rpa journal <run_id>")
+    try:
+        j = rpa.journal(args[0])
+        _json_out(j)
+    except CaissaRpaError as exc:
+        _die(str(exc))
+
+
+def cmd_find(rpa: CaissaRpaClient, args: list[str]) -> None:
+    """Resolve a selector and print matching elements."""
+    if not args:
+        _die('usage: caissa-rpa find \'{"cls":"QPushButton"}\'')
+    raw = " ".join(args)
+    try:
+        sel = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        _die(f"invalid JSON: {exc}")
+    try:
+        resp = rpa.find({"selector": sel})
+        _json_out(resp)
+    except CaissaRpaError as exc:
+        _die(str(exc))
+
+
+def cmd_cancel(rpa: CaissaRpaClient, args: list[str]) -> None:
+    """Cancel the active (or named) run."""
+    run_id = args[0] if args else None
+    try:
+        resp = rpa.cancel(run_id)
+        _json_out(resp)
+    except CaissaRpaError as exc:
+        _die(str(exc))
+
+
+def cmd_workflows(rpa: CaissaRpaClient, _args: list[str]) -> None:
+    """List registered workflow names."""
+    try:
+        wfs = rpa.workflows()
+        for name in wfs:
+            print(name)
+        if not wfs:
+            print("(no workflows registered)")
+    except CaissaRpaError as exc:
+        _die(str(exc))
+
+
+def cmd_doctor(rpa: CaissaRpaClient, _args: list[str]) -> None:
+    """Print capability probe and install hints."""
+    try:
+        caps = rpa.capabilities()
+    except CaissaRpaError as exc:
+        _die(f"cannot reach Caissa: {exc}")
+    print(f"cv_available   : {caps.get('cv_available', False)}")
+    print(f"ocr_available  : {caps.get('ocr_available', False)}")
+    cv_ver = caps.get("cv_version")
+    if cv_ver:
+        print(f"cv_version     : {cv_ver}")
+    hint = caps.get("install_hint")
+    if hint:
+        print(f"\ninstall_hint: {hint}")
+    else:
+        print("\nAll RPA capabilities available.")
+
+
+_COMMANDS = {
+    "state": cmd_state,
+    "run": cmd_run,
+    "status": cmd_status,
+    "journal": cmd_journal,
+    "find": cmd_find,
+    "cancel": cmd_cancel,
+    "workflows": cmd_workflows,
+    "doctor": cmd_doctor,
+}
+
+
+def main() -> None:
+    """Entry point for the caissa-rpa CLI."""
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(0)
+
+    cmd_name = args[0]
+    cmd_args = args[1:]
+
+    handler = _COMMANDS.get(cmd_name)
+    if handler is None:
+        _die(
+            f"unknown command {cmd_name!r}. "
+            f"Available: {', '.join(sorted(_COMMANDS))}"
+        )
+
+    if not os.path.exists(_SOCK):
+        _die(
+            f"socket not found: {_SOCK}. "
+            "Is Caissa running?  (tools/caissa)"
+        )
+
+    rpa = CaissaRpaClient(socket_path=_SOCK)
+    handler(rpa, cmd_args)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12",
+  "version": 1,
+  "entries": [
+    {
+      "sha256": "d4fc6137d7addf97f8a693bd53b240f1344c05fe4f9864a6930f6e298e1378bc",
+      "platform": "amiga_68k",
+      "label": "Battle Chess (Amiga, Dragon Inc crack, 1988)",
+      "file_size": 84912,
+      "supported": true,
+      "container": "amiga_hunk",
+      "hunk_code_file_offset": 40,
+      "hunk_code_size": 84872,
+      "load_address": 0,
+      "notes": "Single HUNK_CODE block, pre-relocated. No HUNK_RELOC32. Base address 0x00000000.",
+      "offsets": {
+        "a4_init": "0x1113C",
+        "a4_value": "0x7FFE",
+        "state_machine_dispatch": "0x81C8",
+        "jump_table": "0x8198",
+        "state6_handler": "0x80D4",
+        "ai_outer_driver": "0x81DC",
+        "ai_phase0_init": "0x8230",
+        "ai_phase1_search": "0x82DE",
+        "ai_phase2_cleanup": "0x84C4",
+        "ai_find_move": "0x901C",
+        "per_piece_eval": "0x94D8",
+        "post_move": "0x9808",
+        "best_move_writer": "0x0126",
+        "board_0x88_check": "0xADD0"
+      },
+      "globals_a4_relative": {
+        "-0x49A4": "ai_best_move (8-byte MoveSpec output)",
+        "-0x4CDC": "piece_table_base (8 bytes/entry)",
+        "-0x4CDE": "piece_counter (word)",
+        "-0x35A0": "game_state (word)",
+        "-0x35BC": "target_move_from (word)",
+        "-0x35BA": "target_move_to (word)",
+        "-0x4CE0": "player1_color (word)",
+        "-0x4CE2": "player2_color (word)",
+        "-0x4298": "move_count (word)"
+      },
+      "move_struct": {
+        "size_bytes": 8,
+        "layout": [
+          {"offset": 0, "size": 2, "field": "from_sq",  "encoding": "0x88 square index"},
+          {"offset": 2, "size": 2, "field": "to_sq",    "encoding": "0x88 square index"},
+          {"offset": 4, "size": 2, "field": "flags",    "encoding": "move-type flags"},
+          {"offset": 6, "size": 1, "field": "piece",    "encoding": "piece type nibble (0=empty..6=king)"},
+          {"offset": 7, "size": 1, "field": "legal",    "encoding": "non-zero = legal"}
+        ]
+      }
+    }
+  ]
+}

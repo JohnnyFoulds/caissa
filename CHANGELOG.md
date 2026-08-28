@@ -12,6 +12,20 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 2 (Foundations)**: `bin/Code/Base/CaissaErrors.py` promotes
+  `CaissaError` to the repo-wide root (D1); `Code.Rpa.Errors` re-exports it for backward
+  compat. `bin/Code/Retro/` package created with `Errors.py` (`RetroError` + 11 leaf
+  classes) and `Types.py` (`MoveSpec`, `RomId`, `MemRegion`, `Level`, `ThinkResult`,
+  `Platform` — zero third-party imports, N-RETRO-1). `tests/unit/retro/test_foundations.py`
+  covers N-RETRO-1 through N-RETRO-5 (16 passing, 5 xfail stubs for Phases 3–7).
+  `pytest.ini` gains `retro`, `retro_emu`, `retro_rom` markers; `ruff.toml` adds
+  `bin/Code/Retro/**`, `tests/unit/retro/**`, `tools/caissa-retro` to include list;
+  `Makefile` adds `cov-retro`, `test-retro-emu`, `test-retro-rom`, `retro-doctor` targets
+  and extends `make test` to include the `retro` marker. `requirements-retro.txt` lists
+  `unicorn` + `capstone`. `Resources/Retro/manifest.json` records the confirmed Amiga
+  Dragon Inc crack (SHA256 `d4fc6137…`) with all 32 labelled offsets and the full
+  globals/move-struct tables from Phase 1-B recon. Decisions D2 and D4 resolved:
+  whole-binary headless emulation confirmed as the emulation strategy.
 - **Retro Engine — Phase 0 (Documentation & Process)**: full SDD artefact set for
   the Retro Engine feature (`docs/features/retro-engine/`): `initial_idea.md` (FROZEN),
   `feature_spec.md` (Gate A satisfied), `feature_steps.md` (all test names for all

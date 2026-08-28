@@ -9,12 +9,16 @@
 # ignored. (D11)
 
 include = [
+    "bin/Code/Base/CaissaErrors.py",
     "bin/Code/Rpa/**",
     "bin/Code/Fritz/**",
+    "bin/Code/Retro/**",
     "bin/Code/Main/LogSetup.py",
     "tests/unit/rpa/**",
     "tests/unit/fritz/**",
+    "tests/unit/retro/**",
     "tools/caissa-rpa",
+    "tools/caissa-retro",
     "tools/design/**",
 ]
 

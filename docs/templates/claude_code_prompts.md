@@ -151,3 +151,57 @@ The main documents are:
 - The specification at `<feature-spec-doc>`
 - The phase tracker at `<feature-steps-doc>`
 ```
+
+---
+
+## Milestone Review
+
+_Explore what has been built honestly before deciding what is next. Follow with the
+Exploration → Document pattern: discuss first, then ask Claude to formalise findings._
+
+```text
+We have just completed <milestone description>. Please review the full repository and:
+
+1. Summarise what has been built that is new (did not exist before this work).
+2. Identify which additions are genuinely novel or differentiated.
+3. Point out any architectural or technical debt worth addressing.
+4. Suggest the highest-value next feature, with a one-sentence rationale.
+
+Be direct. If something is ordinary, say so.
+```
+
+---
+
+## Housekeeping Check
+
+_Use at natural boundaries: before starting a new feature, or when the repo feels cluttered._
+
+```text
+Please do a housekeeping pass on the repository:
+
+1. Branches: list any branches not `main` and not a current active branch. For each,
+   confirm whether merged or abandoned, and recommend deletion or archiving.
+2. CHANGELOG: confirm `[Unreleased]` section is accurate and complete.
+3. Feature docs: any `docs/features/` directories complete but not yet archived?
+4. Open PRs: any PRs open against the wrong base or stale?
+
+Report each item with a recommended action. Do not take any action yet.
+```
+
+---
+
+## Feature Archive
+
+_Use when a feature is fully merged and implementation docs should move to the archive._
+
+```text
+The <feature name> feature is complete. All phases are merged to main.
+
+Please:
+1. `git mv docs/features/<name>/ docs/features/_archive/<name>/`
+2. Add `**Status:** Completed <today's date>` to the front matter of each archived file.
+3. Update any cross-references pointing to the old path.
+4. Confirm the archive exists and the original path is gone.
+
+Do not delete — the archive is the audit trail.
+```

@@ -12,6 +12,13 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 3 (ROM manifest + containers)**: `bin/Code/Retro/Manifest.py`
+  (load/validate/verify for `manifest.json`, streaming sha256, N-RETRO-6) and
+  `bin/Code/Retro/Rom.py` (Amiga HUNK format parser; packer detection for
+  PowerPacker/Imploder/XPK/LZX; `PackedBinaryError` on packed binaries; handles
+  HUNK_CODE/DATA/BSS/RELOC32/SYMBOL/DEBUG). `tests/unit/retro/test_manifest.py`
+  (9 tests) and `tests/unit/retro/test_rom.py` (11 tests) using synthetic HUNK
+  containers; Phase-3 xfail stubs replaced with real implementations.
 - **Retro Engine — Phase 2 (Foundations)**: `bin/Code/Base/CaissaErrors.py` promotes
   `CaissaError` to the repo-wide root (D1); `Code.Rpa.Errors` re-exports it for backward
   compat. `bin/Code/Retro/` package created with `Errors.py` (`RetroError` + 11 leaf

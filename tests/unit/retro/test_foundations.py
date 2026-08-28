@@ -301,18 +301,6 @@ def test_think_result_has_move():
 # xfail stubs for future phases
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="Phase 3: Manifest.py not yet implemented")
-def test_manifest_loads_known_rom():
-    """Manifest.py must load and validate manifest.json without error."""
-    pytest.fail("xfail stub")
-
-
-@pytest.mark.xfail(strict=True, reason="Phase 3: Rom.py not yet implemented")
-def test_rom_parses_amiga_hunk():
-    """Rom.py must parse a synthetic Amiga HUNK container without error."""
-    pytest.fail("xfail stub")
-
-
 @pytest.mark.xfail(strict=True, reason="Phase 4: Cpu.py not yet implemented")
 def test_fake_cpu_replays_trace():
     """FakeCpu must replay a scripted register/memory trace."""

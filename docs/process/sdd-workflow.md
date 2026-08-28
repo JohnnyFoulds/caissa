@@ -213,5 +213,7 @@ when resolved, with the date and the rationale that closed them.
 
 - `docs/standards/spec-driven-development.md` — normative *what* (spec format, §7 completeness checklist)
 - `docs/templates/` — template files for all four artefacts
-- `docs/claude_code/prompts.md` — ready-to-paste session prompts
+- `docs/claude_code/prompts.md` — Caissa/SDD-specific session prompts
+- `docs/claude_code/prompt-library.md` — general-purpose prompt templates
+- `docs/claude_code/working-patterns.md` — cross-project patterns and plan feedback moves
 - `docs/rpa/decisions.md` — ADR log for the RPA layer

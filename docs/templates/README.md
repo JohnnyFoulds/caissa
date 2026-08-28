@@ -32,7 +32,9 @@ CLAUDE.md                         ← repo-wide context (read automatically)
             ├─ feature_steps.md   ← LIVING phase tracker (links back to spec; updated as phases complete)
             └─ implementation_plan.md  ← LIVING session breakdown
                     │
-                    └─► docs/claude_code/prompts.md  ← prompt library (path table filled in)
+                    └─► docs/claude_code/prompts.md      ← SDD/Caissa prompt library
+                    └─► docs/claude_code/prompt-library.md  ← general-purpose templates
+                    └─► docs/claude_code/working-patterns.md ← cross-project patterns
 ```
 
 The typical sequence for a new feature:

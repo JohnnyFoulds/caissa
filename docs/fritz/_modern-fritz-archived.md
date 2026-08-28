@@ -1,4 +1,23 @@
-# Modern Fritz Skin — Specification
+# Modern Fritz Skin — SUPERSEDED
+
+> **This document is superseded by `docs/features/fritz-polish/feature_spec.md` and
+> `docs/fritz/concepts.md` (Phase D, 2026-08-28).** It is retained as an archive only.
+>
+> **Three drifted claims, reported per `docs/claude_code/prompts.md:144-147` (code is the
+> authority, not this doc):**
+>
+> 1. `WFritzEnginePanel` — shipped as `WFritzAnalysisTable`. The name in the spec below is wrong.
+> 2. Palette: `#161616` / `#1f1f1f` listed here; shipped values are `#252526` / `#1e1e1e`.
+> 3. "Q2: Same 88-key set" — the template has 85 keys, each `.colors` file has 86 (`IS_DARK` is
+>    the extra key), and "same key set as all other files" is the mis-described version of Q2
+>    (Q2's trigger is the template, not cross-file parity).
+>
+> The still-accurate content (mode hook contract, `on_mode_enter`/`on_mode_exit` general contract)
+> has been migrated to `docs/fritz/concepts.md`.
+
+---
+
+# Modern Fritz Skin — Original Specification (archived)
 
 ## Overview
 

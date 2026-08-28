@@ -7,6 +7,7 @@ Hierarchy::
     └─ CaissaError              (Code.Base.CaissaErrors — repo-wide root)
        └─ RetroError             (Retro domain base)
           ├─ RomError            ROM loading / verification failures
+          ├─ RomNotFoundError    ROM file missing from expected path
           ├─ ManifestError       manifest.json parse / schema failures
           ├─ HashMismatchError   sha256 does not match any known-good digest
           ├─ UnsupportedRomError ROM identified but not in the supported manifest
@@ -27,6 +28,7 @@ __all__ = [
     "CaissaError",
     "RetroError",
     "RomError",
+    "RomNotFoundError",
     "ManifestError",
     "HashMismatchError",
     "UnsupportedRomError",
@@ -50,6 +52,24 @@ class RetroError(CaissaError):
 
 class RomError(RetroError):
     """Raised when a ROM file cannot be opened, parsed, or loaded into the emulator."""
+
+
+class RomNotFoundError(RetroError):
+    """Raised when the ROM file does not exist at the expected path.
+
+    :attr path: Filesystem path that was checked.
+    """
+
+    def __init__(self, path: str) -> None:
+        """Initialise with an actionable message.
+
+        :param path: Filesystem path of the missing ROM.
+        """
+        super().__init__(
+            f"ROM not found at {path!r}. Supply a verified copy and set the path — "
+            f"see docs/retro/rom-setup.md."
+        )
+        self.path = path
 
 
 class ManifestError(RetroError):

@@ -109,12 +109,13 @@ def test_all_retro_leaf_errors_are_retro_error_subclasses():
         PackedBinaryError,
         RetroError,
         RomError,
+        RomNotFoundError,
         ThinkError,
         UciError,
         UnsupportedRomError,
     )
     leaves = [
-        RomError, ManifestError, HashMismatchError, UnsupportedRomError,
+        RomError, RomNotFoundError, ManifestError, HashMismatchError, UnsupportedRomError,
         PackedBinaryError, CpuError, EmulatorUnavailableError, BridgeError,
         ThinkError, OracleError, UciError,
     ]
@@ -297,11 +298,3 @@ def test_think_result_has_move():
     assert empty.has_move is False
 
 
-# ---------------------------------------------------------------------------
-# xfail stubs for future phases
-# ---------------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="Phase 7: Think.py not yet implemented")
-def test_think_produces_move_from_startpos():
-    """Think.think() must return a non-null ThinkResult from the start position."""
-    pytest.fail("xfail stub")

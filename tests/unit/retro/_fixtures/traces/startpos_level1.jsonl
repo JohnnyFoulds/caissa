@@ -1,0 +1,2 @@
+{"kind": "observation", "data": {"event": "position_written", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}}
+{"kind": "observation", "data": {"event": "best_move_written", "from_sq": 20, "to_sq": 52, "piece": 1}}

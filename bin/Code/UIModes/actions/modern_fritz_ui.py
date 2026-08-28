@@ -91,6 +91,142 @@ def _uninstall_fritz_pgn_coloring(base):
         pass
 
 
+# ── notation tab strip + NAG palette ───────────────────────────────────────────
+
+# Tab labels in order; only "Notation" has live content initially.
+_NOTATION_TAB_LABELS = [
+    "Notation",
+    "Training",
+    "Score sheet",
+    "LiveBook",
+    "Openings Book",
+    "My Moves",
+]
+
+# (label, NAG integer) pairs for the two NAG button rows.
+_NAG_ROW_1 = [("‼", 3), ("!", 1), ("!?", 5), ("?!", 6), ("?", 2), ("??", 4)]
+_NAG_ROW_2 = [("=", 10), ("∞", 13), ("⩲", 14), ("⩱", 15), ("±", 16), ("∓", 17), ("+−", 18)]
+
+
+def _build_notation_widget(mw) -> QtWidgets.QWidget:
+    """Wrap *mw.base.pgn* in a container that adds a tab strip and NAG palette.
+
+    Widget tree::
+
+        _FritzNotationContainer  (objectName WFritzNotationContainer)
+        ├─ QTabBar               (objectName WFritzNotationTabBar)
+        ├─ _nag_bar              (objectName WFritzNagBar)
+        │  ├─ row-1  QWidget     (objectName WFritzNagRow1)
+        │  └─ row-2  QWidget     (objectName WFritzNagRow2)
+        └─ mw.base.pgn           (reparented here)
+
+    :spec: §5.2
+    """
+    container = QtWidgets.QWidget(mw)
+    container.setObjectName("WFritzNotationContainer")
+    vbox = QtWidgets.QVBoxLayout(container)
+    vbox.setContentsMargins(0, 0, 0, 0)
+    vbox.setSpacing(0)
+
+    # ── tab bar ──────────────────────────────────────────────────────────────
+    tab_bar = QtWidgets.QTabBar(container)
+    tab_bar.setObjectName("WFritzNotationTabBar")
+    tab_bar.setExpanding(False)
+    tab_bar.setDrawBase(False)
+    for label in _NOTATION_TAB_LABELS:
+        tab_bar.addTab(label)
+    vbox.addWidget(tab_bar)
+
+    # ── NAG palette ──────────────────────────────────────────────────────────
+    nag_bar = QtWidgets.QWidget(container)
+    nag_bar.setObjectName("WFritzNagBar")
+    nag_vbox = QtWidgets.QVBoxLayout(nag_bar)
+    nag_vbox.setContentsMargins(2, 2, 2, 2)
+    nag_vbox.setSpacing(1)
+
+    for row_idx, nag_row_def in enumerate((_NAG_ROW_1, _NAG_ROW_2), start=1):
+        row_widget = QtWidgets.QWidget(nag_bar)
+        row_widget.setObjectName(f"WFritzNagRow{row_idx}")
+        row_hbox = QtWidgets.QHBoxLayout(row_widget)
+        row_hbox.setContentsMargins(0, 0, 0, 0)
+        row_hbox.setSpacing(2)
+        for label, nag_num in nag_row_def:
+            btn = QtWidgets.QToolButton(row_widget)
+            btn.setText(label)
+            btn.setObjectName(f"WFritzNagBtn_{nag_num}")
+            btn.setFixedHeight(18)
+            btn.setToolTip(f"NAG {nag_num}")
+            # Capture nag_num in closure
+            btn.clicked.connect(lambda _checked=False, n=nag_num, _mw=mw: _apply_nag(_mw, n))
+            row_hbox.addWidget(btn)
+        row_hbox.addStretch()
+        nag_vbox.addWidget(row_widget)
+
+    vbox.addWidget(nag_bar)
+
+    # ── pgn grid ─────────────────────────────────────────────────────────────
+    vbox.addWidget(mw.base.pgn)
+
+    return container
+
+
+def _apply_nag(mw, nag_num: int) -> None:
+    """Apply *nag_num* to the currently selected move in the notation grid.
+
+    :spec: §5.2
+    """
+    mgr = getattr(mw.base, "manager", None)
+    if mgr is None:
+        return
+    pgn_ctrl = getattr(mgr, "pgn", None)
+    if pgn_ctrl is None or not hasattr(pgn_ctrl, "only_move"):
+        return
+
+    try:
+        row, col = mw.base.pgn.current_position()
+        move = pgn_ctrl.only_move(row, col.key)
+        if move is None:
+            return
+        move.put_nag(nag_num)
+        mw.base.pgn.refresh()
+    except Exception:
+        _log.debug("Fritz apply_nag failed", exc_info=True)
+
+
+def _attach_fritz_delegates(pgn_grid) -> list:
+    """Replace WHITE/BLACK column delegates with :class:`FritzEtiquetaPGN`.
+
+    Returns the list of ``(col, original_delegate)`` pairs so the caller can
+    restore them on mode exit.
+
+    :spec: §5.5
+    """
+    from Code.Fritz.Delegates import FritzEtiquetaPGN
+
+    o_columns = pgn_grid.o_columns
+    restored = []
+    for col_key, is_white in (("WHITE", True), ("BLACK", False)):
+        col = o_columns.locate_column(col_key)
+        if col is not None:
+            restored.append((col, col.edicion))
+            col.edicion = FritzEtiquetaPGN(is_white)
+    pgn_grid.reread_columns()
+    return restored
+
+
+def _restore_delegates(pgn_grid, saved_delegates: list) -> None:
+    """Restore delegate objects saved by :func:`_attach_fritz_delegates`.
+
+    :spec: §5.5
+    """
+    for col, original in saved_delegates:
+        col.edicion = original
+    try:
+        pgn_grid.reread_columns()
+    except Exception:
+        _log.debug("Fritz delegate restore error", exc_info=True)
+
+
 # ── layout helpers ─────────────────────────────────────────────────────────────
 
 def _find_widget_in_layout(top_layout, target):
@@ -172,7 +308,6 @@ def on_mode_enter(procesador):
     mw._fritz_pgn_restore = None
     mw._fritz_wbase_constraints = []
 
-    _install_fritz_pgn_coloring(mw.base)
     home.action_chosen.connect(lambda action: _on_home_action(procesador, action))
 
     _log.debug("Modern Fritz layout activated (home screen)")
@@ -215,8 +350,8 @@ def _swap_home_to_analysis(procesador):
     eval_graph = WFritzEvalGraph(mw, bar)
 
     # ── 3. Wrap content widgets in WFritzPane ────────────────────────────────
-    from Code.Fritz.WFritzPane import WFritzPane
     from Code.Fritz.PaneRegistry import PaneRegistry
+    from Code.Fritz.WFritzPane import WFritzPane
 
     reg = PaneRegistry()
     for s in _PANE_SPECS:
@@ -225,7 +360,10 @@ def _swap_home_to_analysis(procesador):
     ph_pane  = WFritzPane(_PANE_SPECS[0], player_header)
     tbl_pane = WFritzPane(_PANE_SPECS[1], table)
     eg_pane  = WFritzPane(_PANE_SPECS[2], eval_graph)
-    pgn_pane = WFritzPane(_PANE_SPECS[3], mw.base.pgn)
+
+    # Build the notation container (tab strip + NAG palette + pgn grid).
+    notation_widget = _build_notation_widget(mw)
+    pgn_pane = WFritzPane(_PANE_SPECS[3], notation_widget)
 
     # ── 4. Restructure right_col ─────────────────────────────────────────────
     # Current right_col: [home(0), pgn_information(1)]
@@ -264,6 +402,10 @@ def _swap_home_to_analysis(procesador):
     }
     for _pane in _pane_dict.values():
         _pane.wire_pane_api(_api, _PANE_SPECS)
+
+    # ── Attach FritzEtiquetaPGN to notation columns (replaces monkey-patch) ────
+    saved_delegates = _attach_fritz_delegates(mw.base.pgn)
+    mw._fritz_saved_delegates = saved_delegates
 
     # ── 6. Show and start the new widgets ────────────────────────────────────
     for _p in _pane_dict.values():
@@ -420,7 +562,15 @@ def pane_api(mw) -> dict:
 def on_mode_exit(procesador):
     """Restore the standard layout before Procesador.reset() wipes state."""
     mw = procesador.main_window
-    _uninstall_fritz_pgn_coloring(mw.base)
+
+    # Restore FritzEtiquetaPGN → original EtiquetaPGN delegates.
+    saved = getattr(mw, "_fritz_saved_delegates", None)
+    if saved is not None:
+        _restore_delegates(mw.base.pgn, saved)
+        try:
+            del mw._fritz_saved_delegates
+        except AttributeError:
+            pass
 
     table = getattr(mw, "_fritz_analysis_table", None)
     eval_graph = getattr(mw, "_fritz_eval_graph", None)

@@ -72,9 +72,21 @@ def _contains_pyside6(source: str, filename: str) -> bool:
     return False
 
 
-# Module names (basenames relative to bin/Code/Fritz/) allowed to import PySide6.
+# Module names (relative to bin/Code/Fritz/) allowed to import PySide6 directly.
 # This list is empty in Phase 0 and grows as widget modules are added.
 _PYSIDE6_ALLOWED_RELATIVE: set[str] = set()
+
+# Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted
+# upstream code without being in the full PySide6 allowlist.  They cannot import
+# PySide6 directly — they merely call upstream functions that happen to use Qt
+# internally (e.g. Nags.nag_color returns a QColor).
+_ADAPTER_TAINT_ALLOWED_RELATIVE: set[str] = {
+    "ThemeGateway.py",
+    "ModeGateway.py",
+    "ConfigGateway.py",
+    "GeometryStore.py",
+    "EngineGateway.py",
+}
 
 # Qt-tainted upstream modules: importing these makes a module Qt-tainted even
 # without a direct PySide6 import.  Validated against bin/Code/ in
@@ -121,6 +133,19 @@ def test_no_pyside6_import_outside_allowlist():
         # Relative path from fritz_root, e.g. "Types.py" or "widgets/WFritzPane.py"
         rel_to_fritz = os.path.relpath(path, fritz_root)
         if rel_to_fritz in _PYSIDE6_ALLOWED_RELATIVE:
+            continue
+        # Adapter-tier modules may import Qt-tainted upstream but not PySide6 directly.
+        if rel_to_fritz in _ADAPTER_TAINT_ALLOWED_RELATIVE:
+            # Still check for a direct PySide6 import, which adapters must not have.
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    source = fh.read()
+            except OSError:
+                continue
+            if _contains_pyside6(source, path):
+                violations.append(
+                    f"{os.path.relpath(path)}: adapter module has direct PySide6 import"
+                )
             continue
         try:
             with open(path, encoding="utf-8") as fh:

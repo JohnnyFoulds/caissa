@@ -12,6 +12,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 8 (UCI shim + engine registration)**: `bin/Code/Retro/Uci.py` —
+  `UciSession` handling uci/isready/setoption/position/go/stop/quit; `io.StringIO` injection
+  seam for unit tests; FR-2 graceful degradation (`bestmove 0000` + info-string error when no
+  ROM); `EmuStrictOriginal` guard rejects non-50 Hz clock rates.
+  `tools/caissa-retro` — thin Python entry point wrapping `Uci.main()`.
+  `bin/OS/darwin/OSEngines.py` — `caissa-retro` registered as `ENG_FIXED`, elo 800, guarded
+  by `os.path.isfile(exe)` (engine silently absent when not set up).
+  `tests/unit/retro/test_uci.py` (11 tests, all `retro` marker, no ROM, no unicorn).
+  123 retro tests passing.
 - **Retro Engine — Phase 7 (Think orchestrator + Oracle + Trace)**: `bin/Code/Retro/Think.py`
   — `ThinkSession` that drives whole-binary emulation (write_position → clear_best_move →
   set_computer_color → emu_start → read_best_move → ThinkResult); rom_path vs cpu injection

@@ -11,6 +11,10 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
+### Fixed
+- **Mode toolbar escape hatch**: added `caissa:switch_mode` to `toolbar_inject` for Analyse, Coach, Compete, Just Play, and Train modes — every mode now has a one-click toolbar button to switch back to Classical or another mode
+- **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
+
 ### Added
 - **Win95 Fritz retro skin**: Windows 95-style 3D bevel theme — raised/inset `outset`/`inset` borders, `#c0c0c0` system grey, navy (`#000080`) selection, zero `border-radius`, chunky 16px scrollbars
 - **DOS Fritz retro skin**: CGA terminal theme — amber-on-black (`#ffb000` on `#000000`), hard 1px borders, invert-on-hover buttons, `#0000aa` CGA-blue selection, VSCode icon pack for minimal look

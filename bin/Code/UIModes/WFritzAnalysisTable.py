@@ -25,6 +25,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 import Code
 from Code.Base import Game
+from Code.Fritz.EvalModel import describe as _eval_describe
 
 _log = logging.getLogger(__name__)
 
@@ -146,6 +147,11 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         hl.addWidget(self._btn_plus)
         outer.addWidget(self._hdr)
 
+        # Dense one-line eval summary: "Black is slightly better: ⩱ (-0.60) Depth: 24/45 …"
+        self._lb_eval_summary = QtWidgets.QLabel("", self)
+        self._lb_eval_summary.setObjectName("WFritzEvalSummary")
+        outer.addWidget(self._lb_eval_summary)
+
         self._table = QtWidgets.QTableWidget(self)
         self._table.setObjectName("WFritzAnalysisGrid")
         self._table.setColumnCount(4)
@@ -255,6 +261,8 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         except Exception:
             pass
 
+        self._update_eval_summary(mrm)
+
         li = mrm.li_rm or []
         for row in range(self._n_pv):
             if row < len(li):
@@ -262,6 +270,58 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
                 self._fill_row(row, row + 1, rm, fen)
             else:
                 self._clear_row(row)
+
+    def _update_eval_summary(self, mrm) -> None:
+        """Populate the one-line dense eval label from *mrm*.
+
+        Format: ``"Black is slightly better: ⩱ (-0.60) Depth: 24/45 00:00:16 51157kN"``
+
+        :param mrm: Live ``MultiEngineResponse``.
+        :spec: FR-31
+        """
+        summary = _eval_describe(mrm)
+        if summary is None:
+            self._lb_eval_summary.setText("")
+            return
+
+        try:
+            from Code.Nags.Nags import dic_symbol_nags
+            nag_sym = dic_symbol_nags(summary.nag) if summary.nag is not None else ""
+        except Exception:
+            nag_sym = ""
+
+        cp_str = f"({summary.cp / 100.0:+.2f})" if summary.cp is not None else ""
+        depth_str = (
+            f"{summary.depth}/{summary.seldepth}" if summary.seldepth else str(summary.depth)
+        )
+
+        # Format elapsed time as HH:MM:SS or MM:SS
+        total_s = summary.ms // 1000
+        h, rem = divmod(total_s, 3600)
+        m, s = divmod(rem, 60)
+        time_str = f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+        # Format node count (e.g. 51157kN)
+        if summary.nodes >= 1_000_000:
+            nodes_str = f"{summary.nodes // 1000}kN"
+        elif summary.nodes >= 1_000:
+            nodes_str = f"{summary.nodes // 1000}kN"
+        else:
+            nodes_str = f"{summary.nodes}N" if summary.nodes else ""
+
+        parts = [summary.text]
+        if nag_sym:
+            parts.append(f": {nag_sym}")
+        if cp_str:
+            parts.append(f" {cp_str}")
+        if depth_str:
+            parts.append(f" Depth: {depth_str}")
+        if time_str:
+            parts.append(f" {time_str}")
+        if nodes_str:
+            parts.append(f" {nodes_str}")
+
+        self._lb_eval_summary.setText("".join(parts))
 
     def _fill_row(self, row, rank, rm, fen):
         try:

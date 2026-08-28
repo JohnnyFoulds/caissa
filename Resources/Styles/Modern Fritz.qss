@@ -1013,6 +1013,24 @@ font-weight: bold;
 color: #cccccc;
 }
 
+WFritzLCD
+{
+qproperty-litColor: #00ff88;
+qproperty-dimColor: #103a18;
+qproperty-boxHeight: 34;
+qproperty-boxWidth: 108;
+qproperty-segmentThickness: 4;
+background-color: #000000;
+border-radius: 2px;
+}
+
+#WFritzEvalSummary
+{
+font-size: 8pt;
+color: #cccccc;
+padding: 2px 8px;
+}
+
 /* NAG BACKGROUND COLOURS (also reachable from Options -> Colours) ------------ */
 /* Values are read from dic_colors under NAG_BRILLIANT..NAG_BLUNDER keys.      */
 /* The monkey-patch in modern_fritz_ui.py reads these via Code.Fritz.ThemeGateway. */

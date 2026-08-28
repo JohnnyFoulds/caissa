@@ -297,7 +297,7 @@ exist in source.
 
 ---
 
-## Phase 4 — LCD clocks and the dense eval line ⬜
+## Phase 4 — LCD clocks and the dense eval line ✅
 
 **Branch:** `feat/fritz-clocks-eval`
 

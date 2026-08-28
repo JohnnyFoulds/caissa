@@ -76,6 +76,7 @@ def _contains_pyside6(source: str, filename: str) -> bool:
 # Grows as widget modules are added — Phase 3 adds WFritzPane.py.
 _PYSIDE6_ALLOWED_RELATIVE: set[str] = {
     "WFritzPane.py",
+    "WFritzLCD.py",
 }
 
 # Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted
@@ -87,7 +88,7 @@ _ADAPTER_TAINT_ALLOWED_RELATIVE: set[str] = {
     "ModeGateway.py",
     "ConfigGateway.py",
     "GeometryStore.py",
-    "EngineGateway.py",
+    "EngineGateway.py",   # reads Code.procesador — Qt-tainted via Code.*
 }
 
 # Qt-tainted upstream modules: importing these makes a module Qt-tainted even
@@ -231,6 +232,9 @@ _UPSTREAM_FRITZ_IMPORT_ALLOWLIST = {
     os.path.normpath("Code/Board/Board.py"),
     # Caissa-authored mode hook — imports PaneSpec, WFritzPane, PaneRegistry (Phase 3).
     os.path.normpath("Code/UIModes/actions/modern_fritz_ui.py"),
+    # Phase 4: LCD clock widget wired into the player header; eval model wired into the analysis table.
+    os.path.normpath("Code/UIModes/WFritzPlayerHeader.py"),
+    os.path.normpath("Code/UIModes/WFritzAnalysisTable.py"),
 }
 
 

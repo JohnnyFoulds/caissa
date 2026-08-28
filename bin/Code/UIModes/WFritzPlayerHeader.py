@@ -23,6 +23,8 @@ import logging
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from Code.Fritz.WFritzLCD import WFritzLCD
+
 _log = logging.getLogger(__name__)
 
 
@@ -48,9 +50,8 @@ class _PlayerRow(QtWidgets.QWidget):
         self._name = QtWidgets.QLabel("", self)
         self._name.setObjectName("WFritzPlayerName")
 
-        self._clock = QtWidgets.QLabel("", self)
+        self._clock = WFritzLCD(self)
         self._clock.setObjectName("WFritzPlayerClock")
-        self._clock.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
 
         ly.addWidget(icon_lbl)
         ly.addWidget(self._name, 1)
@@ -58,7 +59,7 @@ class _PlayerRow(QtWidgets.QWidget):
 
     def update_text(self, name: str, clock: str):
         self._name.setText(name)
-        self._clock.setText(clock)
+        self._clock.set_time_text(clock)
 
     def paintEvent(self, event):
         opt = QtWidgets.QStyleOption()

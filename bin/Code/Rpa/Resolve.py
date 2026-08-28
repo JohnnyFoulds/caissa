@@ -18,10 +18,11 @@ bin/Code/Rpa/Resolve.py — Tiered target resolver for the Caissa RPA layer.
 When a non-object tier wins the resolution, a ``WARNING`` is emitted because that
 indicates the object selector is broken and should be fixed.
 
-Image and OCR tiers are not yet implemented — they raise
-:class:`~Code.Rpa.Errors.VisionUnavailableError` as stubs pending Phase 7.
+Image and OCR tiers are implemented via :mod:`Code.Rpa.Vision` (Phase 7).  They are
+lazily imported so that ``cv2``/``pytesseract`` remain optional; if unavailable,
+:class:`~Code.Rpa.Errors.VisionUnavailableError` is raised with the install command.
 
-:spec: FR-4, §6 (feature_spec.md)
+:spec: FR-4, FR-7, §6, §9 (feature_spec.md)
 """
 
 from __future__ import annotations
@@ -203,55 +204,94 @@ class TargetResolver:
     def resolve_one(self, target: Target, snapshot: Snapshot) -> ElementRef:
         """Resolve *target* against *snapshot*, returning the best-match element.
 
-        Resolution order:
+        Resolution order (``tier="auto"``):
         1. Object tier (Qt widget tree).
-        2. Image tier — stub; raises :class:`~Code.Rpa.Errors.VisionUnavailableError`.
-        3. OCR tier — stub; raises :class:`~Code.Rpa.Errors.VisionUnavailableError`.
+        2. Image tier (``cv2`` template matching) — requires ``cv2``.
+        3. OCR tier (``pytesseract``) — requires ``cv2`` + ``tesseract`` binary.
 
-        When a non-object tier wins, ``logger.warning`` is emitted.
+        When a non-object tier wins, ``logger.warning`` is emitted because the object
+        selector should be preferred wherever possible.
+
+        Explicitly requesting ``tier="image"`` or ``tier="ocr"`` raises
+        :class:`~Code.Rpa.Errors.VisionUnavailableError` if the required library is
+        not installed.
 
         :param target: The target to resolve.
         :param snapshot: Current app snapshot.
         :returns: :class:`~Code.Rpa.Types.ElementRef` for the best match.
         :raises AmbiguousMatchError: If two or more candidates share the highest confidence.
         :raises TargetNotFoundError: If no candidate meets the threshold.
-        :raises VisionUnavailableError: If the image or OCR tier is explicitly requested.
+        :raises VisionUnavailableError: If the required vision library is not available.
         """
         tier = target.selector.tier
-
-        if tier == "image":
-            raise VisionUnavailableError(
-                "Image tier not yet implemented (Phase 7). "
-                "Install: pip install -r requirements-rpa.txt"
-            )
-        if tier == "ocr":
-            raise VisionUnavailableError(
-                "OCR tier not yet implemented (Phase 7). "
-                "Install: pip install -r requirements-rpa.txt && brew install tesseract"
-            )
 
         # Object tier
         candidates = self._object_candidates(target.selector, snapshot)
 
-        if not candidates and tier == "auto":
-            # Image and OCR tiers are Phase 7 stubs — fall through to not-found
-            logger.warning(
-                "Object tier found no match for selector %r; image/OCR tiers not yet available",
-                target.selector,
-            )
+        if candidates and tier in ("object", "auto"):
+            # Apply anchor filter then return
+            if target.anchor is not None:
+                candidates = self._apply_anchor(candidates, target, snapshot)
+            if candidates:
+                return self._pick_best(candidates, target.selector)
 
-        # Apply anchor filter
-        if target.anchor is not None and candidates:
-            candidates = self._apply_anchor(
-                candidates, target, snapshot
-            )
-
-        if not candidates:
+        if tier == "object":
+            # Explicit object-only request with no match
             raise TargetNotFoundError(
                 f"No element found matching {target.selector!r}"
             )
 
-        return self._pick_best(candidates, target.selector)
+        # Object tier found nothing in auto mode — log before trying vision
+        if tier == "auto" and not candidates:
+            logger.warning(
+                "Object tier found no match for selector %r; trying image/OCR tiers",
+                target.selector,
+            )
+
+        # Image and OCR tiers — lazy Vision imports
+        from Code.Rpa.Vision.Availability import probe as _probe
+
+        flags = _probe()
+
+        if tier in ("image", "auto") and target.selector.image is not None:
+            if not flags.cv_available:
+                if tier == "image":
+                    raise VisionUnavailableError(
+                        f"Image tier unavailable: {flags.reason}"
+                    )
+            else:
+                image_match = self._image_candidates(target, snapshot)
+                if image_match:
+                    logger.warning(
+                        "Non-object tier (image) used for selector %r — fix the object selector",
+                        target.selector,
+                    )
+                    if target.anchor is not None:
+                        image_match = self._apply_anchor(image_match, target, snapshot)
+                    if image_match:
+                        return self._pick_best(image_match, target.selector)
+
+        if tier in ("ocr", "auto") and target.selector.text is not None:
+            if not flags.ocr_available:
+                if tier == "ocr":
+                    raise VisionUnavailableError(
+                        f"OCR tier unavailable: {flags.reason}"
+                    )
+            else:
+                ocr_match = self._ocr_candidates(target, snapshot)
+                if ocr_match:
+                    logger.warning(
+                        "Non-object tier (ocr) used for selector %r — fix the object selector",
+                        target.selector,
+                    )
+                    if target.anchor is not None:
+                        ocr_match = self._apply_anchor(ocr_match, target, snapshot)
+                    if ocr_match:
+                        return self._pick_best(ocr_match, target.selector)
+
+        raise TargetNotFoundError(
+            f"No element found matching {target.selector!r}"
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -350,3 +390,78 @@ class TargetResolver:
         winner = best[0]
         name = winner.widget.get("object_name") or winner.widget.get("text") or selector.cls or ""
         return ElementRef(selector=name, rect=winner.rect)
+
+    def _image_candidates(
+        self, target: Target, snapshot: Snapshot
+    ) -> list[_Candidate]:
+        """Return image-tier candidates by template matching against snapshot.screenshot.
+
+        Requires ``snapshot.screenshot`` to be populated (done by ``QtDriver.snapshot()``
+        when cv2 is available).  Returns an empty list when screenshot is absent.
+
+        :param target: Target whose ``selector.image`` is a manifest template name.
+        :param snapshot: Current snapshot, optionally carrying a screenshot.
+        :returns: List of :class:`_Candidate` objects.
+        """
+        if snapshot.screenshot is None:
+            return []
+        if target.selector.image is None:
+            return []
+
+        from Code.Rpa.Vision.Template import find_all
+
+        try:
+            from Code.Rpa.Vision.Manifest import load_and_verify
+            import Code
+            manifest_path = Code.path_resource("Rpa/Templates/manifest.json")
+            manifest = load_and_verify(manifest_path)
+            entry = manifest.get(target.selector.image)
+        except Exception as exc:
+            logger.warning("Image tier: manifest error for %r: %s", target.selector.image, exc)
+            return []
+
+        try:
+            from PySide6.QtGui import QImage
+            import numpy as np
+            qimg = QImage(entry.path).convertToFormat(QImage.Format.Format_RGB888)
+            w, h = qimg.width(), qimg.height()
+            bpl = qimg.bytesPerLine()
+            buf = np.frombuffer(qimg.constBits(), dtype=np.uint8).copy()
+            if bpl == w * 3:
+                template_rgb = buf.reshape(h, w, 3)
+            else:
+                template_rgb = buf.reshape(h, bpl)[:, :w * 3].reshape(h, w, 3)
+        except Exception as exc:
+            logger.warning("Image tier: failed to load template %r: %s", entry.path, exc)
+            return []
+
+        matches = find_all(snapshot.screenshot, template_rgb, threshold=target.selector.threshold)
+        return [_Candidate(widget={}, confidence=m.confidence, rect=m.rect) for m in matches]
+
+    def _ocr_candidates(
+        self, target: Target, snapshot: Snapshot
+    ) -> list[_Candidate]:
+        """Return OCR-tier candidates by phrase search against snapshot.screenshot.
+
+        Requires ``snapshot.screenshot`` and pytesseract.  Returns an empty list
+        when screenshot is absent or when no text is specified in the selector.
+
+        :param target: Target whose ``selector.text`` is the phrase to find.
+        :param snapshot: Current snapshot, optionally carrying a screenshot.
+        :returns: List of :class:`_Candidate` objects.
+        """
+        if snapshot.screenshot is None:
+            return []
+        if target.selector.text is None:
+            return []
+
+        from Code.Rpa.Vision.Ocr import find_phrase
+
+        phrase = target.selector.text
+        try:
+            matches = find_phrase(snapshot.screenshot, phrase)
+        except Exception as exc:
+            logger.warning("OCR tier: error finding phrase %r: %s", phrase, exc)
+            return []
+
+        return [_Candidate(widget={}, confidence=m.confidence, rect=m.rect) for m in matches]

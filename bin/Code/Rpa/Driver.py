@@ -146,17 +146,35 @@ class QtDriver(Driver):
     # ------------------------------------------------------------------
 
     def snapshot(self, depth: int = 3) -> "Snapshot":
-        """Return a widget-tree snapshot (state_name='UNKNOWN' until Phase 4).
+        """Return a widget-tree snapshot with an optional screen capture.
+
+        Populates ``Snapshot.screenshot`` via :func:`~Code.Rpa.Vision.Capture.grab`
+        when cv2 is available; silently omits it otherwise so object-tier RPA works
+        without OpenCV installed.
 
         :param depth: Widget-tree recursion depth passed to :meth:`dump_ui`.
         :returns:     :class:`~Code.Rpa.Types.Snapshot` wrapping the raw dump.
         """
         from Code.Rpa.Types import Snapshot
         tree = self.dump_ui(depth).get("roots", [])
+
+        screenshot = None
+        try:
+            from Code.Rpa.Vision.Availability import probe as _probe
+            if _probe().cv_available:
+                from Code.Rpa.Vision.Capture import grab as _grab
+                from PySide6.QtWidgets import QApplication
+                mw = QApplication.activeWindow()
+                if mw is not None:
+                    screenshot = _grab(mw)
+        except Exception:
+            pass  # Vision unavailable or window not ready — object tier unaffected
+
         return Snapshot(
             state_name="UNKNOWN",
             widget_tree=tree,
             timestamp_ms=self.now(),
+            screenshot=screenshot,
         )
 
     def click(self, selector: str, target_type: str = "widget") -> dict:

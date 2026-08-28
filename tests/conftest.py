@@ -11,6 +11,30 @@ import types
 import pytest
 from tests.helpers import _AutoStub
 
+
+def pytest_collection_modifyitems(config, items):
+    """Skip ``rpa_cv`` tests when cv2 is unavailable or running offscreen."""
+    _skip_cv = None
+
+    def _should_skip_cv():
+        nonlocal _skip_cv
+        if _skip_cv is None:
+            if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+                _skip_cv = pytest.mark.skip(reason="rpa_cv requires a real display (QT_QPA_PLATFORM=offscreen)")
+            else:
+                try:
+                    import cv2  # noqa: F401
+                    _skip_cv = False
+                except ImportError:
+                    _skip_cv = pytest.mark.skip(reason="rpa_cv requires cv2 (pip install opencv-python-headless)")
+        return _skip_cv
+
+    for item in items:
+        if item.get_closest_marker("rpa_cv"):
+            skip = _should_skip_cv()
+            if skip is not False:
+                item.add_marker(skip)
+
 # ── repo paths ────────────────────────────────────────────────────────────────
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN_DIR = os.path.join(REPO_ROOT, "bin")

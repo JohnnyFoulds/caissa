@@ -134,8 +134,13 @@ class Snapshot:
         ``rect`` keys (see ``Driver.snapshot`` contract).
     :param timestamp_ms: Wall-clock time in milliseconds when the snapshot was taken,
         as returned by ``driver.now()``.
+    :param screenshot: Optional :class:`~Code.Rpa.Vision.Capture.Screenshot` taken
+        at snapshot time by ``QtDriver``.  Typed ``Any`` so that ``Types.py`` remains
+        free of numpy/cv2 imports (N-RPA-1).  ``None`` in unit-test snapshots and
+        whenever the image/OCR tiers are not required.
     """
 
     state_name: str
     widget_tree: list[dict[str, Any]]
     timestamp_ms: float
+    screenshot: Any = None

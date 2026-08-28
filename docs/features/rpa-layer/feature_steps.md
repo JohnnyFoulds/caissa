@@ -341,7 +341,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 7 — Vision ⬜
+## Phase 7 — Vision ✅
 
 **Branch:** `feat/rpa-vision`
 **Docs shipped (Gate H):** `docs/rpa/vision.md`

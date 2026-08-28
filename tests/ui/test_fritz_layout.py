@@ -31,6 +31,8 @@ import time
 
 import pytest
 
+pytestmark = pytest.mark.ui
+
 _REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _PK_PATH = os.path.join(_REPO, "UserData", "__Config__", "lk.pk2")
 

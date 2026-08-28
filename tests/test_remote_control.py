@@ -22,6 +22,8 @@ import time
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 SOCKET_PATH = "/tmp/caissa-control.sock"
 
 

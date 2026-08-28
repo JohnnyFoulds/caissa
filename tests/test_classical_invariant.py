@@ -19,6 +19,8 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Bootstrap: make the bin/ tree importable without Qt or a display
 # ---------------------------------------------------------------------------

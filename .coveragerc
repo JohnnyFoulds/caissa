@@ -1,0 +1,17 @@
+[run]
+branch = true
+source = Code.Rpa
+
+[report]
+omit =
+    # Qt-touching modules — covered by rpa_ui suite, not the default make test
+    bin/Code/Rpa/Driver.py
+    bin/Code/Rpa/Service.py
+    bin/Code/Rpa/Vision/Capture.py
+    # cv2/tesseract — covered by rpa_cv suite
+    bin/Code/Rpa/Vision/Template.py
+    bin/Code/Rpa/Vision/Ocr.py
+    # Test double — exercised by every unit test but is the double itself
+    bin/Code/Rpa/Fakes.py
+
+fail_under = 90

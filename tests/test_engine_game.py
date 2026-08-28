@@ -9,6 +9,8 @@ Run:
 import pytest
 from tests.helpers import GameDriver, build_default_dic_var, wait_until
 
+pytestmark = pytest.mark.unit
+
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

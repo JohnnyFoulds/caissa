@@ -17,15 +17,14 @@ BIN_DIR = os.path.join(REPO_ROOT, "bin")
 
 
 def _bootstrap():
-    """One-time init: QApplication + Code.configuration + icons + pieces."""
-    sys.argv = ["LucasR.py"]
-    os.chdir(BIN_DIR)
-    if BIN_DIR not in sys.path:
-        sys.path.insert(0, BIN_DIR)
+    """One-time init: QApplication + Code.configuration + icons + pieces.
 
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
+    Called lazily on the first request of the ``qt_app`` fixture so that pure
+    unit tests (``tests/unit/rpa/``) that never request ``qt_app`` do not trigger
+    the native-extension imports (FasterCode, PySide6) at collection time.
+    """
     from PySide6 import QtWidgets
+
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
     import Code
@@ -50,11 +49,22 @@ def _bootstrap():
     return app
 
 
-_APP = _bootstrap()
+# Set up sys.path and cwd eagerly so Code.* imports work in all tests
+# without needing the full Qt bootstrap.
+sys.argv = ["LucasR.py"]
+os.chdir(BIN_DIR)
+if BIN_DIR not in sys.path:
+    sys.path.insert(0, BIN_DIR)
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+_APP = None  # Populated lazily on first qt_app fixture request
 
 
 @pytest.fixture(scope="session")
 def qt_app():
+    global _APP
+    if _APP is None:
+        _APP = _bootstrap()
     return _APP
 
 

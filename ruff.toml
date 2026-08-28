@@ -1,0 +1,30 @@
+# ruff.toml — Caissa-scoped lint config
+#
+# include restricts linting to Caissa-owned paths.  This leaves the upstream
+# Lucas Chess R6 code (bin/Code/** except the explicit paths below) unlinted.
+#
+# IMPORTANT: make lint must invoke ruff with --config ruff.toml explicitly.
+# Without it, ruff walks upward from each file and finds bin/pyproject.toml first,
+# inheriting its lint.ignore = ["E722"] with no select — this config would be silently
+# ignored. (D11)
+
+include = [
+    "bin/Code/Rpa/**",
+    "bin/Code/Main/LogSetup.py",
+    "tests/unit/rpa/**",
+    "tools/caissa-rpa",
+]
+
+# Exclude fixture files — they may intentionally contain lint violations used by tests.
+exclude = [
+    "tests/unit/rpa/_fixtures",
+]
+
+target-version = "py313"
+line-length = 120
+
+[lint]
+select = ["E", "W", "F", "I", "UP"]
+# E722 (bare except:) is NOT suppressed here — new code must not use bare except:
+# The bin/pyproject.toml suppresses E722 for upstream code only; that file is not
+# read when --config ruff.toml is passed.

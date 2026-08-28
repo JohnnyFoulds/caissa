@@ -29,6 +29,11 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **Claude working patterns docs**: `docs/claude_code/working-patterns.md` (cross-project
+  patterns mined from 3,786 prompts / 89 sessions), `docs/claude_code/prompt-library.md`
+  (13 project-agnostic prompt templates), `docs/claude_code/session-archaeology.md`
+  (GDrive backup runbook and corpus recovery guide), `docs/claude_code/claude-md-snippet.md`
+  (portable CLAUDE.md rules block), `tools/claude_mine.py` (reusable transcript miner).
 - **RPA layer — Phase 9 (Production Readiness)**: Gate E production readiness review with
   all findings tracked to resolution. `tests/unit/rpa/test_completeness.py` — 5 structural
   tests: `test_no_pyside6_import_outside_allowlist` (AST walker enforcing N-RPA-2),

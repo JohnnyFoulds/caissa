@@ -131,7 +131,11 @@ convention: `docs/features/<name>/` with `initial_idea.md`, `feature_spec.md`,
 
 The full SDD/TDD routine and 8-gate checklist: `docs/process/sdd-workflow.md`.  
 Templates: `docs/templates/`.  
-Prompt library: `docs/claude_code/prompts.md`.
+Prompt library (SDD/Caissa): `docs/claude_code/prompts.md`.  
+Prompt library (general): `docs/claude_code/prompt-library.md`.  
+Working patterns: `docs/claude_code/working-patterns.md`.  
+Session archaeology runbook: `docs/claude_code/session-archaeology.md`.  
+Portable CLAUDE.md snippet: `docs/claude_code/claude-md-snippet.md`.
 
 Existing flat specs (grandfathered): `docs/theme-mode-system.md`, `docs/ui-testing.md`.
 

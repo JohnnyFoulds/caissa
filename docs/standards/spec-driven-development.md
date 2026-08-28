@@ -94,7 +94,9 @@ New features use the **feature-directory convention**:
 | Mode JSON schema | `Resources/Modes/<name>.json` |
 | Theme overlay schema | `Resources/Styles/<name>.ui.json` |
 | Standards documents | `docs/standards/` |
-| Prompt library | `docs/claude_code/prompts.md` |
+| Prompt library (SDD/Caissa) | `docs/claude_code/prompts.md` |
+| Prompt library (general) | `docs/claude_code/prompt-library.md` |
+| Working patterns | `docs/claude_code/working-patterns.md` |
 | Process routine and gates | `docs/process/sdd-workflow.md` |
 
 **Archived examples:** `docs/features/_archive/<name>/` (after completion).

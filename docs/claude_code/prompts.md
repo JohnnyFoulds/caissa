@@ -1,15 +1,19 @@
-# Claude Code Prompts — Caissa
+# Claude Code Prompts — Caissa (SDD/TDD Library)
 
-<!-- Evolved from the RPA-layer filled-in prompts. Now the general Caissa development prompts
-     library. RPA-specific gate checks are preserved as examples at the end. -->
+<!-- Caissa-specific SDD/TDD prompts for the living-document workflow.
+     For general-purpose prompts that work in any project, see prompt-library.md.
+     For the patterns behind these prompts, see working-patterns.md. -->
 
 ---
 
 ## Usage Patterns
 
-These are the workflow patterns that emerged across the RPA layer development sessions.
-Read this section first — the prompts below only work well when used in the right sequence
-and with the right intent.
+These patterns emerged from RPA layer development and apply to any Caissa feature.
+Read this section first — the prompts below only work well in the right sequence.
+
+> **See also:** `docs/claude_code/working-patterns.md` — cross-project patterns,
+> plan feedback moves, and the full recurring-corrections list.
+> `docs/claude_code/prompt-library.md` — project-agnostic templates.
 
 ### 1. The SDD Pipeline Sequence
 

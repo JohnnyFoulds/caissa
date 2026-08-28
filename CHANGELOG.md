@@ -12,6 +12,11 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Fritz Polish — Phase 2 (Fixed window) — production code + verbs + tests**:
+  - `bin/Code/Rpa/Driver.py` — six new `QtDriver` verbs: `window_info` (geometry + `fit_board`/`key_video`/`ui_mode` flags), `board_info` (ancho, `width_piece`, orientation), `resize_window`, `set_window_state`, `set_splitter_sizes` (registered name or objectName substring fallback for unregistered splitters such as `WFritzRightCol`), `click_tabbar` (bare `QTabBar` match for ribbon and notation strip).
+  - `bin/Code/Debug/RemoteControl.py` — two-line dispatch delegations for all six verbs.
+  - `tests/ui/rc_contract.json` — six new probes (four success-path for `window_info`/`board_info`/`resize_window`/`set_window_state`, two error-path for `set_splitter_sizes`/`click_tabbar`).
+  - `tests/ui/test_fixed_window.py` — 15 T-FIX tests implemented (T-FIX-01..15): resize correctness, window unchanged on game start/end, board grows with window, min-size proof (G1), maximize/restore round-trip, fullscreen round-trip, `width_piece` never persisted by fit, splitter sizes applied, no `RuntimeError` on repeated mode cycling, `fit_board` flag active, stored `width_piece` stable across fits, window stable across game cycle, no BASEV entry from Fritz mode (`WBase.py:291` decoupling), `dispatch_size` path guarded.
 - **Fritz Polish — Phase D (Documentation + process, Gate A)**: complete SDD artefact set in
   `docs/features/fritz-polish/` (`initial_idea.md`, `feature_spec.md`, `feature_steps.md`,
   `implementation_plan.md`). Design-time product docs in `docs/fritz/` (`README.md`,

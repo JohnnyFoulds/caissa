@@ -16,6 +16,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 7 (Vision)**: `bin/Code/Rpa/Vision/` — `Availability.probe()`
+  (cached capability probe, never raises), `Capture.grab()` (QWidget → Screenshot with
+  `bytesPerLine()` padding fix and RGB channel order), `Screenshot.logical()` (DPR-1
+  resize via `INTER_AREA`), `Template.find_all()` (TM_CCOEFF_NORMED + NMS at IoU 0.3 +
+  multi-scale fallback `[0.95, 1.05, 0.90, 1.10]`), `Ocr.find_phrase()` (line-grouped
+  multi-word phrase matching, 2× INTER_CUBIC pre-processing), `Manifest.load_and_verify()`
+  (sha256 check). Image and OCR tiers wired into `TargetResolver`; `Snapshot` gains optional
+  `screenshot` field; `QtDriver.snapshot()` captures lazily when cv2 is available.
+  Empty `Resources/Rpa/Templates/manifest.json` scaffolded. `rpa_cv` conftest skip hook
+  added (skips on offscreen or missing cv2). 11 tests in `tests/unit/rpa/test_vision.py`
+  (2 always-run, 9 `rpa_cv` marked). Gate H doc: `docs/rpa/vision.md`.
 - **RPA layer — Phase 6 (service + rpa_* verbs + client/CLI)**: `bin/Code/Rpa/Service.py` —
   `RpaService` with run registry, 10 `rpa_*` verb handlers (`rpa_capabilities`,
   `rpa_state`, `rpa_find`, `rpa_run`, `rpa_status`, `rpa_journal`, `rpa_cancel`,

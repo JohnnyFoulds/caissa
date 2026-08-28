@@ -121,15 +121,20 @@ def _key_allowed(key: str, literals, prefixes) -> bool:
     return False
 
 
-def load_mode_hook(mode_name: str):
+def load_mode_hook(mode_name: str, hook: str | None = None):
     """
     Load the optional UI hook module for a mode.
 
     :param mode_name: Mode name string (e.g. ``"Coach"``).
+    :param hook:      Optional explicit hook basename (without ``_ui.py``) from the
+                      mode JSON's ``"hook"`` key.  When present it overrides the
+                      name-derived path, so ``"Modern Fritz Dark"`` with
+                      ``"hook": "modern_fritz"`` resolves to ``modern_fritz_ui.py``
+                      rather than ``modern_fritz_dark_ui.py``.
     :returns:         The loaded module, or ``None`` if the hook file does not exist
                       or fails to load.
 
-    The hook file is ``bin/Code/UIModes/actions/<mode_name_lower>_ui.py``.
+    The hook file is ``bin/Code/UIModes/actions/<safe_name>_ui.py``.
     It may expose any of:
 
     * ``patch_config_form(form, configuration, overlay)``
@@ -140,8 +145,12 @@ def load_mode_hook(mode_name: str):
     import logging as _logging
 
     actions_dir = os.path.join(os.path.dirname(__file__), "actions")
-    # Normalise to a valid Python module filename: lower-case, spaces and hyphens → underscores
-    safe_name = mode_name.lower().replace(" ", "_").replace("-", "_")
+    if hook:
+        # Explicit hook override: normalise and use directly.
+        safe_name = hook.lower().replace(" ", "_").replace("-", "_")
+    else:
+        # Normalise to a valid Python module filename: lower-case, spaces and hyphens → underscores
+        safe_name = mode_name.lower().replace(" ", "_").replace("-", "_")
     path = os.path.join(actions_dir, f"{safe_name}_ui.py")
     if not os.path.exists(path):
         return None

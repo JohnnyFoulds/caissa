@@ -360,7 +360,7 @@ def options(parent, configuration):
 
     # Step 7: Call mode UI hook if present (after base + overlay + mode section)
     import logging as _logging
-    _hook = _UIModes.load_mode_hook(_active_mode.get("name", ""))
+    _hook = _UIModes.load_mode_hook(_active_mode.get("name", ""), hook=_active_mode.get("hook"))
     if _hook and hasattr(_hook, "patch_config_form"):
         try:
             _hook.patch_config_form(form, configuration, _overlay)

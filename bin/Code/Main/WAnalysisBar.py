@@ -20,6 +20,9 @@ class AnalysisBar(QtWidgets.QWidget):
         self.engine_manager = None
         self.mrm = None
         self.activated = False
+        # When True, activate() will not call setVisible() — used by Fritz mode
+        # to keep the bar hidden while still running the analysis engine.
+        self.force_hidden = False
         self.value_objective = 0
         self.acercando = False
         self.aeval = AnalysisEval.AnalysisEval()
@@ -72,7 +75,8 @@ class AnalysisBar(QtWidgets.QWidget):
         if ok is None:
             ok = False
         self.activated = ok
-        self.setVisible(ok)
+        if not self.force_hidden:
+            self.setVisible(ok)
         if ok:
             if self.engine_manager is None:
                 self.engine_manager = Code.procesador.analyzer_refresh_clone(0, 0, 0, 1)
@@ -123,9 +127,12 @@ class AnalysisBar(QtWidgets.QWidget):
         return rm
 
     def control_state(self, mrm):
+        if self.activated and self.engine_manager:
+            # Always store mrm even when the widget is hidden (e.g. Fritz mode
+            # hides this bar but WFritzAnalysisTable polls bar.mrm directly).
+            self.mrm = mrm
         if self.isVisible():
             if self.engine_manager:
-                self.mrm = mrm
                 if mrm:
                     rm = mrm.rm_best()
 

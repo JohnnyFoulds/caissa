@@ -140,12 +140,14 @@ def load_mode_hook(mode_name: str):
     import logging as _logging
 
     actions_dir = os.path.join(os.path.dirname(__file__), "actions")
-    path = os.path.join(actions_dir, f"{mode_name.lower()}_ui.py")
+    # Normalise to a valid Python module filename: lower-case, spaces and hyphens → underscores
+    safe_name = mode_name.lower().replace(" ", "_").replace("-", "_")
+    path = os.path.join(actions_dir, f"{safe_name}_ui.py")
     if not os.path.exists(path):
         return None
     try:
         spec = importlib.util.spec_from_file_location(
-            f"_caissa_mode_{mode_name.lower()}_ui", path
+            f"_caissa_mode_{safe_name}_ui", path
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

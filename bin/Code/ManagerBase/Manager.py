@@ -807,6 +807,11 @@ class Manager:
 
         analysis_bar = dic.get("ANALYSIS_BAR")
         if analysis_bar is None:
+            # let the game-setup dict override the global default
+            reinicio = getattr(self, "reinicio", None)
+            if reinicio:
+                analysis_bar = reinicio.get("ANALYSIS_BAR")
+        if analysis_bar is None:
             analysis_bar = self.configuration.x_analyzer_activate_ab
         self.main_window.activate_analysis_bar(analysis_bar)
 

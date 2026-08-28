@@ -59,13 +59,22 @@ def _pil_to_b64(img: Image.Image) -> str:
 
 
 def _diff_score(our_path: Path, ref_path: Path) -> float | None:
-    """Compute mean-diff score between our render and the reference."""
+    """Compute mean-diff score between our render and the reference.
+
+    Returns None when the images have very different aspect ratios — comparing a
+    cropped mockup against a full Fritz screenshot produces a meaningless score.
+    """
     if not our_path.exists() or not ref_path.exists():
         return None
     from tools.design.compare import images_mean_diff
-    from tools.design.compare import score_label
     a = Image.open(our_path)
     b = Image.open(ref_path)
+    # Skip diff when aspect ratios differ by more than 2× — the reference is
+    # likely a full-window screenshot, not a matching crop.
+    ar_a = a.width / max(a.height, 1)
+    ar_b = b.width / max(b.height, 1)
+    if max(ar_a, ar_b) / max(min(ar_a, ar_b), 0.01) > 2.0:
+        return None
     return images_mean_diff(a, b)
 
 
@@ -145,7 +154,7 @@ _ROW_TEMPLATE = """
 def _score_class(score: float | None) -> tuple[str, str, str]:
     """Return (css_class, text, verdict) for a diff score."""
     if score is None:
-        return "score-na", "—", "no reference"
+        return "score-na", "—", "n/a"
     from tools.design.compare import score_label
     label = score_label(score)
     return f"score-{label}", f"{score:.1f}", label

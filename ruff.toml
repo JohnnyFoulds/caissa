@@ -10,9 +10,12 @@
 
 include = [
     "bin/Code/Rpa/**",
+    "bin/Code/Fritz/**",
     "bin/Code/Main/LogSetup.py",
     "tests/unit/rpa/**",
+    "tests/unit/fritz/**",
     "tools/caissa-rpa",
+    "tools/design/**",
 ]
 
 # Exclude fixture files — they may intentionally contain lint violations used by tests.

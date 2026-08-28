@@ -101,6 +101,15 @@ class WBase(QtWidgets.QWidget):
 
         self.setWindowIcon(Iconos.Aplicacion64())
 
+        # Read ribbon name from the active mode JSON (None → no ribbon).
+        try:
+            from Code.UIModes import UIModes
+            self.ribbon_spec = UIModes.active_mode().get("ribbon")
+        except Exception:
+            self.ribbon_spec = None
+
+        self.ribbon = None  # populated by create_toolbar → Ribbon.install
+
         self.create_toolbar()
 
         self.create_board()
@@ -139,7 +148,8 @@ class WBase(QtWidgets.QWidget):
 
         icons_tb = self.configuration.type_icons()
         self.tb.setToolButtonStyle(icons_tb)
-        is_vertical = not self.configuration.x_tb_orientation_horizontal
+        # A vertical toolbar crushes a ribbon — force horizontal when a ribbon is present.
+        is_vertical = not self.configuration.x_tb_orientation_horizontal and self.ribbon_spec is None
         is_icon_only = icons_tb == QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly
         if icons_tb == QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon:
             sz = 32
@@ -205,6 +215,17 @@ class WBase(QtWidgets.QWidget):
         action.setToolTip(f"{_('Next')}: [+, {_('Page Down')}]")
         action = self.dic_toolbar[TB_PREVIOUS]
         action.setToolTip(f"{_('Previous')}: [-, {_('Page Up')}]")
+
+        # Install ribbon after all QActions exist so every slot can bind on first sync.
+        if self.ribbon_spec:
+            try:
+                from Code.Fritz import Ribbon as _Ribbon
+                self.ribbon = _Ribbon.install(self, self.ribbon_spec)
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "WBase: Ribbon install failed", exc_info=True
+                )
 
     def translate_again_tb(self):
         dic_opciones = self.dic_opciones_tb()
@@ -486,6 +507,13 @@ class WBase(QtWidgets.QWidget):
 
     def pon_toolbar(self, li_acciones, separator=False, with_shortcuts=False, with_eboard=False):
         self.with_shortcuts = with_shortcuts
+
+        # Hoist li_acciones so closeEvent/set_hints can read it even via the ribbon path.
+        self.tb.li_acciones = list(li_acciones) if not isinstance(li_acciones, list) else li_acciones
+
+        if self.ribbon:
+            self.ribbon.sync(self.tb.li_acciones)
+            return self.tb
 
         self.tb.clear()
         if with_eboard:

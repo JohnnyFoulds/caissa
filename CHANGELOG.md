@@ -12,6 +12,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Fritz Polish — Phase 7 (Office-style ribbon)**: `bin/Code/Fritz/RibbonModel.py` (pure:
+  `load`, `state`, `overflow`, `best_tab`, `compact`); `bin/Code/Fritz/Ribbon.py` (`install`
+  — degrades gracefully to plain toolbar on any failure); `bin/Code/Fritz/WRibbon.py`
+  (`WRibbon` + QTabBar + QStackedWidget, `WRibbonPanesGroup` for pane checkboxes);
+  `Resources/Ribbons/modern-fritz.json` (7-tab ribbon map: Home, File, Board, Training,
+  Analysis, Opening, Engine); `Resources/Modes/modern-fritz.json` gains `"ribbon": "modern-fritz"`;
+  `WBase.create_toolbar` installs the ribbon after all QActions are built; `WBase.pon_toolbar`
+  routes through `WRibbon.sync` (idempotent, no widget reconstruction after first call);
+  T-RMAP-01..08 unit tests all passing; `docs/fritz/ribbon.md` (Gate H).
 - **Retro Engine — Phase 6 (Bridge — FEN↔board marshalling)**: `bin/Code/Retro/Bridge.py`
   — stdlib-only FEN parser (`parse_fen`, `parse_piece_placement`); 0x88 square helpers
   (`sq88`, `sq88_to_file_rank`, `sq88_to_alg`, `alg_to_sq88`); `Bridge` class that

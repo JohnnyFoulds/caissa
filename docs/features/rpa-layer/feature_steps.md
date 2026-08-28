@@ -387,7 +387,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 8 — Workflows + Regression Suite ⬜
+## Phase 8 — Workflows + Regression Suite ✅
 
 **Branch:** `feat/rpa-workflows`
 **Docs shipped (Gate H):** `docs/rpa/authoring-workflows.md`, `docs/rpa/testing.md`

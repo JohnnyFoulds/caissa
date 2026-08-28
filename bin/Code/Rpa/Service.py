@@ -34,19 +34,19 @@ logger = logging.getLogger(__name__)
 # Workflow registry (populated by Code.Rpa.Workflows modules at import time)
 # ---------------------------------------------------------------------------
 
-_WORKFLOW_REGISTRY: dict[str, list] = {}
-"""Maps workflow name → list of :class:`~Code.Rpa.Activities.Activity` instances."""
-
-
 def register_workflow(name: str, activities: list) -> None:
     """Register a named workflow.
+
+    Delegates to :func:`~Code.Rpa.Workflows.Registry.register`.  Kept for
+    backwards compatibility with any code that called ``Service.register_workflow``.
 
     :param name: Workflow name used in ``rpa_run`` requests.
     :param activities: Top-level activity list.
     :returns: None.
     """
-    _WORKFLOW_REGISTRY[name] = activities
-    logger.debug("Workflow registered: %r (%d activities)", name, len(activities))
+    from Code.Rpa.Workflows.Registry import register as _reg
+    _reg(name, activities)
+    logger.debug("Workflow registered via Service: %r (%d activities)", name, len(activities))
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +110,26 @@ def _env_snapshot() -> dict[str, Any]:
     return env
 
 
+def _load_builtin_workflows() -> None:
+    """Import all built-in workflow modules so they self-register.
+
+    Called once at RpaService init.  Import errors are logged and swallowed
+    so a broken workflow does not prevent the service from starting.
+    """
+    _modules = [
+        "Code.Rpa.Workflows.smoke_home",
+        "Code.Rpa.Workflows.classical_invariant",
+        "Code.Rpa.Workflows.play_a_game",
+        "Code.Rpa.Workflows.config_roundtrip",
+    ]
+    for mod in _modules:
+        try:
+            import importlib
+            importlib.import_module(mod)
+        except Exception as exc:
+            logger.warning("Failed to load workflow module %r: %s", mod, exc)
+
+
 # ---------------------------------------------------------------------------
 # RpaService
 # ---------------------------------------------------------------------------
@@ -154,6 +174,9 @@ class RpaService:
             logger.debug("RpaService pump timer started (50 ms)")
         else:
             self._timer = None
+
+        # Import all workflow modules so they register on first service start
+        _load_builtin_workflows()
 
     # ------------------------------------------------------------------
     # Pump
@@ -329,13 +352,13 @@ class RpaService:
         workflow_name = data.get("workflow", "")
         if not workflow_name:
             return {"error": "missing 'workflow' key"}
-        if workflow_name not in _WORKFLOW_REGISTRY:
-            return {"error": str(WorkflowNotFoundError(
-                f"Workflow {workflow_name!r} is not registered. "
-                f"Available: {list(_WORKFLOW_REGISTRY)}"
-            ))}
+        from Code.Rpa.Workflows.Registry import get as _wf_get
         try:
-            activities = list(_WORKFLOW_REGISTRY[workflow_name])
+            activities = _wf_get(workflow_name)
+        except WorkflowNotFoundError as exc:
+            return {"error": str(exc)}
+        try:
+            activities = list(activities)  # fresh copy
             run_id = self._start_run(activities, workflow_name=workflow_name)
             return {"run_id": run_id}
         except RunAlreadyActiveError as exc:
@@ -489,7 +512,8 @@ class RpaService:
         :param arg: Ignored.
         :returns: Dict with ``workflows`` list.
         """
-        return {"workflows": sorted(_WORKFLOW_REGISTRY)}
+        from Code.Rpa.Workflows.Registry import all_names as _all_names
+        return {"workflows": _all_names()}
 
 
 # ---------------------------------------------------------------------------

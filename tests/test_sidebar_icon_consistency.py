@@ -23,6 +23,9 @@ import time
 import pytest
 from PIL import Image, ImageChops
 
+# Shared image helpers — single implementation in tools/design/compare.py
+from tools.design.compare import crop_button, images_mean_diff  # noqa: F401
+
 pytestmark = pytest.mark.unit
 
 # ---------------------------------------------------------------------------
@@ -167,34 +170,6 @@ def measure_icon(img: Image.Image) -> dict:
         "alpha_pct": non_transparent / total_px,
     }
 
-
-# ---------------------------------------------------------------------------
-# Screenshot crop helper (Layer 3)
-# ---------------------------------------------------------------------------
-
-def crop_button(screenshot_path: str, btn: dict, dpr: float) -> Image.Image:
-    """
-    Crop one button's region from a screenshot.
-    btn must have x, y, width, height (logical pixels, window-relative).
-    dpr is the device pixel ratio (2 on Retina, 1 on standard).
-    """
-    img = Image.open(screenshot_path)
-    scale = round(dpr)
-    left   = int(btn["x"] * scale)
-    top    = int(btn["y"] * scale)
-    right  = left + int(btn["width"] * scale)
-    bottom = top  + int(btn["height"] * scale)
-    return img.crop((left, top, right, bottom))
-
-
-def images_mean_diff(a: Image.Image, b: Image.Image) -> float:
-    """Mean absolute pixel difference between two same-size images (0–255)."""
-    a = a.convert("RGB").resize((32, 32), Image.LANCZOS)
-    b = b.convert("RGB").resize((32, 32), Image.LANCZOS)
-    diff = ImageChops.difference(a, b)
-    pixels = list(diff.getdata())
-    total = sum(sum(ch for ch in px) / len(px) for px in pixels)
-    return total / len(pixels)
 
 
 # ---------------------------------------------------------------------------

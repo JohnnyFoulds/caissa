@@ -12,42 +12,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
-- **Retro Engine — Phase 10 (Production Readiness)**: `tests/unit/retro/test_completeness.py`
-  — three invariant tests: N-RETRO-7 (every public callable has a docstring), N-RETRO-11
-  (classical mode does not import Code.Retro), and NFR-2 (no wall-clock calls in think path).
-  `bin/Code/Retro/__init__.py` and `bin/Code/Retro/Cpus/__init__.py` updated with module
-  docstrings to satisfy N-RETRO-7. `docs/features/retro-engine/production_readiness.md`
-  (Gate E artefact) capturing tier status, residual gaps, and run instructions.
-  127 retro tests passing.
-- **Retro Engine — Phase 9 (DOS x86 second target scaffolding)**:
-  `bin/Code/Retro/Cpus/UnicornX86.py` — `UnicornX86(Cpu)` backend for
-  `UC_ARCH_X86 + UC_MODE_16` (real-mode DOS); same Cpu seam as Unicorn68k.
-  `docs/retro/divergences.md` — cross-port move divergence registry (empty
-  until DOS binary is captured). `tests/unit/retro/test_dos.py` — 3 `retro_emu`
-  tests (synthetic .COM load, AX roundtrip, unknown-reg error); 2 `retro_rom`
-  stubs; 1 `retro` corpus-comparison test (vacuously passes until DOS corpus
-  exists). 124 retro tests passing.
-- **Retro Engine — Phase 8 (UCI shim + engine registration)**: `bin/Code/Retro/Uci.py` —
-  `UciSession` handling uci/isready/setoption/position/go/stop/quit; `io.StringIO` injection
-  seam for unit tests; FR-2 graceful degradation (`bestmove 0000` + info-string error when no
-  ROM); `EmuStrictOriginal` guard rejects non-50 Hz clock rates.
-  `tools/caissa-retro` — thin Python entry point wrapping `Uci.main()`.
-  `bin/OS/darwin/OSEngines.py` — `caissa-retro` registered as `ENG_FIXED`, elo 800, guarded
-  by `os.path.isfile(exe)` (engine silently absent when not set up).
-  `tests/unit/retro/test_uci.py` (11 tests, all `retro` marker, no ROM, no unicorn).
-  123 retro tests passing.
-- **Retro Engine — Phase 7 (Think orchestrator + Oracle + Trace)**: `bin/Code/Retro/Think.py`
-  — `ThinkSession` that drives whole-binary emulation (write_position → clear_best_move →
-  set_computer_color → emu_start → read_best_move → ThinkResult); rom_path vs cpu injection
-  seam; `RomNotFoundError` raised with actionable message when ROM file missing.
-  `bin/Code/Retro/Oracle.py` — `CorpusEntry` dataclass, `load_corpus(path)` JSONL loader,
-  `Oracle.verify_corpus_entry(entry, session)` move verifier.
-  `bin/Code/Retro/Trace.py` — `TRACE_OBSERVATION` constant, `TraceRecord`, `load_trace`,
-  `redact_check` (forbids "code"/"bytecode"/"opcodes"/"raw_instructions" keys, N-RETRO-4).
-  `bin/Code/Retro/Errors.py`: added `RomNotFoundError` leaf class.
-  `tests/unit/retro/test_think.py` (8 tests) and `tests/unit/retro/test_oracle.py` (16 tests),
-  both `retro` marker, FakeCpu only. Committed fixture files in `tests/unit/retro/_fixtures/`.
-  112 retro tests passing, 0 xfail stubs remaining.
+- **Fritz Polish — Phase 7 (Office-style ribbon)**: `bin/Code/Fritz/RibbonModel.py` (pure:
+  `load`, `state`, `overflow`, `best_tab`, `compact`); `bin/Code/Fritz/Ribbon.py` (`install`
+  — degrades gracefully to plain toolbar on any failure); `bin/Code/Fritz/WRibbon.py`
+  (`WRibbon` + QTabBar + QStackedWidget, `WRibbonPanesGroup` for pane checkboxes);
+  `Resources/Ribbons/modern-fritz.json` (7-tab ribbon map: Home, File, Board, Training,
+  Analysis, Opening, Engine); `Resources/Modes/modern-fritz.json` gains `"ribbon": "modern-fritz"`;
+  `WBase.create_toolbar` installs the ribbon after all QActions are built; `WBase.pon_toolbar`
+  routes through `WRibbon.sync` (idempotent, no widget reconstruction after first call);
+  T-RMAP-01..08 unit tests all passing; `docs/fritz/ribbon.md` (Gate H).
 - **Retro Engine — Phase 6 (Bridge — FEN↔board marshalling)**: `bin/Code/Retro/Bridge.py`
   — stdlib-only FEN parser (`parse_fen`, `parse_piece_placement`); 0x88 square helpers
   (`sq88`, `sq88_to_file_rank`, `sq88_to_alg`, `alg_to_sq88`); `Bridge` class that

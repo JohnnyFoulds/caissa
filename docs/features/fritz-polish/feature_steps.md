@@ -435,7 +435,7 @@ exist in source.
 
 ---
 
-## Phase 7 — The Office-style ribbon ⬜
+## Phase 7 — The Office-style ribbon ✅
 
 **Branch:** `feat/fritz-ribbon`
 

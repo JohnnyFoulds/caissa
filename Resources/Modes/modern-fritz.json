@@ -21,6 +21,7 @@
   "toolbar_inject": ["caissa:fritz_level", "caissa:switch_mode"],
 
   "config_section": null,
+  "ribbon": "modern-fritz",
   "style": "Fritz",
   "icons": "MIDNIGHT",
   "font": null,

@@ -79,6 +79,9 @@ _PYSIDE6_ALLOWED_RELATIVE: set[str] = {
     "WFritzLCD.py",
     # Phase 5: FritzEtiquetaPGN delegate — Qt allowlist tier.
     "Delegates.py",
+    # Phase 7: Ribbon widget and wiring — Qt allowlist tier.
+    "WRibbon.py",
+    "Ribbon.py",
 }
 
 # Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted
@@ -237,6 +240,8 @@ _UPSTREAM_FRITZ_IMPORT_ALLOWLIST = {
     # Phase 4: LCD clock widget wired into the player header; eval model wired into the analysis table.
     os.path.normpath("Code/UIModes/WFritzPlayerHeader.py"),
     os.path.normpath("Code/UIModes/WFritzAnalysisTable.py"),
+    # Phase 7: Ribbon installed inside WBase.create_toolbar.
+    os.path.normpath("Code/Main/WBase.py"),
 }
 
 

@@ -48,11 +48,11 @@ SCENES = [
 # Map: scene name → best reference filename inside FRITZ_REF.
 # If a file does not exist, the reference column is left blank in review.html.
 SCENE_REF = {
-    "pane_titlebar":  "pane_titlebar.png",
-    "clocks":         "game_clock_02.png",
-    "eval_line":      "eval_beside_moves.png",
-    "nag_row":        "nag_1tacticalanalysis6.png",
-    "notation_tabs":  "notation_tabs_01.png",
+    "pane_titlebar":  "ref_pane_titlebar.png",
+    "clocks":         "ref_clocks.png",
+    "eval_line":      "ref_eval_line.png",
+    "nag_row":        "ref_nag_row.png",
+    "notation_tabs":  "ref_notation_tabs.png",
     "ribbon_home":    "ribbon_home.png",
     "full":           "fritz_152f18engshot.png",
 }

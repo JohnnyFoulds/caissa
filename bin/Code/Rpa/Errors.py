@@ -34,13 +34,7 @@ Hierarchy::
 """
 
 
-class CaissaError(Exception):
-    """Base class for all errors raised by Caissa-specific code.
-
-    Downstream code should catch ``CaissaError`` when it wants to handle any
-    Caissa-specific failure without caring about the domain.  Domain code should
-    catch the most specific type available.
-    """
+from Code.Base.CaissaErrors import CaissaError  # noqa: F401  re-export for backward compat (D1)
 
 
 class RpaError(CaissaError):

@@ -32,7 +32,7 @@ pytestmark = pytest.mark.rpa
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).parents[3]
-_SUITE_MARKERS = {"unit", "ui", "rpa", "rpa_ui", "rpa_cv"}
+_SUITE_MARKERS = {"unit", "ui", "rpa", "rpa_ui", "rpa_cv", "retro", "retro_emu", "retro_rom"}
 
 
 def _get_rpa_errors():
@@ -169,9 +169,13 @@ def test_types_module_has_no_third_party_imports():
 
 
 def test_errors_module_has_no_third_party_imports():
-    """Errors.py must import nothing outside the Python standard library.
+    """Errors.py must import only stdlib and Code.Base (intra-project, D1).
 
-    :spec: NFR-1
+    After D1 (Phase 2) Code.Rpa.Errors re-exports CaissaError from Code.Base.CaissaErrors.
+    Code.Base is the only intra-project import allowed here; all other non-stdlib imports
+    are treated as third-party violations.
+
+    :spec: NFR-1, decisions.md D1
     """
     errors_path = _REPO_ROOT / "bin" / "Code" / "Rpa" / "Errors.py"
     tree = ast.parse(errors_path.read_text())
@@ -181,12 +185,12 @@ def test_errors_module_has_no_third_party_imports():
         if isinstance(node, ast.Import):
             for alias in node.names:
                 top = alias.name.split(".")[0]
-                if top not in _STDLIB_TOPS:
+                if top not in _STDLIB_TOPS and top != "Code":
                     third_party.add(alias.name)
         elif isinstance(node, ast.ImportFrom):
             if node.module:
                 top = node.module.split(".")[0]
-                if top not in _STDLIB_TOPS and node.level == 0:
+                if top not in _STDLIB_TOPS and node.level == 0 and top != "Code":
                     third_party.add(node.module)
 
     assert not third_party, (

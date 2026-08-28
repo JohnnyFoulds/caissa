@@ -1,0 +1,11 @@
+# requirements-retro.txt — Caissa Retro Engine optional dependencies
+#
+# Install before running the emulator tier:
+#   pip install -r requirements-retro.txt
+#
+# The app and the FakeCpu test tier run WITHOUT these packages.
+# Capstone is optional dev tooling (recon scripts); unicorn is required for
+# the real emulator.
+
+unicorn>=2.1.0
+capstone>=5.0     # optional — recon tooling only; not imported by Code.Retro

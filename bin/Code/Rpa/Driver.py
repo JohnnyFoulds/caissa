@@ -912,6 +912,10 @@ class QtDriver(Driver):
     def open_config(self) -> dict:
         """Open the General Configuration dialog asynchronously.
 
+        Bypasses the options QMenu (which pops up at the cursor position and
+        may appear on a different monitor) and calls WindowConfig.options
+        directly so the dialog reliably appears parented to the main window.
+
         :returns: ``{"ok": True}`` immediately; dialog opens after the current
                   dispatch returns.
         """
@@ -920,10 +924,25 @@ class QtDriver(Driver):
         proc = Code.procesador
         if not proc:
             return {"error": "no procesador"}
+        mw = getattr(proc, "main_window", None)
+        if not mw:
+            return {"error": "no main window"}
+
+        def _open():
+            try:
+                from Code.Config import WindowConfig
+                from Code.Main import InitApp
+                dic_previo = Code.configuration.read_dic_x()
+                if WindowConfig.options(mw, Code.configuration):
+                    Code.configuration.graba()
+                    InitApp.apply_live_style(Code.configuration)
+                    if Code.configuration.needs_reinit(dic_previo):
+                        proc.reiniciar()
+            except Exception as exc:
+                logger.error("open_config _open callback failed: %s", exc, exc_info=True)
+
         try:
-            if not getattr(proc, "main_window", None):
-                return {"error": "no main window"}
-            QtCore.QTimer.singleShot(0, proc.menu_options)
+            QtCore.QTimer.singleShot(0, _open)
             return {"ok": True}
         except Exception as exc:
             return {"error": str(exc)}

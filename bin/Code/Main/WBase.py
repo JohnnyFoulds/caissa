@@ -288,7 +288,7 @@ class WBase(QtWidgets.QWidget):
     def create_board(self):
         ae = ScreenUtils.desktop_height()
         mx = int(ae * 0.08)
-        key = "BASE" if self.parent.key_video == "maind" else "BASEV"
+        key = "BASE" if self.configuration.x_tb_orientation_horizontal else "BASEV"
         config_board = self.manager.configuration.config_board(key, mx)
         from Code.Themes import CaissaThemes
         _theme = CaissaThemes.find_theme(getattr(self.configuration, "x_caissa_theme", ""))

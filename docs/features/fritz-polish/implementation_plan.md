@@ -9,18 +9,21 @@
 
 | What exists | Status |
 |---|---|
-| `docs/features/fritz-polish/feature_spec.md` | Written — Gate A candidate |
-| `docs/features/fritz-polish/initial_idea.md` | Written — FROZEN |
-| `docs/features/fritz-polish/feature_steps.md` | Written — all test names declared |
-| `docs/features/fritz-polish/implementation_plan.md` | This file — Phase D in progress |
-| `bin/Code/Fritz/` | Does not exist yet |
-| `docs/fritz/` | Does not exist yet |
-| `docs/standards/ui-design-process.md` | Does not exist yet |
-| `docs/standards/architecture.md` | Does not exist yet |
+| `docs/features/fritz-polish/feature_spec.md` | Written — Gate A ✅ |
+| `docs/features/fritz-polish/initial_idea.md` | Written — FROZEN ✅ |
+| `docs/features/fritz-polish/feature_steps.md` | Written — all test names declared ✅ |
+| `docs/features/fritz-polish/implementation_plan.md` | This file ✅ |
+| `docs/fritz/` | Design-time pages written ✅ |
+| `docs/fritz/design-approval.md` | Design gate PASSED 2026-08-28 ✅ |
+| `docs/standards/ui-design-process.md` | Written ✅ |
+| `docs/standards/architecture.md` | Written ✅ |
+| `bin/Code/Fritz/` | Package created — `Types`, `Errors`, `QssRules`, `ModeGateway`, `BoardFit`, `GeometryStore` + full unit test suite ✅ |
+| `tools/design/` | Design harness (`fritz_mock.py`, `compare.py`, `review.py`) ✅ |
+| `tests/ui/test_fixed_window.py` | 15 T-FIX tests (Phase 2) ✅ |
 
+**Phase D and Phase 0 are complete. Phase 2 is complete.**  
+**Phase 1 (de-hardcode `WFritz*` widgets) is the next phase.**  
 One branch = one phase = one PR. **Never commit directly to `main`.**
-Work begins at **Session D-B** (the design-time `docs/fritz/` pages and standards).
-Session D-A was the four SDD artefacts; those are now written.
 
 ---
 

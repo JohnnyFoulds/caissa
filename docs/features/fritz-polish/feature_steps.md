@@ -24,7 +24,7 @@ Updated after each phase is completed.
 
 ---
 
-## Phase D — Documentation & Process 🔄
+## Phase D — Documentation & Process ✅
 
 **Branch:** `docs/fritz-polish`
 
@@ -68,7 +68,7 @@ exist in source.
 
 ---
 
-## Phase 0 — Fritz package skeleton, QSS contract, design harness ⬜
+## Phase 0 — Fritz package skeleton, QSS contract, design harness ✅
 
 **Branch:** `chore/fritz-foundations`
 
@@ -181,7 +181,7 @@ exist in source.
 
 ---
 
-## Phase 2 — Fixed window, board fits the available space ⬜
+## Phase 2 — Fixed window, board fits the available space ✅
 
 **Branch:** `feat/fritz-fixed-window`
 

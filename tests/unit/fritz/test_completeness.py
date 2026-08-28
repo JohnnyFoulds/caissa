@@ -73,8 +73,10 @@ def _contains_pyside6(source: str, filename: str) -> bool:
 
 
 # Module names (relative to bin/Code/Fritz/) allowed to import PySide6 directly.
-# This list is empty in Phase 0 and grows as widget modules are added.
-_PYSIDE6_ALLOWED_RELATIVE: set[str] = set()
+# Grows as widget modules are added — Phase 3 adds WFritzPane.py.
+_PYSIDE6_ALLOWED_RELATIVE: set[str] = {
+    "WFritzPane.py",
+}
 
 # Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted
 # upstream code without being in the full PySide6 allowlist.  They cannot import
@@ -227,6 +229,8 @@ _UPSTREAM_FRITZ_IMPORT_ALLOWLIST = {
     # Paths are relative to BIN_DIR (conftest sets cwd to bin/).
     os.path.normpath("Code/Main/MainWindow.py"),
     os.path.normpath("Code/Board/Board.py"),
+    # Caissa-authored mode hook — imports PaneSpec, WFritzPane, PaneRegistry (Phase 3).
+    os.path.normpath("Code/UIModes/actions/modern_fritz_ui.py"),
 }
 
 

@@ -972,6 +972,47 @@ WFritzAnalysisTable
     background-color: #1890e8;
 }
 
+/* SPLITTER HANDLES ─────────────────────────────────────────────────────────── */
+
+QSplitter::handle
+{
+background-color: #3c3c3c;
+}
+
+QSplitter::handle:hover
+{
+background-color: #505050;
+}
+
+QSplitter::handle:horizontal
+{
+width: 4px;
+}
+
+QSplitter::handle:vertical
+{
+height: 4px;
+}
+
+/* WFRITZPANE — pane wrapper with gradient title bar ─────────────────────────── */
+
+WFritzPane
+{
+qproperty-titleHeight: 20;
+qproperty-titleTop: #3c3c3c;
+qproperty-titleBottom: #2d2d2d;
+qproperty-titlePadX: 6;
+background-color: #1e1e1e;
+border: 1px solid #505050;
+}
+
+#WFritzPaneTitle
+{
+font-size: 8pt;
+font-weight: bold;
+color: #cccccc;
+}
+
 /* NAG BACKGROUND COLOURS (also reachable from Options -> Colours) ------------ */
 /* Values are read from dic_colors under NAG_BRILLIANT..NAG_BLUNDER keys.      */
 /* The monkey-patch in modern_fritz_ui.py reads these via Code.Fritz.ThemeGateway. */

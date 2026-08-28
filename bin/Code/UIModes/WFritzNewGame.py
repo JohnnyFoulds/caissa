@@ -34,12 +34,13 @@ _SELECTED_FG = "#ffffff"
 _BTN_FG = "#d4d4d4"
 
 _LEVELS = [
-    ("Easy",        5,    0),    # (label, depth, time_tenths)
-    ("Club",        10,   0),
-    ("Active",      15,   0),
-    ("Strong",      20,   0),
-    ("Master",      0,    50),   # 5s per move
-    ("Grandmaster", 0,    0),    # unlimited
+    # (label, skill_level, time_tenths)  — Stockfish UCI_LimitStrength + movetime
+    ("Easy",        3,    10),   # skill 3,  1s per move
+    ("Club",        8,    20),   # skill 8,  2s per move
+    ("Active",      13,   30),   # skill 13, 3s per move
+    ("Strong",      17,   50),   # skill 17, 5s per move
+    ("Master",      20,   100),  # skill 20, 10s per move
+    ("Grandmaster", 20,   0),    # skill 20, unlimited
 ]
 
 _TIMES = [
@@ -125,7 +126,7 @@ class WFritzNewGame(QtWidgets.QDialog):
         hl.setSpacing(6)
 
         self._level_btns = {}
-        for i, (label, depth, time_tenths) in enumerate(_LEVELS):
+        for i, (label, skill_level, time_tenths) in enumerate(_LEVELS):
             btn = self._toggle_btn(label)
             btn.clicked.connect(lambda _, idx=i: self._pick_level(idx))
             self._level_btns[i] = btn
@@ -230,23 +231,29 @@ class WFritzNewGame(QtWidgets.QDialog):
             side = "B" if random.randint(1, 2) == 1 else "N"
 
         try:
-            engine_key = Code.configuration.x_rival_inicial
-            engine = SelectEngines.busca_engine_default(ENG_INTERNAL, engine_key, None)
+            engine = SelectEngines.busca_engine_default(ENG_INTERNAL, "stockfish", None)
+            if engine is None:
+                engine = SelectEngines.busca_engine_default(ENG_INTERNAL, Code.configuration.x_rival_inicial, None)
         except Exception:
-            _log.error("Fritz new game: could not resolve default engine", exc_info=True)
+            _log.error("Fritz new game: could not resolve engine", exc_info=True)
+            return None
+        if engine is None:
+            _log.error("Fritz new game: no usable engine found")
             return None
 
-        label, depth, time_tenths = _LEVELS[self._level_idx]
+        label, skill_level, time_tenths = _LEVELS[self._level_idx]
         time_label, minutes, _sec_inc = _TIMES[self._time_idx]
         with_time = minutes > 0
+
+        li_uci = [("UCI_LimitStrength", "true"), ("UCI_Elo", str(800 + skill_level * 150))]
 
         dr = {
             "ENGINE": engine.key,
             "TYPE": ENG_INTERNAL,
             "ALIAS": engine.key,
-            "LIUCI": list(getattr(engine, "liUCI", [])),
+            "LIUCI": li_uci,
             "ENGINE_TIME": time_tenths,
-            "ENGINE_DEPTH": depth,
+            "ENGINE_DEPTH": 0,
             "ENGINE_NODES": 0,
             "ENGINE_UNLIMITED": 3,
         }
@@ -256,6 +263,7 @@ class WFritzNewGame(QtWidgets.QDialog):
             "ISWHITE": side == "B",
             "RIVAL": dr,
             "ADJUST": ADJUST_BETTER,
+            "ANALYSIS_BAR": True,
             "HINTS": 0,
             "THOUGHTTT": -1,
             "ARROWSTT": 0,

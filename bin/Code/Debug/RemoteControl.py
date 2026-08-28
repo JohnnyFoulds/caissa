@@ -461,14 +461,12 @@ class RemoteControl(QtCore.QObject):
             return {"error": f"no visible widget matching {query!r}"}
         if not w.isEnabled():
             return {"error": f"widget {query!r} is disabled"}
-        # Try QPushButton.click() first, then QTest
+        # Defer the click so the socket response is sent first — same pattern as
+        # _click_toolbar — prevents blocking dialogs from deadlocking the socket.
         if hasattr(w, "click") and callable(w.click):
-            try:
-                w.click()
-                return {"ok": True, "class": type(w).__name__, "text": query}
-            except Exception:
-                pass
-        QTest.mouseClick(w, Qt.MouseButton.LeftButton)
+            QtCore.QTimer.singleShot(0, w.click)
+        else:
+            QtCore.QTimer.singleShot(0, lambda: QTest.mouseClick(w, Qt.MouseButton.LeftButton))
         return {"ok": True, "class": type(w).__name__, "text": query}
 
     def _click_toolbar(self, text: str) -> dict:

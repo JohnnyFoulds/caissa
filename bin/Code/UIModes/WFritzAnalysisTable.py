@@ -138,6 +138,7 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
 
     def start(self):
         """Begin polling the analysis bar for engine data."""
+        self._request_multipv()
         self._timer.start()
 
     def stop(self):

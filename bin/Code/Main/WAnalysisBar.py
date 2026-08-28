@@ -123,9 +123,12 @@ class AnalysisBar(QtWidgets.QWidget):
         return rm
 
     def control_state(self, mrm):
+        if self.activated and self.engine_manager:
+            # Always store mrm even when the widget is hidden (e.g. Fritz mode
+            # hides this bar but WFritzAnalysisTable polls bar.mrm directly).
+            self.mrm = mrm
         if self.isVisible():
             if self.engine_manager:
-                self.mrm = mrm
                 if mrm:
                     rm = mrm.rm_best()
 

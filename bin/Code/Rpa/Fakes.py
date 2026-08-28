@@ -57,6 +57,10 @@ class FakeClock:
     """
 
     def __init__(self, start_ms: float = 0.0) -> None:
+        """Initialise the fake clock.
+
+        :param start_ms: Initial ``now_ms`` value (default 0.0).
+        """
         self.now_ms: float = start_ms
         self._pending: list[_Pending] = []
 
@@ -139,6 +143,13 @@ class FakeDriver(Driver):
     """
 
     def __init__(self, world: World | None = None, clock: FakeClock | None = None) -> None:
+        """Initialise the fake driver.
+
+        :param world: World fixture describing the simulated UI state.
+            Defaults to a minimal HOME world.
+        :param clock: Deterministic clock.  Defaults to a fresh
+            :class:`FakeClock` at ``now_ms=0.0``.
+        """
         self.world: World = world or World(current_state="HOME")
         self.clock: FakeClock = clock or FakeClock()
         self.calls: list[dict] = []  # recorded actuation calls for assertion

@@ -148,3 +148,22 @@ def find_all(
         )
         for score, box in sorted(kept, key=lambda c: c[0], reverse=True)
     ]
+
+
+def load_template(path: str) -> "numpy.ndarray":
+    """Load a PNG template file from *path* and return it as an RGB ndarray.
+
+    Uses ``cv2.imread`` (which reads BGR) and converts to RGB so the result is
+    consistent with :func:`find_all`'s channel-order contract.
+
+    :param path: Absolute path to a PNG (or other cv2-supported) image file.
+    :returns: H×W×3 uint8 ndarray in **RGB** channel order.
+    :raises FileNotFoundError: If the file does not exist or cv2 cannot read it.
+    """
+    import cv2
+    import numpy as np
+
+    bgr = cv2.imread(path)
+    if bgr is None:
+        raise FileNotFoundError(f"cv2.imread returned None for {path!r}")
+    return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)

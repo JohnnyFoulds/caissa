@@ -16,6 +16,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 9 (Production Readiness)**: Gate E production readiness review with
+  all findings tracked to resolution. `tests/unit/rpa/test_completeness.py` — 5 structural
+  tests: `test_no_pyside6_import_outside_allowlist` (AST walker enforcing N-RPA-2),
+  `test_every_public_callable_in_rpa_has_docstring`, `test_cv2_absent_from_sys_modules_after_plain_start`,
+  `test_rpa_timeout_below_pytest_timeout`, `test_every_planned_test_name_exists_in_suite`.
+  N-RPA-2 violation in `Resolve._image_candidates` fixed: `load_template()` added to
+  `Vision/Template.py` (cv2-only, no Qt). Gate H docs: `docs/rpa/user-guide.md`,
+  `docs/rpa/troubleshooting.md`, `docs/rpa/operations.md`.
+  Gate E artefact: `docs/features/rpa-layer/production_readiness.md`.
 - **RPA layer — Phase 8 (Workflows + Regression Suite)**: `bin/Code/Rpa/Workflows/` —
   `Registry.py` (`register`, `get`, `all_names`); four built-in workflows:
   `smoke_home` (converge + assert HOME), `classical_invariant` (assert toolbar;

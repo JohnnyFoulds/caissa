@@ -151,6 +151,12 @@ class _Candidate:
     __slots__ = ("widget", "confidence", "rect")
 
     def __init__(self, widget: dict[str, Any], confidence: float, rect: Rect) -> None:
+        """Initialise a candidate.
+
+        :param widget: Raw widget info dict from the snapshot (may be empty for CV tiers).
+        :param confidence: Match confidence in [0.0, 1.0].
+        :param rect: Bounding rect in logical coordinates.
+        """
         self.widget = widget
         self.confidence = confidence
         self.rect = rect
@@ -421,16 +427,8 @@ class TargetResolver:
             return []
 
         try:
-            from PySide6.QtGui import QImage
-            import numpy as np
-            qimg = QImage(entry.path).convertToFormat(QImage.Format.Format_RGB888)
-            w, h = qimg.width(), qimg.height()
-            bpl = qimg.bytesPerLine()
-            buf = np.frombuffer(qimg.constBits(), dtype=np.uint8).copy()
-            if bpl == w * 3:
-                template_rgb = buf.reshape(h, w, 3)
-            else:
-                template_rgb = buf.reshape(h, bpl)[:, :w * 3].reshape(h, w, 3)
+            from Code.Rpa.Vision.Template import load_template
+            template_rgb = load_template(entry.path)
         except Exception as exc:
             logger.warning("Image tier: failed to load template %r: %s", entry.path, exc)
             return []

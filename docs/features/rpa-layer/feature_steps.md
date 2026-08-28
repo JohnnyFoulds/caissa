@@ -424,7 +424,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 9 — Production Readiness ⬜
+## Phase 9 — Production Readiness ✅
 
 **Branch:** `chore/rpa-production-readiness`
 **Docs shipped (Gate H):** `docs/rpa/user-guide.md`, `docs/rpa/troubleshooting.md`,

@@ -467,12 +467,25 @@ class RpaService:
             required_state = target_state
 
             def precondition(self_, ctx):
+                """True if the app is already at the target state.
+
+                :param ctx: Current run context.
+                :returns: True when target_state is recognised.
+                """
                 return recognise(ctx.snapshot) == target_state
 
             def execute(self_, ctx):
-                pass
+                """No-op — convergence drives us to the target state.
+
+                :param ctx: Current run context.
+                """
 
             def postcondition(self_, ctx):
+                """True once the app is confirmed at the target state.
+
+                :param ctx: Current run context.
+                :returns: True when target_state is confirmed after settle.
+                """
                 return recognise(ctx.refresh_snapshot()) == target_state
 
         try:

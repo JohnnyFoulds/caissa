@@ -12,6 +12,7 @@
       "hunk_code_file_offset": 40,
       "hunk_code_size": 84872,
       "load_address": 0,
+      "repo_path": "Resources/Retro/BattleChess.amiga",
       "notes": "Single HUNK_CODE block, pre-relocated. No HUNK_RELOC32. Base address 0x00000000.",
       "offsets": {
         "a4_init": "0x1113C",

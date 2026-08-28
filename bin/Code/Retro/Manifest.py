@@ -13,14 +13,45 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from Code.Retro.Errors import HashMismatchError, ManifestError, UnsupportedRomError
 from Code.Retro.Types import Platform, RomId
 
-_DEFAULT_MANIFEST: Path = Path(__file__).parents[3] / "Resources" / "Retro" / "manifest.json"
+_REPO_ROOT: Path = Path(__file__).parents[3]
+_DEFAULT_MANIFEST: Path = _REPO_ROOT / "Resources" / "Retro" / "manifest.json"
 
-__all__ = ["load", "sha256_file", "verify"]
+__all__ = ["load", "sha256_file", "verify", "default_rom_path"]
+
+
+def default_rom_path() -> str | None:
+    """Return the ROM path to use when none is explicitly supplied.
+
+    Resolution order:
+
+    1. ``CAISSA_RETRO_ROM`` environment variable (user-supplied path).
+    2. ``repo_path`` field of the first supported manifest entry that resolves
+       to an existing file inside the repository (committed binary).
+
+    :return: Absolute path string, or ``None`` if no ROM can be located.
+    """
+    env = os.environ.get("CAISSA_RETRO_ROM")
+    if env:
+        return env
+    try:
+        entries = load()
+    except ManifestError:
+        return None
+    for entry in entries:
+        if not entry.get("supported", True):
+            continue
+        repo_rel = entry.get("repo_path")
+        if repo_rel:
+            candidate = _REPO_ROOT / repo_rel
+            if candidate.exists():
+                return str(candidate)
+    return None
 
 
 def sha256_file(path: str) -> str:

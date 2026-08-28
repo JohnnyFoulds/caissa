@@ -295,14 +295,14 @@ def _planned_test_names() -> list[str]:
     steps_path = os.path.normpath(
         os.path.join(
             os.path.dirname(__file__),
-            "..", "..", "..", "docs", "features", "fritz-polish", "feature_steps.md",
+            "..", "..", "..", "docs", "features", "_archive", "fritz-polish", "feature_steps.md",
         )
     )
     # Fail loudly if the file is missing — a mistyped path must not silently pass.
     if not os.path.isfile(steps_path):
         raise FileNotFoundError(
             f"feature_steps.md not found at expected path: {steps_path}\n"
-            "Check that docs/features/fritz-polish/feature_steps.md exists."
+            "Check that docs/features/_archive/fritz-polish/feature_steps.md exists."
         )
 
     with open(steps_path, encoding="utf-8") as fh:

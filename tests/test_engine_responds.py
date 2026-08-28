@@ -11,6 +11,8 @@ Run:
 import os
 import pytest
 
+pytestmark = pytest.mark.unit
+
 
 def _sf_binary():
     return os.path.join(

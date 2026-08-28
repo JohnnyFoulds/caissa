@@ -59,7 +59,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 1 — Foundations ⬜
+## Phase 1 — Foundations ✅
 
 **Branch:** `chore/rpa-foundations`
 **Docs shipped (Gate H):** `docs/rpa/api/` scaffold builds green (Sphinx config, `make docs`)

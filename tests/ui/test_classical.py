@@ -15,6 +15,8 @@ import time
 
 import pytest
 
+pytestmark = pytest.mark.ui
+
 
 # ---------------------------------------------------------------------------
 # Helpers

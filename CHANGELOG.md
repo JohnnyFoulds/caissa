@@ -30,6 +30,25 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
     `error-handling.md`; CV amendment (§7.1) and stale reference fix in `ui-testing.md`
   - `CLAUDE.md` updated with `rpa` scope, `bin/Code/Rpa/` tree, and process pointers
 
+- **RPA layer — Phase 1 (foundations)**: Infrastructure for the Caissa RPA engine:
+  - `bin/Code/Rpa/Errors.py` — `CaissaError` (repo-wide base), `RpaError` domain base,
+    and 15 specific exception classes with RST docstrings
+  - `bin/Code/Rpa/Types.py` — `Rect`, `ElementRef`, `Snapshot` frozen dataclasses
+    with zero third-party imports (N-RPA-1)
+  - `bin/Code/Main/LogSetup.py` — single-call app logging configuration;
+    reads `CAISSA_LOG_LEVEL`; no-op if called again
+  - `ruff.toml` at repo root — Caissa-scoped lint config with `select = ["E","W","F","I","UP"]`;
+    E722 enforced; `--config ruff.toml` required in Makefile (D11)
+  - `Makefile` — `test`, `test-all`, `cov`, `test-ui`, `test-cv`, `lint`, `docs`, `rpa-doctor`
+    targets; venv resolved via `git rev-parse --git-common-dir`
+  - `requirements-rpa.txt` / `requirements-dev.txt` — optional vision deps split from base
+  - `pytest.ini` — `rpa`, `rpa_ui`, `rpa_cv` markers added; D12 comment
+  - `tests/unit/rpa/test_foundations.py` — 13 passing tests + 87 `xfail(strict=True)` stubs
+    covering all future phases (Phase 9's completeness gate anchors here)
+  - `docs/conf.py` — Sphinx autodoc config for `make docs → docs/rpa/api/`
+  - Marker discipline applied: `pytestmark = pytest.mark.unit` / `.ui` added to all
+    existing test files; `test_every_collected_test_has_exactly_one_suite_marker` enforces it
+  - `tests/conftest.py` bootstrap made lazy — pure unit tests no longer trigger Qt bootstrap
 
 - **Win95 Fritz retro skin**: Windows 95-style 3D bevel theme — raised/inset `outset`/`inset` borders, `#c0c0c0` system grey, navy (`#000080`) selection, zero `border-radius`, chunky 16px scrollbars
 - **DOS Fritz retro skin**: CGA terminal theme — amber-on-black (`#ffb000` on `#000000`), hard 1px borders, invert-on-hover buttons, `#0000aa` CGA-blue selection, VSCode icon pack for minimal look

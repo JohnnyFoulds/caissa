@@ -1,0 +1,13 @@
+# requirements-rpa.txt — optional RPA vision/OCR dependencies
+#
+# Install these to enable CV/OCR-based element location (N-RPA-9: lazy-imported;
+# a plain app start without an rpa_* verb never loads cv2 or numpy).
+#
+# opencv-python-headless is required (NOT opencv-python) — the full wheel bundles
+# Qt plugins that clash with PySide6 on macOS. (D4)
+#
+# Also install the tesseract binary: brew install tesseract (macOS) or apt-get install tesseract-ocr
+
+opencv-python-headless>=4.9,<5
+pytesseract>=0.3.10
+numpy>=1.26,<3

@@ -23,6 +23,8 @@ import time
 import pytest
 from PIL import Image, ImageChops
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------

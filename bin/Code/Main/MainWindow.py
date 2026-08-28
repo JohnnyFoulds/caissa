@@ -3,6 +3,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import Code
 from Code.Base.Constantes import TB_CANCEL, TB_CLOSE, TB_QUIT, TB_STOP, TB_TUTOR_STOP, TB_END_REPLAY
 from Code.Board import Eboard
+from Code.Fritz import ModeGateway
+from Code.Fritz.GeometryStore import _MAXIMIZED_TOKEN
 from Code.Main import WBase, WInformation
 from Code.QT import Colocacion, Iconos, LCDialog, QTUtils, ScreenUtils
 from Code.Translations import WorkTranslate
@@ -18,7 +20,8 @@ class MainWindow(LCDialog.LCDialog):
 
         titulo = ""
         icono = Iconos.Aplicacion64()
-        extparam = extparam if extparam else "maind"
+        self._fit_board = bool(ModeGateway.layout().get("fit_board_to_window"))
+        extparam = extparam or ("fritzd" if self._fit_board else "maind")
         LCDialog.LCDialog.__init__(self, owner, titulo, icono, extparam)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
@@ -47,9 +50,12 @@ class MainWindow(LCDialog.LCDialog):
 
         self.board = self.base.board
         self.board.set_dispatch_size(self.adjust_size)
-        self.board.allowed_extern_resize(True)
+        self.board.allowed_extern_resize(not self._fit_board)
         self.anchoAntesMaxim = None
         self.resizing = False
+        self._fitting = False
+        self._last_applied_ap = -1
+        self._fit_timer = None
 
         self.splitter = splitter = QtWidgets.QSplitter(self)
         splitter.addWidget(self.base)
@@ -58,6 +64,9 @@ class MainWindow(LCDialog.LCDialog):
         ly = Colocacion.H().control(splitter).margen(0)
 
         self.setLayout(ly)
+        if self._fit_board:
+            ly.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetNoConstraint)
+            self.setMinimumSize(0, 0)
 
         ctrl1: QtGui.QShortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+1"), self)
         ctrl1.activated.connect(self.pressed_shortcut_ctrl1)
@@ -197,6 +206,14 @@ class MainWindow(LCDialog.LCDialog):
         self.setWindowFlags(QtCore.Qt.WindowType.WindowCloseButtonHint | flags)
         if self.board.is_maximized():
             self.showMaximized()
+        elif self._fit_board:
+            self.xrestore_video()
+            dic = self.restore_dicvideo()
+            if dic and dic.get("_SIZE_") == _MAXIMIZED_TOKEN:
+                self.showMaximized()
+            else:
+                self.show()
+                self.schedule_fit_board()
         else:
             self.xrestore_video()
             self.adjust_size()
@@ -227,7 +244,10 @@ class MainWindow(LCDialog.LCDialog):
         if getattr(self.manager, "in_the_presentation", False):
             self.manager.presentacion(False)
 
-        if nue.fullscreen:
+        if self._fit_board:
+            self.base.tb.setVisible(not nue.fullscreen)
+            self.schedule_fit_board()
+        elif nue.fullscreen:
             self.previous_f11_maximized = ant.maximizado
             self.base.tb.hide()
             self.board.siF11 = True
@@ -270,6 +290,9 @@ class MainWindow(LCDialog.LCDialog):
         return resp
 
     def adjust_size(self):
+        if self._fit_board:
+            return
+
         def adjust():
             if self.resizing:
                 return
@@ -294,11 +317,66 @@ class MainWindow(LCDialog.LCDialog):
         QtCore.QTimer.singleShot(15, adjust)
 
     def _adjust_tamh(self):
+        if self._fit_board:
+            return
         if not (self.isMaximized() or self.board.siF11):
             for n in range(3):
                 self.adjustSize()
                 self.refresh()
         self.refresh()
+
+    def _fit_board_now(self):
+        """Compute and apply the best board size for the current window layout.
+
+        Guards: G2 (reentrancy), G3 (unchanged ap).
+
+        :spec: §2.4, Phase 2 (feature_spec.md)
+        """
+        if self._fitting:
+            return
+        board_ancho = getattr(self.board, "ancho", 0)
+        if not board_ancho:
+            return
+        self._fitting = True
+        try:
+            hint = self.base.minimumSizeHint()
+            overhead_w = hint.width() - board_ancho
+            overhead_h = hint.height() - board_ancho
+            pane = self.splitter.widget(0).size()
+            from Code.Fritz.BoardFit import fit
+            result = fit(
+                pane_w=pane.width(),
+                pane_h=pane.height(),
+                overhead_w=overhead_w,
+                overhead_h=overhead_h,
+                margin_pieces=getattr(self.board, "margin_pieces", 0),
+                tam_recuadro_pct=self.board.config_board.tamRecuadro(),
+                tam_frontera_pct=self.board.config_board.tamFrontera(),
+            )
+            if result.width_piece == self._last_applied_ap:
+                return
+            self._last_applied_ap = result.width_piece
+            self.board.fit_to_width_piece(result.width_piece)
+        finally:
+            self._fitting = False
+
+    def schedule_fit_board(self):
+        """Schedule a debounced board fit (G4: 60 ms single-shot owned timer).
+
+        Coalesces burst resizeEvents during drag to a single fit.
+
+        :spec: §2.4, Phase 2 (feature_spec.md)
+        """
+        if self._fit_timer is None:
+            self._fit_timer = QtCore.QTimer(self)
+            self._fit_timer.setSingleShot(True)
+            self._fit_timer.timeout.connect(self._fit_board_now)
+        self._fit_timer.start(60)
+
+    def resizeEvent(self, event):
+        QtWidgets.QDialog.resizeEvent(self, event)
+        if self._fit_board:
+            self.schedule_fit_board()
 
     def set_title(self):
         title = f"{Code.lucas_chess} {Code.VERSION}"
@@ -505,17 +583,30 @@ class MainWindow(LCDialog.LCDialog):
     def save_video(self, dic_extended=None):
         dic = {} if dic_extended is None else dic_extended
 
+        if self._fit_board and self.isFullScreen():
+            return dic
+
         pos = self.pos()
         dic["_POSICION_"] = "%d,%d" % (pos.x(), pos.y())
 
-        tam = self.size()
-        dic["_SIZE_"] = "%d,%d" % (tam.width(), tam.height())
+        if self._fit_board and self.isMaximized():
+            dic["_SIZE_"] = _MAXIMIZED_TOKEN
+            ng = self.normalGeometry()
+            dic["_NORMAL_SIZE_"] = "%d,%d" % (ng.width(), ng.height())
+        else:
+            tam = self.size()
+            dic["_SIZE_"] = "%d,%d" % (tam.width(), tam.height())
+            if self._fit_board:
+                dic.pop("_NORMAL_SIZE_", None)
 
         for grid in self.liGrids:
             grid.save_video(dic)
 
         for sp, name in self.liSplitters:
-            sps = sp.sizes()
+            try:
+                sps = sp.sizes()
+            except RuntimeError:
+                continue
             key = f"SP_{name}"
             if name == "InformacionPGN" and sps[1] == 0:
                 sps = self.pgn_information.sp_sizes
@@ -533,6 +624,24 @@ class MainWindow(LCDialog.LCDialog):
         return dic
 
     def xrestore_video(self):
+        if self._fit_board:
+            dic = self.restore_dicvideo()
+            if not dic:
+                default = ModeGateway.layout().get("default_size", [1280, 860])
+                self.resize(int(default[0]), int(default[1]))
+                return
+            size_str = dic.get("_SIZE_", "")
+            if size_str != _MAXIMIZED_TOKEN:
+                self.restore_video()
+            else:
+                ng_str = dic.get("_NORMAL_SIZE_", "")
+                if ng_str:
+                    try:
+                        nw, nh = map(int, ng_str.split(","))
+                        self.resize(nw, nh)
+                    except (ValueError, TypeError):
+                        pass
+            return
         if self.restore_video():
             dic = self.restore_dicvideo()
             self.pgn_information.width_saved = dic.get("WINFO_WIDTH")

@@ -5,31 +5,20 @@ Shows a per-half-move evaluation history bar chart, similar to Fritz 15–18's
 "evaluation profile" that sits above the move list.  White advantage is drawn
 above the centre line in Fritz blue; black advantage is drawn below in red.
 
-Architecture
-────────────
-The widget accumulates evaluations by polling the ``AnalysisBar.mrm`` object
-at 250 ms intervals.  Each time the game gains a new half-move, the current
-centipawn value is locked in for that ply.  If the user navigates backwards
-(ply count drops) the trailing entries are trimmed so the graph matches the
-visible board position.
+Design values arrive via ``qproperty-`` on the ``WFritzEvalGraph`` selector
+in the active ``.qss``; see ``docs/fritz/qss-contract.md`` for the full E1
+property table.  Python defaults equal the ``Modern Fritz`` dark-theme values.
 
-Bars are capped at ± :data:`_CAP_CP` centipawns for visual scaling; mate
-values (±30000 from ``centipawns_abs()``) are rendered at the cap boundary.
-
-The widget has a fixed height of 80 px and expands horizontally.
+:spec: §5.3, Phase 1 (feature_spec.md)
 """
+from __future__ import annotations
+
 import logging
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 _log = logging.getLogger(__name__)
 
-_BG = "#1e1e1e"
-_DIVIDER = "#505050"
-_WHITE_BAR = "#0078d4"
-_BLACK_BAR = "#d16969"
-_CURRENT = "#ffffff"
-_H = 80           # fixed height in px
 _CAP_CP = 600     # centipawns shown at full height
 _MATE_CP = 30000  # centipawns_abs() value for mate
 
@@ -37,21 +26,90 @@ _MATE_CP = 30000  # centipawns_abs() value for mate
 class WFritzEvalGraph(QtWidgets.QWidget):
     """Fritz-style evaluation profile graph.
 
+    Design values (colours, height) arrive from the QSS via ``qproperty-``
+    properties; Python defaults equal the ``Modern Fritz`` dark-theme values.
+
     :param parent:       Parent widget (MainWindow).
-    :param analysis_bar: Running :class:`~Code.Main.WAnalysisBar.AnalysisBar` instance.
+    :param analysis_bar: Running ``AnalysisBar`` instance.
+
+    :spec: §5.3, Phase 1 (feature_spec.md)
     """
+
+    # ── E1: qproperty- contract ────────────────────────────────────────────────
+
+    def _get_bgColor(self) -> QtGui.QColor:
+        return self._bgColor
+
+    def _set_bgColor(self, v: QtGui.QColor) -> None:
+        self._bgColor = v
+        self.update()
+
+    bgColor = QtCore.Property(QtGui.QColor, _get_bgColor, _set_bgColor)
+
+    def _get_dividerColor(self) -> QtGui.QColor:
+        return self._dividerColor
+
+    def _set_dividerColor(self, v: QtGui.QColor) -> None:
+        self._dividerColor = v
+        self.update()
+
+    dividerColor = QtCore.Property(QtGui.QColor, _get_dividerColor, _set_dividerColor)
+
+    def _get_whiteBarColor(self) -> QtGui.QColor:
+        return self._whiteBarColor
+
+    def _set_whiteBarColor(self, v: QtGui.QColor) -> None:
+        self._whiteBarColor = v
+        self.update()
+
+    whiteBarColor = QtCore.Property(QtGui.QColor, _get_whiteBarColor, _set_whiteBarColor)
+
+    def _get_blackBarColor(self) -> QtGui.QColor:
+        return self._blackBarColor
+
+    def _set_blackBarColor(self, v: QtGui.QColor) -> None:
+        self._blackBarColor = v
+        self.update()
+
+    blackBarColor = QtCore.Property(QtGui.QColor, _get_blackBarColor, _set_blackBarColor)
+
+    def _get_currentBarColor(self) -> QtGui.QColor:
+        return self._currentBarColor
+
+    def _set_currentBarColor(self, v: QtGui.QColor) -> None:
+        self._currentBarColor = v
+        self.update()
+
+    currentBarColor = QtCore.Property(QtGui.QColor, _get_currentBarColor, _set_currentBarColor)
+
+    def _get_graphHeight(self) -> int:
+        return self._graphHeight
+
+    def _set_graphHeight(self, v: int) -> None:
+        self._graphHeight = v
+        self.setFixedHeight(v)
+
+    graphHeight = QtCore.Property(int, _get_graphHeight, _set_graphHeight)
+
+    # ── constructor ────────────────────────────────────────────────────────────
 
     def __init__(self, parent, analysis_bar):
         super().__init__(parent)
         self.setObjectName("WFritzEvalGraph")
         self.analysis_bar = analysis_bar
 
-        self.setFixedHeight(_H)
-        self.setMinimumWidth(80)
-        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_OpaquePaintEvent)
+        # E1 property defaults (Modern Fritz dark values)
+        self._bgColor = QtGui.QColor("#1e1e1e")
+        self._dividerColor = QtGui.QColor("#505050")
+        self._whiteBarColor = QtGui.QColor("#0078d4")
+        self._blackBarColor = QtGui.QColor("#d16969")
+        self._currentBarColor = QtGui.QColor("#ffffff")
+        self._graphHeight = 80
 
-        # _evals: list of signed centipawn values, one per half-move played.
-        # Positive = white advantage; negative = black advantage.
+        self.setFixedHeight(self._graphHeight)
+        self.setMinimumWidth(80)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+
         self._evals: list[int] = []
         self._last_ply: int = -1
         self._current_ply: int = -1
@@ -86,7 +144,6 @@ class WFritzEvalGraph(QtWidgets.QWidget):
         if not bar or not bar.activated:
             return
 
-        # Derive current ply from the game object
         try:
             import Code
             mgr = Code.procesador.manager if Code.procesador else None
@@ -97,7 +154,6 @@ class WFritzEvalGraph(QtWidgets.QWidget):
         except Exception:
             return
 
-        # Read current analysis value (signed centipawns, white perspective)
         mrm = bar.mrm
         if mrm:
             rm = mrm.rm_best()
@@ -110,15 +166,11 @@ class WFritzEvalGraph(QtWidgets.QWidget):
 
         self._current_ply = ply
 
-        # If ply grew: lock in evaluation for the position just reached
         if ply > self._last_ply:
-            # Fill any gap (shouldn't happen except on resume)
             while len(self._evals) < ply:
                 self._evals.append(self._last_mrm_cp)
             self._last_ply = ply
             self.update()
-
-        # If ply shrank (user navigated back): trim
         elif ply < len(self._evals):
             self._evals = self._evals[:ply]
             self._last_ply = ply
@@ -126,32 +178,28 @@ class WFritzEvalGraph(QtWidgets.QWidget):
 
     # ── painting ───────────────────────────────────────────────────────────────
 
-    def paintEvent(self, _event):
+    def paintEvent(self, event):
+        opt = QtWidgets.QStyleOption()
+        opt.initFrom(self)
         p = QtGui.QPainter(self)
+        self.style().drawPrimitive(QtWidgets.QStyle.PrimitiveElement.PE_Widget, opt, p, self)
         p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, False)
 
         w, h = self.width(), self.height()
         mid = h // 2
 
-        # Background
-        p.fillRect(0, 0, w, h, QtGui.QColor(_BG))
+        p.fillRect(0, 0, w, h, self._bgColor)
 
         n = len(self._evals)
         if n == 0:
-            # Draw centre line only
-            p.setPen(QtGui.QColor(_DIVIDER))
+            p.setPen(self._dividerColor)
             p.drawLine(0, mid, w, mid)
             p.end()
             return
 
         bar_w = max(2, w // max(n, 1))
-        # When bars are very thin, render them pixel-tight
         if bar_w * n < w:
             bar_w = max(2, w // n)
-
-        col_white = QtGui.QColor(_WHITE_BAR)
-        col_black = QtGui.QColor(_BLACK_BAR)
-        col_curr = QtGui.QColor(_CURRENT)
 
         for i, cp in enumerate(self._evals):
             x = i * bar_w
@@ -161,11 +209,11 @@ class WFritzEvalGraph(QtWidgets.QWidget):
 
             is_current = (i == self._current_ply - 1)
             if is_current:
-                color = col_curr
+                color = self._currentBarColor
             elif cp >= 0:
-                color = col_white
+                color = self._whiteBarColor
             else:
-                color = col_black
+                color = self._blackBarColor
 
             if cp >= 0:
                 rect = QtCore.QRect(x, mid - height_px, bar_w - 1, height_px)
@@ -174,7 +222,6 @@ class WFritzEvalGraph(QtWidgets.QWidget):
 
             p.fillRect(rect, color)
 
-        # Centre divider
-        p.setPen(QtGui.QColor(_DIVIDER))
+        p.setPen(self._dividerColor)
         p.drawLine(0, mid, w, mid)
         p.end()

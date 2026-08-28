@@ -22,6 +22,22 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   `troubleshooting.md`. Resource directory placeholders: `Resources/Retro/`,
   `Resources/Retro/Corpus/`. `.gitignore` updated to exclude `Resources/Retro/Fixtures/`
   and `UserData/Retro/` (user ROM and trace paths).
+- **Fritz Polish — Phase 2 (Fixed window) — production code + verbs + tests**:
+  - `bin/Code/Rpa/Driver.py` — six new `QtDriver` verbs: `window_info` (geometry + `fit_board`/`key_video`/`ui_mode` flags), `board_info` (ancho, `width_piece`, orientation), `resize_window`, `set_window_state`, `set_splitter_sizes` (registered name or objectName substring fallback for unregistered splitters such as `WFritzRightCol`), `click_tabbar` (bare `QTabBar` match for ribbon and notation strip).
+  - `bin/Code/Debug/RemoteControl.py` — two-line dispatch delegations for all six verbs.
+  - `tests/ui/rc_contract.json` — six new probes (four success-path for `window_info`/`board_info`/`resize_window`/`set_window_state`, two error-path for `set_splitter_sizes`/`click_tabbar`).
+  - `tests/ui/test_fixed_window.py` — 15 T-FIX tests implemented (T-FIX-01..15): resize correctness, window unchanged on game start/end, board grows with window, min-size proof (G1), maximize/restore round-trip, fullscreen round-trip, `width_piece` never persisted by fit, splitter sizes applied, no `RuntimeError` on repeated mode cycling, `fit_board` flag active, stored `width_piece` stable across fits, window stable across game cycle, no BASEV entry from Fritz mode (`WBase.py:291` decoupling), `dispatch_size` path guarded.
+- **Fritz Polish — Phase D (Documentation + process, Gate A)**: complete SDD artefact set in
+  `docs/features/fritz-polish/` (`initial_idea.md`, `feature_spec.md`, `feature_steps.md`,
+  `implementation_plan.md`). Design-time product docs in `docs/fritz/` (`README.md`,
+  `concepts.md`, `glossary.md`, `decisions.md`, `design-approval.md`). Two new engineering
+  standards: `docs/standards/ui-design-process.md` (PySide6-in-shipping-medium design loop,
+  E1-E4 `qproperty-` contract, Qt escalation ladder, approval gate) and
+  `docs/standards/architecture.md` (feature-package convention, purity tiers, AST purity test,
+  strangler-fig scope limit, characterisation-test-first refactor procedure). `CLAUDE.md` gains
+  Purity tiers subsection, two new standards in the summary, and a Development Commands section.
+  `docs/modern-fritz.md` superseded via `git mv` to `docs/fritz/_modern-fritz-archived.md` with
+  three drifted claims documented.
 
 ### Fixed
 - **Mode toolbar escape hatch**: added `caissa:switch_mode` to `toolbar_inject` for Analyse, Coach, Compete, Just Play, and Train modes — every mode now has a one-click toolbar button to switch back to Classical or another mode

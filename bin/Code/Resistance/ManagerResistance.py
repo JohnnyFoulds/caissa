@@ -291,8 +291,9 @@ class ManagerResistance(Manager.Manager):
         self.disable_all()
         self.state = ST_ENDGAME
         self.procesador.close_engines()
-        self.main_window.adjust_size()
-        self.main_window.resize(0, 0)
+        if not getattr(self.main_window, "_fit_board", False):
+            self.main_window.adjust_size()
+            self.main_window.resize(0, 0)
         if self.movimientos >= 1:
             li_options = [TB_CLOSE, TB_CONFIG, TB_UTILITIES]
             self.set_toolbar(li_options)

@@ -9,10 +9,16 @@ Displays up to N engine lines in a Fritz-style table:
     #2  +2.15   d27   d4 d5 c4 c6 Nf3 Nf6 Nc3 e6…
     #3  +1.95   d25   e4 e5 Nf3 Nc6 Bb5 a6 Ba4…
 
-Data source: polls ``analysis_bar.mrm`` every 250 ms; does NOT start a second engine.
-The analysis bar must be activated (``activate_analysis_bar(True)``) before this widget
-starts — handled by ``modern_fritz_ui.on_mode_enter``.
+Data source: polls ``analysis_bar.mrm`` every 250 ms.
+
+Design values arrive via ``qproperty-`` on the ``WFritzAnalysisTable``
+selector and from QSS for the standard widget children.  Python defaults
+equal the ``Modern Fritz`` dark-theme values.
+
+:spec: §5.3, Phase 1 (feature_spec.md)
 """
+from __future__ import annotations
+
 import logging
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -22,26 +28,65 @@ from Code.Base import Game
 
 _log = logging.getLogger(__name__)
 
-_BG = "#252526"
-_SURFACE = "#2d2d2d"
-_BORDER = "#505050"
-_TEXT = "#d4d4d4"
-_DIM = "#9e9e9e"
-_BLUE = "#0078d4"
-_RED = "#d16969"
-_HEADER_H = 28
-_ROW_H = 22
+_ACCENT_DEFAULT = "#0078d4"
+_DANGER_DEFAULT = "#d16969"
+_HEADER_H_DEFAULT = 28
+_ROW_H_DEFAULT = 22
 
 
 class WFritzAnalysisTable(QtWidgets.QWidget):
     """Fritz-style multi-PV engine analysis table.
 
     :param parent:       Parent widget (MainWindow).
-    :param analysis_bar: Running :class:`~Code.Main.WAnalysisBar.AnalysisBar` instance.
+    :param analysis_bar: Running ``AnalysisBar`` instance.
+
+    :spec: §5.3, Phase 1 (feature_spec.md)
     """
 
     _MIN_PV = 1
     _MAX_PV = 5
+
+    # ── E1: qproperty- contract ────────────────────────────────────────────────
+
+    def _get_dangerColor(self) -> QtGui.QColor:
+        return self._dangerColor
+
+    def _set_dangerColor(self, v: QtGui.QColor) -> None:
+        self._dangerColor = v
+        self.update()
+
+    dangerColor = QtCore.Property(QtGui.QColor, _get_dangerColor, _set_dangerColor)
+
+    def _get_accentColor(self) -> QtGui.QColor:
+        return self._accentColor
+
+    def _set_accentColor(self, v: QtGui.QColor) -> None:
+        self._accentColor = v
+        self.update()
+
+    accentColor = QtCore.Property(QtGui.QColor, _get_accentColor, _set_accentColor)
+
+    def _get_headerHeight(self) -> int:
+        return self._headerHeight
+
+    def _set_headerHeight(self, v: int) -> None:
+        self._headerHeight = v
+        if hasattr(self, "_hdr"):
+            self._hdr.setFixedHeight(v)
+
+    headerHeight = QtCore.Property(int, _get_headerHeight, _set_headerHeight)
+
+    def _get_rowHeight(self) -> int:
+        return self._rowHeight
+
+    def _set_rowHeight(self, v: int) -> None:
+        self._rowHeight = v
+        if hasattr(self, "_table"):
+            self._table.verticalHeader().setDefaultSectionSize(v)
+
+    rowHeight = QtCore.Property(int, _get_rowHeight, _set_rowHeight)
+
+    # ── constructor ────────────────────────────────────────────────────────────
 
     def __init__(self, parent, analysis_bar):
         super().__init__(parent)
@@ -50,46 +95,48 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         self._n_pv = 3
         self._multipv_applied = False
 
+        # E1 property defaults
+        self._dangerColor = QtGui.QColor(_DANGER_DEFAULT)
+        self._accentColor = QtGui.QColor(_ACCENT_DEFAULT)
+        self._headerHeight = _HEADER_H_DEFAULT
+        self._rowHeight = _ROW_H_DEFAULT
+
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         self._build_ui()
         self.setMinimumWidth(220)
         self.setMinimumHeight(80)
 
-    # ── layout ────────────────────────────────────────────────────────────────
+    # ── layout ─────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Header row: engine name (left) | depth (centre) | ± (right)
-        hdr = QtWidgets.QWidget(self)
-        hdr.setFixedHeight(_HEADER_H)
-        hdr.setStyleSheet(f"background:{_SURFACE}; border-bottom:1px solid {_BORDER};")
-        hl = QtWidgets.QHBoxLayout(hdr)
+        self._hdr = QtWidgets.QWidget(self)
+        self._hdr.setObjectName("WFritzAnalysisHeader")
+        self._hdr.setFixedHeight(self._headerHeight)
+        hl = QtWidgets.QHBoxLayout(self._hdr)
         hl.setContentsMargins(8, 0, 4, 0)
         hl.setSpacing(4)
 
-        self._lb_engine = QtWidgets.QLabel("", hdr)
-        self._lb_engine.setStyleSheet(f"color:{_DIM}; font-size:11px; background:transparent;")
+        self._lb_engine = QtWidgets.QLabel("", self._hdr)
+        self._lb_engine.setObjectName("WFritzAnalysisEngineLabel")
 
-        self._lb_depth = QtWidgets.QLabel("", hdr)
-        self._lb_depth.setStyleSheet(f"color:{_DIM}; font-size:11px; background:transparent;")
+        self._lb_depth = QtWidgets.QLabel("", self._hdr)
+        self._lb_depth.setObjectName("WFritzAnalysisDepthLabel")
         self._lb_depth.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
 
-        def _btn(symbol):
-            b = QtWidgets.QToolButton(hdr)
-            b.setText(symbol)
-            b.setFixedSize(20, 20)
-            b.setStyleSheet(
-                f"QToolButton{{color:{_TEXT};background:{_BG};border:1px solid {_BORDER};"
-                f"font-size:13px;font-weight:bold;}}"
-                f"QToolButton:hover{{background:{_BORDER};}}"
-                f"QToolButton:pressed{{background:{_BLUE};}}"
-            )
-            return b
+        self._btn_minus = QtWidgets.QToolButton(self._hdr)
+        self._btn_minus.setText("−")
+        self._btn_minus.setFixedSize(20, 20)
+        self._btn_minus.setObjectName("WFritzAnalysisDecBtn")
 
-        self._btn_minus = _btn("−")
-        self._btn_plus = _btn("+")
+        self._btn_plus = QtWidgets.QToolButton(self._hdr)
+        self._btn_plus.setText("+")
+        self._btn_plus.setFixedSize(20, 20)
+        self._btn_plus.setObjectName("WFritzAnalysisIncBtn")
+
         self._btn_minus.clicked.connect(self._dec_pv)
         self._btn_plus.clicked.connect(self._inc_pv)
 
@@ -97,10 +144,10 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         hl.addWidget(self._lb_depth)
         hl.addWidget(self._btn_minus)
         hl.addWidget(self._btn_plus)
-        outer.addWidget(hdr)
+        outer.addWidget(self._hdr)
 
-        # PV rows: QTableWidget, no headers, read-only
         self._table = QtWidgets.QTableWidget(self)
+        self._table.setObjectName("WFritzAnalysisGrid")
         self._table.setColumnCount(4)
         self._table.setHorizontalHeaderLabels(["#", "Score", "d", "Principal Variation"])
         self._table.horizontalHeader().setVisible(False)
@@ -110,14 +157,8 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         self._table.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self._table.setShowGrid(False)
         self._table.setAlternatingRowColors(False)
-        self._table.verticalHeader().setDefaultSectionSize(_ROW_H)
-        self._table.setStyleSheet(
-            f"QTableWidget{{"
-            f"background:{_BG}; color:{_TEXT}; font-size:11px;"
-            f"border:none; gridline-color:transparent;"
-            f"}}"
-            f"QTableWidget::item{{padding:0px 4px; border:none;}}"
-        )
+        self._table.verticalHeader().setDefaultSectionSize(self._rowHeight)
+
         hh = self._table.horizontalHeader()
         hh.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Fixed)
@@ -192,13 +233,10 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         if mrm is None:
             return
 
-        # First time we see real data: request MultiPV=n_pv so subsequent
-        # positions analyzed include all PV lines (takes effect on next go).
         if not self._multipv_applied:
             self._multipv_applied = True
             self._request_multipv()
 
-        # Update header
         engine_name = ""
         try:
             if bar.engine_manager and hasattr(bar.engine_manager, "name"):
@@ -210,7 +248,6 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         depth_txt = f"depth {mrm.depth}" if mrm.depth else ""
         self._lb_depth.setText(depth_txt)
 
-        # Get FEN for PGN conversion
         fen = None
         try:
             if bar.game:
@@ -245,9 +282,11 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
             pass
 
         positive = not score_txt.startswith("-") and not score_txt.startswith("M-")
-        score_color = _BLUE if positive else _RED
+        score_color = self._accentColor if positive else self._dangerColor
 
-        def _set(col, txt, color=_TEXT, bold=False):
+        dim = QtGui.QColor(self.palette().color(self.palette().ColorRole.Mid))
+
+        def _set(col, txt, color, bold=False):
             item = self._table.item(row, col)
             if item is None:
                 item = QtWidgets.QTableWidgetItem(txt)
@@ -255,15 +294,15 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
                 self._table.setItem(row, col, item)
             else:
                 item.setText(txt)
-            item.setForeground(QtGui.QColor(color))
+            item.setForeground(color)
             font = item.font()
             font.setBold(bold)
             item.setFont(font)
 
-        _set(0, f"#{rank}", _DIM)
+        _set(0, f"#{rank}", dim)
         _set(1, score_txt, score_color, bold=True)
-        _set(2, depth_txt, _DIM)
-        _set(3, pv_txt, _TEXT)
+        _set(2, depth_txt, dim)
+        _set(3, pv_txt, self.palette().color(self.palette().ColorRole.Text))
 
     def _clear_row(self, row):
         for col in range(4):

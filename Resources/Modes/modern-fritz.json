@@ -25,5 +25,9 @@
   "icons": "MIDNIGHT",
   "font": null,
   "defaults": {},
-  "layout": null
+  "layout": {
+    "fit_board_to_window": true,
+    "default_size": [1280, 860],
+    "right_col_width": 420
+  }
 }

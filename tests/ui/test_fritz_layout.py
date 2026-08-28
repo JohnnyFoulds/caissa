@@ -146,12 +146,12 @@ def test_fritz_01_home_screen_right_panel(client):
             "T-FRITZ-01 FAIL: WFritzHome widget not found. "
             "Is the app in Modern Fritz mode?"
         )
-        assert home_geo["width"] > 200, (
+        assert home_geo["w"] > 200, (
             f"T-FRITZ-01 FAIL: WFritzHome width {home_geo['width']}px < 200px. "
             "Fritz right column is too narrow."
         )
     else:
-        assert geo["width"] > 200, (
+        assert geo["w"] > 200, (
             f"T-FRITZ-01 FAIL: WFritzRightCol width {geo['width']}px < 200px."
         )
 
@@ -175,7 +175,7 @@ def test_fritz_02_ingame_layout(client):
     assert geo is not None, (
         "T-FRITZ-02 FAIL: Fritz right column widgets not found after starting game."
     )
-    assert geo["width"] >= 300, (
+    assert geo["w"] >= 300, (
         f"T-FRITZ-02 FAIL: Fritz panel width {geo['width']}px < 300px. "
         "WBase's internal right panel is probably still crowding the layout."
     )
@@ -185,7 +185,7 @@ def test_fritz_02_ingame_layout(client):
     assert eval_geo is not None, (
         "T-FRITZ-02 FAIL: WFritzEvalGraph not found in Fritz in-game layout."
     )
-    assert eval_geo["width"] > 50, (
+    assert eval_geo["w"] > 50, (
         f"T-FRITZ-02 FAIL: WFritzEvalGraph too narrow: {eval_geo['width']}px"
     )
 
@@ -213,10 +213,10 @@ def test_fritz_03_player_header(client):
     assert header_geo is not None, (
         "T-FRITZ-03 FAIL: WFritzPlayerHeader widget not found."
     )
-    assert header_geo["height"] >= 50, (
+    assert header_geo["h"] >= 50, (
         f"T-FRITZ-03 FAIL: Player header too short: {header_geo['height']}px"
     )
-    assert header_geo["width"] > 100, (
+    assert header_geo["w"] > 100, (
         f"T-FRITZ-03 FAIL: Player header too narrow: {header_geo['width']}px"
     )
 

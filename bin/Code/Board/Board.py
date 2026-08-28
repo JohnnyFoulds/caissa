@@ -506,6 +506,43 @@ class Board(QtWidgets.QGraphicsView):
         self.config_board.guardaEnDisco()
         self.width_changed()
 
+    def fit_to_width_piece(self, ap):
+        """Apply *ap* as the board width without persisting or triggering resize dispatch.
+
+        Preserves board rotation and does not call ``guardaEnDisco()`` so the
+        fit loop never writes ``width_piece`` to disk.
+
+        :param ap: Target ``width_piece`` value (pixels per side).
+        :spec: §2.3, Phase 2 (feature_spec.md)
+        """
+        is_white_bottom = self.is_white_bottom
+        saved_dispatch = self.dispatch_size
+        self.dispatch_size = None
+        try:
+            self.config_board.width_piece(ap)
+            self.set_width()
+        finally:
+            self.dispatch_size = saved_dispatch
+        if not is_white_bottom:
+            self.try_to_rotate_the_board(None)
+
+    def fit_to(self, px):
+        """Fit the board to *px* available pixels.
+
+        Delegates to :meth:`fit_to_width_piece` via ``BoardFit.width_piece_for_ancho``.
+
+        :param px: Available dimension in pixels.
+        :spec: §2.3, Phase 2 (feature_spec.md)
+        """
+        from Code.Fritz.BoardFit import width_piece_for_ancho
+        ap = width_piece_for_ancho(
+            px,
+            margin_pieces=getattr(self, "margin_pieces", 0),
+            tam_recuadro_pct=self.config_board.tamRecuadro(),
+            tam_frontera_pct=self.config_board.tamFrontera(),
+        )
+        self.fit_to_width_piece(ap)
+
     def width_changed(self):
         is_white_bottom = self.is_white_bottom
         self.set_width()

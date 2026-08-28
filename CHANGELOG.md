@@ -12,6 +12,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 4 (CPU seam + FakeCpu)**: `bin/Code/Retro/Cpu.py` abstract
+  base (8 methods, `HOOK_CODE`/`HOOK_MEM_READ`/`HOOK_MEM_WRITE`/`HOOK_MEM_INVALID`
+  constants, zero Unicorn import). `bin/Code/Retro/Fakes.py` FakeCpu (scripted trace
+  callback, 16 MB flat memory store, monotonic hook handles). `bin/Code/Retro/Cpus/`
+  sub-package: `Availability.py` (unicorn probe + `require()`) and `Unicorn68k.py`
+  (full Unicorn m68k wrapper — the ONLY file in Code.Retro permitted to import unicorn,
+  N-RETRO-2; wraps D0–D7, A0–A7, PC, SP; wraps all four hook types; wraps `UcError`
+  as `CpuError`). `tests/unit/retro/test_cpu.py` (12 `retro`-marked FakeCpu +
+  availability tests; 5 `retro_emu`-marked Unicorn68k tests, skipped when unicorn
+  absent). Total: 51 retro tests passing, 5 skipped, 2 xfail stubs remaining (Bridge,
+  Think).
 - **Retro Engine — Phase 3 (ROM manifest + containers)**: `bin/Code/Retro/Manifest.py`
   (load/validate/verify for `manifest.json`, streaming sha256, N-RETRO-6) and
   `bin/Code/Retro/Rom.py` (Amiga HUNK format parser; packer detection for

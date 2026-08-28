@@ -301,12 +301,6 @@ def test_think_result_has_move():
 # xfail stubs for future phases
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="Phase 4: Cpu.py not yet implemented")
-def test_fake_cpu_replays_trace():
-    """FakeCpu must replay a scripted register/memory trace."""
-    pytest.fail("xfail stub")
-
-
 @pytest.mark.xfail(strict=True, reason="Phase 6: Bridge.py not yet implemented")
 def test_bridge_fen_round_trip():
     """Bridge FEN→struct→FEN must produce the original FEN."""

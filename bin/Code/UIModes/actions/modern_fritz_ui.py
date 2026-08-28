@@ -30,22 +30,19 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 _log = logging.getLogger(__name__)
 
-# Fritz-palette NAG background colours
-_NAG_COLORS: dict = {}
-
-
+# NAG colours come from dic_colors via ThemeGateway — no hardcoded hex here.
 def _nag_colors() -> dict:
-    if not _NAG_COLORS:
-        from Code.Nags.Nags import NAG_1, NAG_2, NAG_3, NAG_4, NAG_5, NAG_6
-        _NAG_COLORS.update({
-            NAG_3: QtGui.QColor("#1d4f1d"),  # !! brilliant  — bright green
-            NAG_1: QtGui.QColor("#183018"),  # !  good       — subtle green
-            NAG_5: QtGui.QColor("#1a2d3d"),  # !? interesting — teal
-            NAG_6: QtGui.QColor("#3d2a00"),  # ?! dubious    — amber
-            NAG_2: QtGui.QColor("#4d2200"),  # ?  mistake    — orange
-            NAG_4: QtGui.QColor("#5c0000"),  # ?? blunder    — red
-        })
-    return _NAG_COLORS
+    import Code
+    from Code.Nags.Nags import NAG_1, NAG_2, NAG_3, NAG_4, NAG_5, NAG_6
+    dc = Code.dic_colors
+    return {
+        NAG_3: QtGui.QColor(dc.get("NAG_BRILLIANT", "#1d4f1d")),
+        NAG_1: QtGui.QColor(dc.get("NAG_GOOD",      "#183018")),
+        NAG_5: QtGui.QColor(dc.get("NAG_INTERESTING","#1a2d3d")),
+        NAG_6: QtGui.QColor(dc.get("NAG_DUBIOUS",   "#3d2a00")),
+        NAG_2: QtGui.QColor(dc.get("NAG_MISTAKE",   "#4d2200")),
+        NAG_4: QtGui.QColor(dc.get("NAG_BLUNDER",   "#5c0000")),
+    }
 
 
 def _install_fritz_pgn_coloring(base):

@@ -122,3 +122,11 @@ CHROME_DANGER=Danger
 CHROME_MESSAGE_BG=Message background
 CHROME_MESSAGE_FG=Message foreground
 TOOLBAR_BORDER=Toolbar border colour
+
+[NAG Colours]
+NAG_BRILLIANT=NAG !! brilliant move background
+NAG_GOOD=NAG ! good move background
+NAG_INTERESTING=NAG !? interesting move background
+NAG_DUBIOUS=NAG ?! dubious move background
+NAG_MISTAKE=NAG ? mistake background
+NAG_BLUNDER=NAG ?? blunder background

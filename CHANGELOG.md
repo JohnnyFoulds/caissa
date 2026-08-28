@@ -12,6 +12,21 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **RPA layer — Phase 0 (documentation & process)**: SDD/TDD artefacts and product
+  documentation foundation for the Caissa closed-loop automation engine. Includes:
+  - `docs/process/sdd-workflow.md` — the SDD/TDD routine with 8-gate checklist
+  - `docs/templates/` — Caissa-adapted SDD artefact templates (no-ABC variants)
+  - `docs/claude_code/prompts.md` — 11-prompt library for the SDD workflow
+  - `docs/features/rpa-layer/` — frozen initial idea, full R/I/P/Q/N feature spec,
+    phase tracker with all test names, and session implementation plan
+  - `docs/rpa/` — product documentation (design-time subset): state machine formal
+    spec, concepts, UiPath mapping, app states, glossary, decisions (D1–D12)
+  - Standards amendments: feature-directory convention in `spec-driven-development.md`;
+    `typing.Protocol` clarification in `coding-standards.md`; `CaissaError` location in
+    `error-handling.md`; CV amendment (§7.1) and stale reference fix in `ui-testing.md`
+  - `CLAUDE.md` updated with `rpa` scope, `bin/Code/Rpa/` tree, and process pointers
+
+
 - **Win95 Fritz retro skin**: Windows 95-style 3D bevel theme — raised/inset `outset`/`inset` borders, `#c0c0c0` system grey, navy (`#000080`) selection, zero `border-radius`, chunky 16px scrollbars
 - **DOS Fritz retro skin**: CGA terminal theme — amber-on-black (`#ffb000` on `#000000`), hard 1px borders, invert-on-hover buttons, `#0000aa` CGA-blue selection, VSCode icon pack for minimal look
 - **Modern Fritz — one-screen layout fix** (`feat/modern-fritz-layout`, PR #6)

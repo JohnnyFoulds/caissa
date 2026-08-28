@@ -13,21 +13,35 @@ Caissa is a fork of Lucas Chess R6 that adds a Mode system (Coach, Analyse, Trai
 ```text
 bin/Code/
 ├─ Main/WBase.py          # Toolbar injection point (pon_toolbar, ~line 503)
+├─ Main/LogSetup.py       # App logging configuration (entry point only)
 ├─ Config/WindowConfig.py # General Configuration dialog
 ├─ UIModes/
 │  ├─ UIModes.py          # Mode loader: active_mode(), toolbar_inject()
 │  └─ actions/            # Per-mode action registrations + hooks
 │     ├─ coach_home.py    # Coach landing screen (2×2 card grid)
 │     └─ <mode>_ui.py     # Optional mode UI hook (patch_config_form, etc.)
+├─ Rpa/                   # RPA layer (closed-loop automation engine)
+│  ├─ Errors.py           # CaissaError + RpaError hierarchy
+│  ├─ Types.py            # Rect, ElementRef, Snapshot (zero third-party imports)
+│  ├─ Driver.py           # Driver base + QtDriver (only Qt-touching class in Rpa/)
+│  ├─ Runner.py           # Step-pumped state machine
+│  └─ ...                 # See docs/rpa/ for the full architecture
 
 Resources/
 ├─ Modes/                 # Mode JSON files (classical, Coach, Analyse, Train, Compete, Just Play)
-└─ Styles/                # QSS themes + optional <name>.ui.json overlays
+├─ Styles/                # QSS themes + optional <name>.ui.json overlays
+└─ Rpa/                   # RPA assets: Templates/, Reference/, Fixtures/
 
 docs/
 ├─ theme-mode-system.md   # SDD: Theme/Mode overlay architecture
 ├─ standards/             # Engineering standards (see below)
-└─ engines.md
+├─ engines.md
+├─ process/
+│  └─ sdd-workflow.md     # SDD/TDD workflow — THE ROUTINE + 8 gates
+├─ features/              # Per-feature SDD artefacts
+│  └─ rpa-layer/          # RPA layer spec, steps, implementation plan
+├─ rpa/                   # RPA layer product documentation
+└─ templates/             # SDD artefact templates
 ```
 
 ---
@@ -85,14 +99,20 @@ See `docs/standards/coding-standards.md`.
 Conventional Commits format: `type(scope): subject`
 
 Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`  
-Scopes: `modes`, `toolbar`, `config`, `coach`, `ui`, `engine`, `theme`
+Scopes: `modes`, `toolbar`, `config`, `coach`, `ui`, `engine`, `theme`, `rpa`
 
 Non-trivial commits need a body with bullet points. See `docs/standards/coding-standards.md`.
 
 ### Specification-Driven Development
-Write an SDD before implementing any non-trivial feature. Store in `docs/<feature>.md`.
-The Theme/Mode overlay system spec (`docs/theme-mode-system.md`) is the reference example.
-See `docs/standards/spec-driven-development.md`.
+Write an SDD before implementing any non-trivial feature. Use the feature-directory
+convention: `docs/features/<name>/` with `initial_idea.md`, `feature_spec.md`,
+`feature_steps.md`, and `implementation_plan.md`. See `docs/standards/spec-driven-development.md`.
+
+The full SDD/TDD routine and 8-gate checklist: `docs/process/sdd-workflow.md`.  
+Templates: `docs/templates/`.  
+Prompt library: `docs/claude_code/prompts.md`.
+
+Existing flat specs (grandfathered): `docs/theme-mode-system.md`, `docs/ui-testing.md`.
 
 ### Docstrings
 RST/Sphinx style for all new public modules, classes, and functions.

@@ -12,6 +12,13 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 10 (Production Readiness)**: `tests/unit/retro/test_completeness.py`
+  — three invariant tests: N-RETRO-7 (every public callable has a docstring), N-RETRO-11
+  (classical mode does not import Code.Retro), and NFR-2 (no wall-clock calls in think path).
+  `bin/Code/Retro/__init__.py` and `bin/Code/Retro/Cpus/__init__.py` updated with module
+  docstrings to satisfy N-RETRO-7. `docs/features/retro-engine/production_readiness.md`
+  (Gate E artefact) capturing tier status, residual gaps, and run instructions.
+  127 retro tests passing.
 - **Retro Engine — Phase 9 (DOS x86 second target scaffolding)**:
   `bin/Code/Retro/Cpus/UnicornX86.py` — `UnicornX86(Cpu)` backend for
   `UC_ARCH_X86 + UC_MODE_16` (real-mode DOS); same Cpu seam as Unicorn68k.

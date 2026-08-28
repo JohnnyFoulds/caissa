@@ -250,7 +250,7 @@ exist in source.
 
 ---
 
-## Phase 3 — Pane title bars and Fritz density ⬜
+## Phase 3 — Pane title bars and Fritz density ✅
 
 **Branch:** `feat/fritz-panes`
 
@@ -278,6 +278,8 @@ exist in source.
 - `test_restore_px_returns_current_when_nonzero` (T-PREG-02)
 - `test_restore_px_floors_at_min_px` (T-PREG-03)
 - `test_unknown_key_raises_pane_not_registered_error` (T-PREG-04)
+- `test_names_preserves_registration_order` (T-PREG-05)
+- `test_register_same_key_twice_replaces_not_duplicates` (T-PREG-06)
 
 **TDD test cases (tests/ui/test_fritz_panes.py):**
 

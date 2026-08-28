@@ -12,6 +12,16 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 0 (Documentation & Process)**: full SDD artefact set for
+  the Retro Engine feature (`docs/features/retro-engine/`): `initial_idea.md` (FROZEN),
+  `feature_spec.md` (Gate A satisfied), `feature_steps.md` (all test names for all
+  10 phases, Phase 1–10 as `xfail(strict=True)` stubs), `implementation_plan.md`
+  (Phase 0 + Phase 1 sessions in full; Phases 2–10 stubs), `decisions.md`. Product
+  documentation in `docs/retro/`: `README.md`, `legal.md` (ROM / copyright policy),
+  `rom-setup.md`, `uci-options.md`, `reverse-engineering.md`, `testing.md`,
+  `troubleshooting.md`. Resource directory placeholders: `Resources/Retro/`,
+  `Resources/Retro/Corpus/`. `.gitignore` updated to exclude `Resources/Retro/Fixtures/`
+  and `UserData/Retro/` (user ROM and trace paths).
 - **Fritz Polish — Phase 2 (Fixed window) — production code + verbs + tests**:
   - `bin/Code/Rpa/Driver.py` — six new `QtDriver` verbs: `window_info` (geometry + `fit_board`/`key_video`/`ui_mode` flags), `board_info` (ancho, `width_piece`, orientation), `resize_window`, `set_window_state`, `set_splitter_sizes` (registered name or objectName substring fallback for unregistered splitters such as `WFritzRightCol`), `click_tabbar` (bare `QTabBar` match for ribbon and notation strip).
   - `bin/Code/Debug/RemoteControl.py` — two-line dispatch delegations for all six verbs.

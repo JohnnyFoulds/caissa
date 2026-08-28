@@ -259,92 +259,76 @@ def render_clocks(out_dir: Path, variant: str, width: int) -> Path:
         " ": frozenset(),
     }
 
+    # Explicit digit geometry — fully independent width/height so proportions are correct
+    DH = 38   # digit cell height
+    DW = 20   # digit cell width  (roughly 1:2 ratio, tall and narrow like a real display)
+    T  = 4    # bar thickness
+    G  = 2    # gap at bar ends
+
     class _LCD(QtWidgets.QWidget):
         """Seven-segment LCD clock widget (prototype for WFritzLCD)."""
 
-        LIT   = QtGui.QColor("#30ff70")
-        DIM   = QtGui.QColor("#0a2010")
-        BG    = QtGui.QColor("#000000")
-        THICK = 9    # segment bar thickness — large enough to read
-        GAP   = 3    # gap between segments
+        LIT = QtGui.QColor("#30ff70")
+        DIM = QtGui.QColor("#0a2010")
+        BG  = QtGui.QColor("#000000")
 
         def __init__(self, text: str = "0:05:00"):
             super().__init__()
             self.setObjectName("WFritzLCDMock")
             self._text = text
-            dh = self._digit_h()
             box_w = self._text_width(text) + 20
-            box_h = dh + 20
+            box_h = DH + 16
             self.setFixedSize(box_w, box_h)
-
-        def _digit_h(self) -> int:
-            # height of one digit cell = 2 * THICK + 3 * GAP (top, middle, bottom bars + gaps)
-            return self.THICK * 2 + self.GAP * 4
-
-        def _digit_w(self) -> int:
-            return self.THICK + self.GAP * 2
 
         def _text_width(self, text: str) -> int:
             w = 0
             for ch in text:
-                if ch == ":":
-                    w += self.THICK + self.GAP * 2
-                else:
-                    w += self._digit_w() + self.GAP
+                w += (T + G * 2 + 2) if ch == ":" else (DW + G)
             return w
 
-        def _seg_path(self, sx: int, sy: int, seg: int) -> QtGui.QPainterPath:
-            t = self.THICK
-            g = self.GAP
-            dw = self._digit_w()
-            dh = self._digit_h()
-            path = QtGui.QPainterPath()
-            if seg == 0:   # top horizontal
-                path.addRect(sx + g, sy, dw - 2*g, t)
-            elif seg == 6: # bottom horizontal
-                path.addRect(sx + g, sy + dh - t, dw - 2*g, t)
-            elif seg == 3: # middle horizontal
-                path.addRect(sx + g, sy + (dh - t)//2, dw - 2*g, t)
-            elif seg == 1: # top-left vertical
-                path.addRect(sx, sy + g, t, dh//2 - g - 1)
-            elif seg == 2: # top-right vertical
-                path.addRect(sx + dw - t, sy + g, t, dh//2 - g - 1)
-            elif seg == 4: # bot-left vertical
-                path.addRect(sx, sy + dh//2 + 1, t, dh//2 - g - 1)
-            elif seg == 5: # bot-right vertical
-                path.addRect(sx + dw - t, sy + dh//2 + 1, t, dh//2 - g - 1)
-            return path
+        def _seg_rect(self, sx, sy, seg):
+            # Returns (x, y, w, h) for one segment bar
+            if seg == 0:  # top horizontal
+                return (sx + G, sy,              DW - 2*G, T)
+            if seg == 6:  # bottom horizontal
+                return (sx + G, sy + DH - T,     DW - 2*G, T)
+            if seg == 3:  # middle horizontal
+                return (sx + G, sy + (DH-T)//2,  DW - 2*G, T)
+            half = DH // 2
+            if seg == 1:  # top-left vertical
+                return (sx,         sy + G + T,  T, half - G - T - 1)
+            if seg == 2:  # top-right vertical
+                return (sx + DW-T,  sy + G + T,  T, half - G - T - 1)
+            if seg == 4:  # bot-left vertical
+                return (sx,         sy + half+1, T, half - G - T - 1)
+            if seg == 5:  # bot-right vertical
+                return (sx + DW-T,  sy + half+1, T, half - G - T - 1)
+            return (0, 0, 0, 0)
 
         def paintEvent(self, _event):
             p = QtGui.QPainter(self)
             p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
             p.fillRect(self.rect(), self.BG)
+            p.setPen(QtCore.Qt.PenStyle.NoPen)
 
-            dh = self._digit_h()
-            dw = self._digit_w()
             x = 10
-            y = (self.height() - dh) // 2
+            y = (self.height() - DH) // 2
 
             for ch in self._text:
                 segs = _SEGS.get(ch)
-                if segs is None:  # colon — two square dots
-                    t = self.THICK
-                    g = self.GAP
-                    dot_sz = max(3, t // 2)
+                if segs is None:  # colon
+                    dot = max(3, T)
+                    cx = x + G
                     p.setBrush(self.LIT)
-                    p.setPen(QtCore.Qt.PenStyle.NoPen)
-                    cx = x + g
-                    p.fillRect(cx, y + dh // 3 - dot_sz // 2, dot_sz, dot_sz, self.LIT)
-                    p.fillRect(cx, y + 2 * dh // 3 - dot_sz // 2, dot_sz, dot_sz, self.LIT)
-                    x += t + g * 2
+                    p.fillRect(cx, y + DH//3 - dot//2,   dot, dot, self.LIT)
+                    p.fillRect(cx, y + 2*DH//3 - dot//2, dot, dot, self.LIT)
+                    x += T + G * 2 + 2
                 else:
-                    # draw all 7 segments (lit or dim)
                     for seg_i in range(7):
-                        path = self._seg_path(x, y, seg_i)
-                        p.setBrush(self.LIT if seg_i in segs else self.DIM)
-                        p.setPen(QtCore.Qt.PenStyle.NoPen)
-                        p.drawPath(path)
-                    x += dw + self.GAP
+                        rx, ry, rw, rh = self._seg_rect(x, y, seg_i)
+                        color = self.LIT if seg_i in segs else self.DIM
+                        p.fillRect(rx, ry, rw, rh, color)
+                    x += DW + G
 
             p.end()
 

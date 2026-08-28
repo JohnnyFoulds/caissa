@@ -30,6 +30,11 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
     `error-handling.md`; CV amendment (§7.1) and stale reference fix in `ui-testing.md`
   - `CLAUDE.md` updated with `rpa` scope, `bin/Code/Rpa/` tree, and process pointers
 
+- **RPA layer — Phase 2-A (contract lock)**: Wire contract for `RemoteControl` recorded
+  before the Phase-2 refactor — `tests/ui/rc_contract.json` (25-verb golden key sets) +
+  `tests/ui/test_rc_contract.py` (24 parametrised / sequential assertions). Tests skip
+  automatically when no live app is reachable.
+
 - **RPA layer — Phase 1 (foundations)**: Infrastructure for the Caissa RPA engine:
   - `bin/Code/Rpa/Errors.py` — `CaissaError` (repo-wide base), `RpaError` domain base,
     and 15 specific exception classes with RST docstrings

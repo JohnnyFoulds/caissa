@@ -18,7 +18,7 @@ import sys
 
 import FasterCode
 
-from Code.Base.Constantes import ENG_INTERNAL
+from Code.Base.Constantes import ENG_FIXED, ENG_INTERNAL
 from Code.Engines import Engines
 from Code.Z import Util
 
@@ -226,6 +226,23 @@ def read_engines(folder_engines: str) -> dict:
         _ensure_exec(eng.path_exe)
         eng.set_type(ENG_INTERNAL)
         dic[key] = eng
+
+    # ── 5. Retro Engine (Battle Chess emulator, ENG_FIXED) ───────────────────
+    _retro_exe = os.path.normpath(os.path.join(_HERE, "..", "..", "tools", "caissa-retro"))
+    if os.path.isfile(_retro_exe):
+        retro = Engines.Engine()
+        retro.key = "caissa-retro"
+        retro.name = "Battle Chess Retro Engine"
+        retro.autor = "Interplay / Dragon (original); Caissa wrapper"
+        retro.url = ""
+        retro.version = "1.0"
+        retro.elo = 800
+        retro.maxMultiPV = 1
+        retro.nodes_compatible = False
+        retro.path_exe = Util.relative_path(_retro_exe)
+        _ensure_exec(retro.path_exe)
+        retro.set_type(ENG_FIXED)
+        dic["caissa-retro"] = retro
 
     _read_engines_cache = dic
     return dic

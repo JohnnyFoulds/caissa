@@ -16,6 +16,20 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 5 (runner + journal + activities)**: The step-pumped closed-loop state
+  machine. `bin/Code/Rpa/Runner.py` — 14-sub-state machine (`SubState` enum), `RunStatus`
+  enum (PENDING/RUNNING/CANCELLING/SUCCEEDED/FAILED/CANCELLED/TIMED_OUT), `Frame` dataclass
+  for the frame stack, `Runner` with `pump() → bool` and cooperative `cancel()`.
+  Three deadlines: run (90 000 ms), step-verify (5 000 ms), converge budget (12 transitions).
+  Backoff: `200×2^(n-1)` capped at 3 000 ms with ±10 % jitter from `random.Random(run_id)`.
+  RetryScope frames detected in `DECIDE_RECOVERY` before entering UNWIND.
+  `bin/Code/Rpa/Journal.py` — `StepRecord` and `RunRecord` dataclasses with JSON persistence
+  and bounded 500-entry sub-state trace. `bin/Code/Rpa/Activities.py` — `Activity` base
+  class and 11 concrete activities (Click, TypeInto, SelectItem, GetText, ElementExists,
+  TakeScreenshot, OpenConfig, CloseDialog, SwitchTab, Sequence, RetryScope).
+  30 unit tests in `tests/unit/rpa/test_runner.py` (2 xfail for Phase 6).
+  `docs/rpa/activities.md` and `docs/rpa/state-machine.md` updated with verified traces.
+
 - **RPA layer — Phase 4 (state model)**: `bin/Code/Rpa/AppState.py` — 8 state constants,
   dialog-first `recognise(snapshot)`, `Transition` frozen dataclass, `TRANSITION_TABLE`
   (9 transitions with force_cancel edges at min_settle_ms >= 600), `StateGraph` with

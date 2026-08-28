@@ -240,7 +240,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 5 — Runner + Journal + Activities ⬜
+## Phase 5 — Runner + Journal + Activities ✅
 
 **Branch:** `feat/rpa-runner`
 **Docs shipped (Gate H):** `docs/rpa/activities.md`; `docs/rpa/state-machine.md` worked traces verified

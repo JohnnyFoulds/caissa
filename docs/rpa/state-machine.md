@@ -1,7 +1,7 @@
 # Runner State Machine — Formal Specification
 
-**Status:** Normative — design intent. Worked traces will be verified against real journals in Phase 5
-(Gate H amends this document if they differ).  
+**Status:** Normative — finalised against `Runner.py` Phase 5. Worked traces verified by the Phase 5
+unit test suite; this document was amended from design intent to match actual behaviour.  
 **Implements:** `bin/Code/Rpa/Runner.py`  
 **See also:** `docs/rpa/concepts.md` (the mental model), `docs/rpa/states.md` (app states)
 
@@ -104,16 +104,27 @@ VERIFY  (call activity.postcondition(ctx) once per pump)
   postcondition false, now() < verify_deadline ───────────► VERIFY (stay)
   postcondition false, now() >= verify_deadline ──────────► DECIDE_RECOVERY
 
-DECIDE_RECOVERY  (inspect attempt count and compensability)
-  attempts < max_attempts ────────────────────────────────► BACKOFF
-  attempts >= max_attempts and activity.compensable ──────► COMPENSATE
-  attempts >= max_attempts and not compensable ───────────► UNWIND
+DECIDE_RECOVERY  (inspect attempt count, compensability, and frame stack)
+  attempts > 0 and attempts < max_attempts ────────────────► BACKOFF
+  attempts >= max_attempts and compensable, first time ────► COMPENSATE
+  no retries available, retry frame in stack with room ────► STEP_ENTER (frame re-entry)
+  otherwise ───────────────────────────────────────────────► UNWIND
+
+  Notes:
+  - BACKOFF requires at least one ACT call (attempts > 0).  A convergence failure
+    (budget exhausted before any ACT) routes to compensation or unwind, not backoff.
+  - COMPENSATE is tried at most once per step (_step_compensated flag).  If the step
+    fails again after the compensated retry, the run goes to UNWIND — not COMPENSATE
+    again.  This prevents infinite compensate→retry loops.
+  - RetryScope frames are checked by walking the stack outward.  The innermost retry
+    frame with attempts < max_attempts absorbs the failure; all inner frames are
+    discarded and the retry frame resets to index=0, attempts+1.
 
 BACKOFF  (idle; no actuation)
-  now() >= backoff_until ─────────────────────────────────► CHECK_PRE
+  now() >= backoff_until ─────────────────────────────────► CHECK_PRE  (converge count reset)
 
 COMPENSATE  (call activity.compensate(ctx); check recognise() == entry_state)
-  back at entry_state ────────────────────────────────────► CHECK_PRE  (retry)
+  back at entry_state ────────────────────────────────────► CHECK_PRE  (retry; converge count reset)
   not back at entry_state ────────────────────────────────► UNWIND
 
 STEP_EXIT  (journal the step; call activity.prepare_next(ctx))
@@ -168,8 +179,13 @@ All in `driver.now()` terms (milliseconds since an arbitrary epoch, advancing wi
 | Deadline | Value | Named constant | Reset trigger |
 |---|---|---|---|
 | Run | 90 000 ms | `RUN_TIMEOUT_MS` | Never (set at run start) |
-| Step-verify | 5 000 ms | `VERIFY_TIMEOUT_MS` | Each new attempt begins |
-| Converge budget | 12 transitions | `CONVERGE_BUDGET` | Each `CHECK_PRE` entry |
+| Step-verify | 5 000 ms | `VERIFY_TIMEOUT_MS` | Each new ACT call (new attempt) |
+| Converge budget | 12 transitions | `CONVERGE_BUDGET` | New step, backoff retry, or compensate retry |
+
+Note: the converge budget is **not** reset on every `CHECK_PRE` entry.  It accumulates across
+`CONVERGE → SETTLE_CONVERGE → CHECK_PRE` cycles within the same step attempt.  It only resets
+when a new step begins (`STEP_ENTER`), when backoff transitions to `CHECK_PRE`, or when a
+successful compensation retries the step.
 
 The run deadline must satisfy `RUN_TIMEOUT_MS + 30_000 <= pytest_timeout_ms` (see D12).
 `test_rpa_timeout_below_pytest_timeout` asserts this invariant numerically.
@@ -196,13 +212,13 @@ replayed by feeding the same `run_id` to `FakeDriver`.
 Frame(activities, index, kind, attempts, max_attempts, deadline, entry_state)
 ```
 
-When a `retry` frame's body fails (reaches `DECIDE_RECOVERY` with `attempts < max_attempts`):
-- `BACKOFF` idles
-- `CHECK_PRE` re-enters the frame at `index=0, attempts+1`
-- This is UiPath Retry Scope semantics with no nesting and no blocking
+When `DECIDE_RECOVERY` runs and no activity-level retries are available, the runner walks the
+frame stack outward.  The innermost `retry` frame with `attempts < max_attempts` absorbs the
+failure: all inner frames are discarded, the retry frame resets to `index=0, attempts+1`,
+and the sub-state returns to `STEP_ENTER`.  This is UiPath Retry Scope semantics — no nesting,
+no blocking.
 
-When a `retry` frame exhausts its `max_attempts`:
-- The recovery path (`COMPENSATE` or `UNWIND`) unwinds the frame
+When all retry frames are exhausted (or there are none), the run enters `UNWIND`.
 
 The frame stack makes scoping without recursion possible: `pump()` is a flat loop.
 
@@ -210,51 +226,79 @@ The frame stack makes scoping without recursion possible: `pump()` is a flat loo
 
 ## 8. Worked Traces
 
-These are design-intent traces. Phase 5 verifies them against real journals; Gate H amends
-this document if any trace is wrong.
+Verified against the Phase 5 unit test suite (`tests/unit/rpa/test_runner.py`).
 
-### 8.1 Happy Path: Click toolbar button
+### 8.1 Happy Path
 
-| Pump | Sub-state | What happens | Actuates? |
+Single `OkActivity` (precondition=True, postcondition=True, settle_ms=0).
+
+| Pump | Status before | Sub-state | What happens |
 |---|---|---|---|
-| 1 | STEP_ENTER | Pop `Click(toolbar, "Options")` off frame | No |
-| 2 | CHECK_PRE | Snapshot reads state=HOME; precondition: state==HOME ✓ | No |
-| 3 | ACT | `driver.trigger_action("Options")` | Yes |
-| 4 | SETTLE | `now() < actuated_at + 100` — wait | No |
-| 5 | SETTLE | `now() >= actuated_at + 100` | No |
-| 6 | VERIFY | Snapshot: DIALOG_CONFIG present → postcondition ✓ | No |
-| 7 | STEP_EXIT | Journal step; prepare_next | No |
-| 8 | FRAME_POP | Frame exhausted; stack empty | No |
-| 9 | DONE | → SUCCEEDED | No |
+| 1 | PENDING | STEP_ENTER | Transitions to RUNNING; sets run deadline; no sub-state work |
+| 2 | RUNNING | STEP_ENTER | Pops OkActivity; creates StepRecord; → CHECK_PRE |
+| 3 | RUNNING | CHECK_PRE | Refreshes snapshot; precondition() → True; → ACT |
+| 4 | RUNNING | ACT | execute() called; _step_attempts=1; → SETTLE |
+| 5 | RUNNING | SETTLE | settle_ms=0, already elapsed; → VERIFY |
+| 6 | RUNNING | VERIFY | postcondition() → True; → STEP_EXIT |
+| 7 | RUNNING | STEP_EXIT | Journal step; frame.advance(); frame exhausted → FRAME_POP |
+| 8 | RUNNING | FRAME_POP | Stack empty; → DONE; _terminate(SUCCEEDED) |
+| 9 | SUCCEEDED | — | pump() returns False |
 
-### 8.2 Precondition failure + convergence + recovery
+### 8.2 Precondition failure → convergence
 
-| Pump | Sub-state | What happens |
-|---|---|---|
-| 1 | STEP_ENTER | Pop `Click(btn)` off frame; required_state=HOME |
-| 2 | CHECK_PRE | State=DIALOG_OTHER → precondition false |
-| 3 | CONVERGE | plan(DIALOG_OTHER → HOME): execute `dialog_cancel` transition |
-| 4 | SETTLE_CONVERGE | Wait `min_settle_ms` for dialog dismiss |
-| 5 | SETTLE_CONVERGE | Elapsed; back to CHECK_PRE |
-| 6 | CHECK_PRE | State=HOME → precondition true |
-| 7 | ACT | `driver.click(btn)` |
-| 8..N | SETTLE → VERIFY | Postcondition false × 3 pumps (button slow) |
-| N+1 | VERIFY | Postcondition true |
-| N+2 | STEP_EXIT → FRAME_POP → DONE | → SUCCEEDED |
-
-### 8.3 Postcondition exhaustion + compensation + unwind
+Activity with `required_state=PLAYING`; FakeDriver world transitions HOME→PLAYING on
+the `new_game_home` action.
 
 | Pump | Sub-state | What happens |
 |---|---|---|
-| 1-3 | STEP_ENTER → ACT → SETTLE | Activity executed |
-| 4..N | VERIFY | Postcondition false until `verify_deadline` |
-| N+1 | DECIDE_RECOVERY | `attempts == max_attempts`, compensable=True |
-| N+2 | COMPENSATE | `activity.compensate(ctx)`; check state == entry_state |
-| N+3 | CHECK_PRE | Compensate succeeded; retry the step (attempts+1) |
-| ... | VERIFY again | Postcondition still fails |
-| M | DECIDE_RECOVERY | `attempts == max_attempts` again, compensable=False now |
-| M+1 | UNWIND | Walk executed steps in reverse, compensating one per pump |
-| ... | UNWIND | All steps unwound |
+| 1 | STEP_ENTER | PENDING→RUNNING (first pump) |
+| 2 | STEP_ENTER | Pops activity; → CHECK_PRE; _step_converge_count=0 |
+| 3 | CHECK_PRE | State=HOME ≠ PLAYING → precondition false; → CONVERGE |
+| 4 | CONVERGE | plan(HOME→PLAYING): trigger `new_game_home`; _converge_count=1; → SETTLE_CONVERGE |
+| 5 | SETTLE_CONVERGE | Idle until min_settle_ms elapsed |
+| … | SETTLE_CONVERGE | (pumps with clock.advance) |
+| N | SETTLE_CONVERGE | Elapsed; → CHECK_PRE |
+| N+1 | CHECK_PRE | State=PLAYING; precondition() → True; → ACT |
+| N+2 | ACT | execute(); → SETTLE → VERIFY |
+| N+3 | VERIFY | postcondition() → True; → STEP_EXIT → FRAME_POP → DONE → SUCCEEDED |
+
+### 8.3 Converge budget exhaustion
+
+Activity whose `required_state` is unreachable (no path in the graph).
+
+| Pump | Sub-state | What happens |
+|---|---|---|
+| 1 | STEP_ENTER | PENDING→RUNNING |
+| 2 | STEP_ENTER | Pops activity; → CHECK_PRE |
+| 3 | CHECK_PRE | precondition false; → CONVERGE |
+| 4 | CONVERGE | plan() raises ConvergeError (no path); → DECIDE_RECOVERY |
+| 5 | DECIDE_RECOVERY | _step_attempts=0 (no ACT yet); not compensable; no retry frame; → UNWIND |
+| 6 | UNWIND | _executed_steps empty; → DONE; _terminate(FAILED) |
+| 7 | FAILED | pump() returns False |
+
+When the planner _can_ reach the target but the world never changes:
+the converge budget (12 transitions) is exhausted across successive
+CONVERGE → SETTLE_CONVERGE → CHECK_PRE cycles without the precondition
+ever becoming true.  After 12 transitions, CONVERGE → DECIDE_RECOVERY
+as above.
+
+### 8.4 Postcondition failure + single compensation + unwind
+
+`CompensableActivity` (max_attempts=1, compensable=True, postcondition always False).
+
+| Pump | Sub-state | What happens |
+|---|---|---|
+| 1–2 | STEP_ENTER → CHECK_PRE | precondition True; → ACT |
+| 3 | ACT | execute(); _step_attempts=1; → SETTLE → VERIFY |
+| 4..N | VERIFY | postcondition False; polling until verify_deadline |
+| N+1 | DECIDE_RECOVERY | attempts(1)==max_attempts(1); compensable and not yet compensated; → COMPENSATE; _step_compensated=True |
+| N+2 | COMPENSATE | compensate(); check state==entry_state; matches → CHECK_PRE; _step_converge_count=0 |
+| N+3 | CHECK_PRE | precondition True; → ACT |
+| N+4 | ACT | execute(); _step_attempts=2; → SETTLE → VERIFY |
+| N+4..M | VERIFY | postcondition False again |
+| M+1 | DECIDE_RECOVERY | attempts>=max_attempts; compensable but _step_compensated=True; no retry frame; → UNWIND |
+| M+2 | UNWIND | Walk executed steps in reverse (compensating any compensable ones) |
+| … | UNWIND | All steps processed |
 | K | DONE | → FAILED |
 
 ---

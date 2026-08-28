@@ -48,6 +48,7 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         self.setObjectName("WFritzAnalysisTable")
         self.analysis_bar = analysis_bar
         self._n_pv = 3
+        self._multipv_applied = False
 
         self._build_ui()
         self.setMinimumWidth(220)
@@ -138,7 +139,7 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
 
     def start(self):
         """Begin polling the analysis bar for engine data."""
-        self._request_multipv()
+        self._multipv_applied = False
         self._timer.start()
 
     def stop(self):
@@ -164,10 +165,13 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         if not bar or not bar.activated:
             return
         try:
-            if bar.engine_manager and hasattr(bar.engine_manager, "set_multipv"):
-                bar.engine_manager.set_multipv(self._n_pv)
+            if bar.engine_manager:
+                if hasattr(bar.engine_manager, "change_multipv"):
+                    bar.engine_manager.change_multipv(self._n_pv)
+                elif hasattr(bar.engine_manager, "set_multipv"):
+                    bar.engine_manager.set_multipv(self._n_pv)
         except Exception:
-            _log.debug("set_multipv failed", exc_info=True)
+            _log.debug("change_multipv failed", exc_info=True)
 
     def _rebuild_rows(self):
         self._table.setRowCount(self._n_pv)
@@ -187,6 +191,12 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
         mrm = bar.mrm
         if mrm is None:
             return
+
+        # First time we see real data: request MultiPV=n_pv so subsequent
+        # positions analyzed include all PV lines (takes effect on next go).
+        if not self._multipv_applied:
+            self._multipv_applied = True
+            self._request_multipv()
 
         # Update header
         engine_name = ""

@@ -145,6 +145,13 @@ def on_mode_enter(procesador):
     home.show()
 
     mw.activate_analysis_bar(True)
+    # Keep the engine running but hide the widget — Fritz uses WFritzAnalysisTable.
+    # force_hidden prevents activate() from calling setVisible(True) again when
+    # Manager.show_info_extra() re-activates the bar during game start; a visible
+    # AnalysisBar forces a board resize that triggers a QGraphicsDropShadowEffect
+    # crash on macOS with Qt6/Metal.
+    mw.base.analysis_bar.force_hidden = True
+    mw.base.analysis_bar.setVisible(False)
     mw.active_information_pgn(True)
     # active_information_pgn(True) calls show() internally — hide it on home screen
     mw.pgn_information.hide()
@@ -405,5 +412,11 @@ def on_mode_exit(procesador):
                 delattr(mw, attr)
             except AttributeError:
                 pass
+
+    # Restore analysis bar visibility control so other modes work normally
+    try:
+        mw.base.analysis_bar.force_hidden = False
+    except Exception:
+        pass
 
     _log.debug("Modern Fritz layout removed")

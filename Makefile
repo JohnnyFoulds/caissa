@@ -18,7 +18,7 @@
 GIT_COMMON := $(shell git rev-parse --git-common-dir 2>/dev/null)
 PY ?= $(GIT_COMMON)/../.venv/bin/python3
 
-.PHONY: test test-all cov test-ui test-cv lint docs rpa-doctor help
+.PHONY: test test-all cov cov-fritz test-ui test-cv lint docs rpa-doctor help
 
 test: ## Fast unit + RPA engine tests (no Qt, no display needed)
 	QT_QPA_PLATFORM=offscreen $(PY) -m pytest -m "unit or rpa" -v
@@ -32,6 +32,15 @@ cov: ## Coverage gate: ≥ 90 % branch coverage for Code.Rpa
 	  --cov-fail-under=90 \
 	  --cov-branch \
 	  --cov-config=.coveragerc \
+	  --cov-report=term-missing \
+	  -v
+
+cov-fritz: ## Coverage gate: ≥ 90 % branch coverage for Code.Fritz (D10)
+	QT_QPA_PLATFORM=offscreen $(PY) -m pytest -m "unit or rpa" \
+	  --cov=Code.Fritz \
+	  --cov-fail-under=90 \
+	  --cov-branch \
+	  --cov-config=fritz.coveragerc \
 	  --cov-report=term-missing \
 	  -v
 

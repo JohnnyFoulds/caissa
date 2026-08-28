@@ -1,0 +1,9 @@
+[run]
+branch = true
+source = Code.Fritz
+
+[report]
+omit =
+    # Qt-touching widget modules — covered by ui/rpa_ui suite, not make test (D10)
+
+fail_under = 90

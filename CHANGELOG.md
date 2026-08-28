@@ -12,6 +12,14 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 9 (DOS x86 second target scaffolding)**:
+  `bin/Code/Retro/Cpus/UnicornX86.py` — `UnicornX86(Cpu)` backend for
+  `UC_ARCH_X86 + UC_MODE_16` (real-mode DOS); same Cpu seam as Unicorn68k.
+  `docs/retro/divergences.md` — cross-port move divergence registry (empty
+  until DOS binary is captured). `tests/unit/retro/test_dos.py` — 3 `retro_emu`
+  tests (synthetic .COM load, AX roundtrip, unknown-reg error); 2 `retro_rom`
+  stubs; 1 `retro` corpus-comparison test (vacuously passes until DOS corpus
+  exists). 124 retro tests passing.
 - **Retro Engine — Phase 8 (UCI shim + engine registration)**: `bin/Code/Retro/Uci.py` —
   `UciSession` handling uci/isready/setoption/position/go/stop/quit; `io.StringIO` injection
   seam for unit tests; FR-2 graceful degradation (`bestmove 0000` + info-string error when no

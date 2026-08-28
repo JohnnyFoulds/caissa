@@ -12,6 +12,18 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 7 (Think orchestrator + Oracle + Trace)**: `bin/Code/Retro/Think.py`
+  — `ThinkSession` that drives whole-binary emulation (write_position → clear_best_move →
+  set_computer_color → emu_start → read_best_move → ThinkResult); rom_path vs cpu injection
+  seam; `RomNotFoundError` raised with actionable message when ROM file missing.
+  `bin/Code/Retro/Oracle.py` — `CorpusEntry` dataclass, `load_corpus(path)` JSONL loader,
+  `Oracle.verify_corpus_entry(entry, session)` move verifier.
+  `bin/Code/Retro/Trace.py` — `TRACE_OBSERVATION` constant, `TraceRecord`, `load_trace`,
+  `redact_check` (forbids "code"/"bytecode"/"opcodes"/"raw_instructions" keys, N-RETRO-4).
+  `bin/Code/Retro/Errors.py`: added `RomNotFoundError` leaf class.
+  `tests/unit/retro/test_think.py` (8 tests) and `tests/unit/retro/test_oracle.py` (16 tests),
+  both `retro` marker, FakeCpu only. Committed fixture files in `tests/unit/retro/_fixtures/`.
+  112 retro tests passing, 0 xfail stubs remaining.
 - **Retro Engine — Phase 6 (Bridge — FEN↔board marshalling)**: `bin/Code/Retro/Bridge.py`
   — stdlib-only FEN parser (`parse_fen`, `parse_piece_placement`); 0x88 square helpers
   (`sq88`, `sq88_to_file_rank`, `sq88_to_alg`, `alg_to_sq88`); `Bridge` class that

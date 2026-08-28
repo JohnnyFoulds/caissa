@@ -1,6 +1,6 @@
 # App States — Reference
 
-**Status:** Design intent — finalised against code in Phase 4 (Gate H)  
+**Status:** Finalised against `bin/Code/Rpa/AppState.py` (Phase 4)  
 **Implements:** `bin/Code/Rpa/AppState.py`  
 **See also:** `docs/rpa/state-machine.md` (runner sub-states), `docs/rpa/concepts.md`
 
@@ -41,6 +41,23 @@ recognise(snapshot):
     if at_home_screen(snapshot):         return HOME
     return UNKNOWN
 ```
+
+### Recogniser signals
+
+The recogniser reads the snapshot's `widget_tree` for these widget-info dict keys:
+
+| Signal | Key/class | Notes |
+|---|---|---|
+| Modal dialog | `modal: True` OR `cls` contains `"Dialog"` or `"WindowConfig"` | |
+| Config dialog | `cls == "WindowConfig"` OR `cls` contains `"OptionsDialog"/"ConfigDialog"` | |
+| Game over | `game_over: True` OR `result` in `{1-0, 0-1, 1/2-1/2, draw, …}` | |
+| Engine thinking | `engine_thinking: True` | |
+| Engine manager | `cls == "ManagerPlayAgainstEngine"` OR `manager_class == "ManagerPlayAgainstEngine"` | |
+| Any manager | `cls` contains `"Manager"` OR `manager_class` key present | |
+| Home screen | `cls == "WBase"` OR `at_home: True` OR empty widget tree | |
+
+These signals drive both the production recogniser (reading from `QtDriver.snapshot()`) and the
+`FakeDriver` world fixture (which can set any of these flags directly).
 
 ---
 

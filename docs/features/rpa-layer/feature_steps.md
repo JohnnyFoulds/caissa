@@ -206,7 +206,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 4 — State Model ⬜
+## Phase 4 — State Model ✅
 
 **Branch:** `feat/rpa-state-model`
 **Docs shipped (Gate H):** `docs/rpa/states.md` finalised against code

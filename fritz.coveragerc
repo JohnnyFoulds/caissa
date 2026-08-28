@@ -4,6 +4,13 @@ source = Code.Fritz
 
 [report]
 omit =
-    # Qt-touching widget modules — covered by ui/rpa_ui suite, not make test (D10)
+    # Qt allowlist tier — covered by ui suite, not the default make test
+    bin/Code/Fritz/WFritzPane.py
+    bin/Code/Fritz/WFritzLCD.py
+    bin/Code/Fritz/WRibbon.py
+    bin/Code/Fritz/Ribbon.py
+    bin/Code/Fritz/Delegates.py
+    # Adapter modules that reach Qt-tainted upstream at runtime — covered by ui suite
+    bin/Code/Fritz/EngineGateway.py
 
 fail_under = 90

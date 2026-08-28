@@ -13,7 +13,6 @@ import sys
 import types
 
 import pytest
-
 from Code.Fritz import ThemeGateway
 
 pytestmark = pytest.mark.unit
@@ -103,3 +102,50 @@ def test_active_style_returns_empty_string_on_exception(monkeypatch):
     monkeypatch.setitem(sys.modules, "Code", fake)
     result = ThemeGateway.active_style()
     assert isinstance(result, str)
+
+
+def test_nag_color_returns_hex_from_cache():
+    """nag_color() returns the cached value on repeated calls."""
+    ThemeGateway.invalidate()
+    ThemeGateway._nag_hex_cache[42] = "#aabbcc"
+    result = ThemeGateway.nag_color(42)
+    assert result == "#aabbcc"
+    # Clean up
+    ThemeGateway.invalidate()
+
+
+def test_nag_color_returns_fallback_on_exception(monkeypatch):
+    """nag_color() returns '#ffffff' when Code.Nags is unavailable."""
+    ThemeGateway.invalidate()
+
+    import builtins
+    real_import = builtins.__import__
+
+    def _blocking_import(name, *args, **kwargs):
+        if "Nags" in name:
+            raise ImportError("no Nags")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _blocking_import)
+    result = ThemeGateway.nag_color(999)
+    assert result == "#ffffff"
+    ThemeGateway.invalidate()
+
+
+def test_invalidate_also_resets_nags_xdic_colors(monkeypatch):
+    """invalidate() resets Nags.xdic_colors when the module is importable."""
+    import types as _types
+
+    fake_nags_mod = _types.ModuleType("Code.Nags.Nags")
+    fake_nags_mod.xdic_colors = {"some_key": "#000"}
+
+    fake_nags_pkg = _types.ModuleType("Code.Nags")
+
+    monkeypatch.setitem(sys.modules, "Code.Nags", fake_nags_pkg)
+    monkeypatch.setitem(sys.modules, "Code.Nags.Nags", fake_nags_mod)
+
+    ThemeGateway._nag_hex_cache[1] = "#ff0000"
+    ThemeGateway.invalidate()
+
+    assert 1 not in ThemeGateway._nag_hex_cache
+    assert fake_nags_mod.xdic_colors == {}

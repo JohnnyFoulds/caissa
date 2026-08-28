@@ -12,6 +12,11 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Fritz Polish — Phase 9 (Production Readiness)**: Gate E complete; 94.22 % branch
+  coverage for `Code.Fritz` per `fritz.coveragerc`; `make docs` clean (zero Sphinx
+  warnings); `docs/features/fritz-polish/production_readiness.md` with 8-section
+  checklist and 6 resolved findings; feature directory archived to
+  `docs/features/_archive/fritz-polish/`.
 - **Fritz Polish — Phase 7 (Office-style ribbon)**: `bin/Code/Fritz/RibbonModel.py` (pure:
   `load`, `state`, `overflow`, `best_tab`, `compact`); `bin/Code/Fritz/Ribbon.py` (`install`
   — degrades gracefully to plain toolbar on any failure); `bin/Code/Fritz/WRibbon.py`

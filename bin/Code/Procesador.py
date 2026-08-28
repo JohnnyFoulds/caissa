@@ -243,7 +243,8 @@ class Procesador:
 
     def reset(self):
         from Code.UIModes.UIModes import active_mode as _active_mode, load_mode_hook as _load_mode_hook
-        _hook = _load_mode_hook(_active_mode().get("name", ""))
+        _am = _active_mode()
+        _hook = _load_mode_hook(_am.get("name", ""), hook=_am.get("hook"))
         if _hook and hasattr(_hook, "on_mode_exit"):
             try:
                 _hook.on_mode_exit(self)
@@ -294,7 +295,8 @@ class Procesador:
         self.kibitzers_manager.stop()
 
         from Code.UIModes.UIModes import active_mode as _active_mode, load_mode_hook as _load_mode_hook
-        _hook = _load_mode_hook(_active_mode().get("name", ""))
+        _am = _active_mode()
+        _hook = _load_mode_hook(_am.get("name", ""), hook=_am.get("hook"))
         if _hook and hasattr(_hook, "on_mode_enter"):
             try:
                 _hook.on_mode_enter(self)

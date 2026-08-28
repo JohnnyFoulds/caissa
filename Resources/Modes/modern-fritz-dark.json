@@ -1,7 +1,9 @@
 {
-  "name": "Modern Fritz",
-  "description": "Fritz-inspired skin: home screen, multi-PV analysis, eval graph, direct game start.",
+  "name": "Modern Fritz Dark",
+  "description": "Fritz-inspired skin with the dark palette (same layout as Modern Fritz).",
   "icon": "Kibitzers",
+
+  "hook": "modern_fritz",
 
   "menu_keys": null,
 
@@ -21,7 +23,7 @@
   "toolbar_inject": ["caissa:fritz_level", "caissa:switch_mode"],
 
   "config_section": null,
-  "style": "Fritz",
+  "style": "Modern Fritz",
   "icons": "MIDNIGHT",
   "font": null,
   "defaults": {},

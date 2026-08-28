@@ -397,7 +397,7 @@ exist in source.
 
 ---
 
-## Phase 6 — Fritz light theme as the default ⬜
+## Phase 6 — Fritz light theme as the default ✅
 
 **Branch:** `feat/fritz-light-theme`
 

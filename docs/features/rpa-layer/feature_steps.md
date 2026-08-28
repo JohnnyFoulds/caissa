@@ -119,7 +119,7 @@ Phase 9 asserts every name in this list exists in the suite.
 
 ---
 
-## Phase 2 — Driver Seam + Contract Lock ⬜
+## Phase 2 — Driver Seam + Contract Lock ✅
 
 **Branch:** `refactor/rpa-driver-seam`
 **Docs shipped (Gate H):** `docs/rpa/extending.md` (driver contract section)

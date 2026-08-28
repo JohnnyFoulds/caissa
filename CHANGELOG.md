@@ -30,6 +30,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
     `error-handling.md`; CV amendment (§7.1) and stale reference fix in `ui-testing.md`
   - `CLAUDE.md` updated with `rpa` scope, `bin/Code/Rpa/` tree, and process pointers
 
+- **RPA layer — Phase 2-B (driver seam)**: `bin/Code/Rpa/Driver.py` — `Driver` plain base +
+  `QtDriver` (all 20+ Qt helpers extracted from `RemoteControl`; only class permitted to
+  import PySide6 in `Code.Rpa`). `bin/Code/Rpa/Fakes.py` — `FakeDriver`, `FakeClock`, and
+  `World` dataclass for deterministic no-Qt unit testing and `dry_run` support (D1).
+  `RemoteControl` reduced to dispatch-only; all helper bodies moved verbatim into `QtDriver`
+  (including `force_cancel` with its use-after-free safety comments). `_dlog` replaced by
+  `logger.debug`; `faulthandler` gated on `CAISSA_RPA_FAULTHANDLER=1`. 24/24 contract
+  assertions pass against the refactored binary — zero behaviour change.
+
 - **RPA layer — Phase 2-A (contract lock)**: Wire contract for `RemoteControl` recorded
   before the Phase-2 refactor — `tests/ui/rc_contract.json` (25-verb golden key sets) +
   `tests/ui/test_rc_contract.py` (24 parametrised / sequential assertions). Tests skip

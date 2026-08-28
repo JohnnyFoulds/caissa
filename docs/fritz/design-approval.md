@@ -1,6 +1,6 @@
 # Fritz Design Approval
 
-**Status:** Pending — gate not yet reached  
+**Status:** APPROVED — gate passed 2026-08-28  
 **Audience:** The sign-off record; filled in at the Phase 0 design gate  
 **See also:** `docs/standards/ui-design-process.md` §5 for the gate procedure
 
@@ -18,42 +18,47 @@ The sign-off is given after two rounds of mockup review, both run via `tools/des
 
 ## Round 1 — Layout and Palette (full window)
 
-**Status:** Not started
+**Status:** Approved — dark variant accepted as the direction for implementation  
+**Date:** 2026-08-28  
+**Signed off by:** JohnnyFoulds
 
 | Scene | Reviewed | Notes |
 |---|---|---|
-| Full window — light palette, variant A | ⬜ | |
-| Full window — light palette, variant B | ⬜ | |
-| Full window — light palette, variant C | ⬜ | |
+| Full window — dark palette (`full_dark.png`) | ✅ | Right column layout confirmed: clocks → engine analysis → eval profile → notation+NAG |
 
-**Direction chosen:** —  
-**Date:** —  
-**Signed off by:** —
+**Direction chosen:** Dark variant mockup as the structural reference. Not pixel-perfect; used as
+a starting point for implementation. Light theme follows in Phase 6 from the same structure.
 
 ---
 
 ## Round 2 — Per-Scene Detail
 
-**Status:** Not started
+**Status:** Approved — accepted as starting points, to be refined during implementation  
+**Date:** 2026-08-28  
+**Signed off by:** JohnnyFoulds
 
 | Scene | Approved | Notes |
 |---|---|---|
-| `clocks` — LCD digit boxes vs Fritz reference | ⬜ | |
-| `pane_titlebar` — gradient title bar, `▾ ✕` buttons | ⬜ | |
-| `notation_tabs` — six-tab strip, NAG rows | ⬜ | |
-| `eval_line` — dense eval summary format | ⬜ | |
-| `nag_row` — two NAG button rows, chip colours | ⬜ | |
-| `ribbon_home` — ribbon height, tab labels, group captions | ⬜ | |
-| `full_window` — complete assembled UI vs Fritz reference | ⬜ | |
-
-**Date:** —  
-**Signed off by:** —
+| `clocks` — LCD digit boxes vs Fritz reference | ✅ | QPainterPath 7-seg digits, two boxes (time + increment) per side |
+| `pane_titlebar` — gradient title bar, `▾ ✕` buttons | ✅ | Layout correct; gradient colours to be refined in Phase 3 |
+| `notation_tabs` — flowing text + NAG toolbar embedded | ✅ | Flowing inline text (not grid); NAG at bottom of pane; Score sheet tab is the grid |
+| `eval_line` — dense eval summary format | ✅ | Single-line format with NAG symbol, cp, depth, time, nodes |
+| `nag_row` — two NAG button rows, chip colours | ✅ | Lives inside notation pane, not a separate pane; QLabel buttons (QToolButton invisible offscreen) |
+| `eval_profile` — bar chart between engine and notation | ✅ | Added in this session; green/blue bars, current-position marker |
+| `full_window` — complete assembled UI vs Fritz reference | ✅ | Structural layout accepted; content and proportions will refine with real data |
 
 ---
 
 ## Gate Status
 
-Phase 3 (`feat/fritz-panes`) is **blocked** until both rounds are signed off and all seven rows above
-are ✅.
+Gate **PASSED**. Phases 3–7 may proceed.
 
-Phases 1 and 2 may proceed without this gate.
+Phases 1 and 2 were approved to proceed in parallel with the review per the plan.
+
+### Key structural decisions locked in by this approval
+
+1. Right column order: Clocks → Engine analysis → Eval profile → Notation (with NAG embedded)
+2. Notation tab shows flowing inline text; Score sheet tab shows the move grid
+3. NAG annotation toolbar is part of the notation pane, not a standalone pane
+4. LCD clock boxes use QPainterPath 7-segment polygons (D11, not a shipped .ttf)
+5. Pane title bars with name + `▾` menu + `✕` close button

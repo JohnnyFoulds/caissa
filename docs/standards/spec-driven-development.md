@@ -82,14 +82,35 @@ Implementation
 
 ## 5. Specification Artefacts and Location
 
+New features use the **feature-directory convention**:
+
 | Artefact | Location |
 | --- | --- |
-| Feature specification (SDD) | `docs/<feature-name>.md` |
+| Feature directory | `docs/features/<feature-name>/` |
+| Initial idea (FROZEN at scope-lock) | `docs/features/<feature-name>/initial_idea.md` |
+| Feature specification (LIVING) | `docs/features/<feature-name>/feature_spec.md` |
+| Phase tracker (LIVING) | `docs/features/<feature-name>/feature_steps.md` |
+| Session plan (LIVING) | `docs/features/<feature-name>/implementation_plan.md` |
 | Mode JSON schema | `Resources/Modes/<name>.json` |
 | Theme overlay schema | `Resources/Styles/<name>.ui.json` |
 | Standards documents | `docs/standards/` |
+| Prompt library | `docs/claude_code/prompts.md` |
+| Process routine and gates | `docs/process/sdd-workflow.md` |
 
-An existing example: `docs/theme-mode-system.md` — the SDD for the Theme/Mode overlay system.
+**Archived examples:** `docs/features/_archive/<name>/` (after completion).
+
+**Grandfathered flat specs** (written before this convention; not moved):
+`docs/theme-mode-system.md`, `docs/ui-testing.md`.
+
+The full four-artefact workflow is:
+1. `initial_idea.md` — freeze scope; record open questions
+2. `feature_spec.md` — write R/I/P/Q/N; Gate A before any code
+3. `feature_steps.md` — phase + test plan; all test names written here first
+4. `implementation_plan.md` — session breakdown (generated from prompts)
+
+**One branch = one phase = one PR.** A phase never branches off another phase's branch.
+
+See `docs/process/sdd-workflow.md` for the full routine and the 8 gates.
 
 ---
 

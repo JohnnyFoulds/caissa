@@ -59,8 +59,12 @@ tests/
 │  ├─ test_classical.py     # classical invariant: all original labels present
 │  └─ test_config_save.py   # end-to-end: open dialog, change a field, close, verify saved
 └─ unit/
-   └─ test_form_overlay.py  # already implemented (no-Qt isolation tests)
+   └─ rpa/                  # RPA layer no-Qt unit tests (see docs/features/rpa-layer/)
 ```
+
+> **Note:** The reference to `tests/unit/test_form_overlay.py` in earlier versions of this
+> document is stale. That file does not exist; the form overlay tests live in `tests/ui/`.
+> The `tests/unit/` directory is created in Phase 1 of the RPA layer feature.
 
 ### 3.1 `CaissaClient`
 
@@ -230,9 +234,42 @@ Steps 1-3 are the infrastructure; steps 4-5 are the tests that use it.
 
 ## 7. Out of scope
 
-- Screenshot pixel-comparison ("golden image") tests — fragile across retina/non-retina and font-rendering differences; the widget-inspection approach is sufficient
 - Windows / Linux CI — the socket server runs cross-platform but this machine is macOS-only
 - Game-logic UI tests (move validation, engine output) — covered by the existing unit test suite and manual play testing
+
+### 7.1 Amendment: CV and Screenshot Assertions (added with RPA layer, Phase 0)
+
+The original §7 excluded *"Screenshot pixel-comparison ('golden image') tests — fragile across
+retina/non-retina and font-rendering differences; the widget-inspection approach is sufficient."*
+
+The Caissa RPA layer amends this exclusion for the following reasons:
+
+1. **The prohibition was on pixel comparison as the primary assertion.** The RPA layer uses CV
+   as a *fallback location tier* (only when object tier fails) and a *verification tier* (only
+   where widget inspection is structurally blind — the custom-painted board, piece rendering,
+   icon presence). This is a fundamentally different role.
+
+2. **The retina objection is answered by DPR normalisation.** Templates are stored at DPR-1
+   (logical) resolution and matching runs on `Screenshot.logical()`. Multi-scale fallback
+   covers residual scale differences.
+
+3. **The font-rendering objection is answered by OCR text *location*, not pixel equality.**
+   "Where is the word Play?" tolerates antialiasing differences that pixel diffs cannot.
+
+4. **Whole-screen baselines are explicitly supported.** The assertion is template-presence and
+   OCR-text-location *within* the capture — never raw full-window pixel equality. The reference
+   PNG (`Resources/Rpa/Reference/<name>.png`) is the human-readable record; assertions are in
+   the sidecar JSON.
+
+**Constraint N-RPA-7** (in `docs/features/rpa-layer/feature_spec.md`) enforces this: CV
+assertions MUST NOT use full-window pixel equality.
+
+**Governance rule:** every CV assertion must be paired with an object-tier assertion where one
+is possible. CV-only assertions carry the `rpa_cv` marker and are excluded from the default run.
+`rpa_cv` also unconditionally skips when `QT_QPA_PLATFORM == "offscreen"`.
+
+**N-RPA-8** preserves §5's "no special OS permissions" NFR: capture uses `widget.grab()` /
+`QTest` inside the app process — never `pyautogui`, `mss`, or CoreGraphics screen capture.
 
 ---
 

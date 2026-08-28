@@ -8,13 +8,24 @@ This document defines how errors should be raised, caught, and logged in new Cai
 
 ## 1. Exception Hierarchy
 
-### 1.1 Caissa-Specific Exceptions
+### 1.1 Caissa-Specific Exceptions (and where they live)
 
-New Caissa code that can fail in structured ways should define specific exception classes rather than raising raw `RuntimeError` or `Exception`. Keep hierarchies shallow — a base class plus one level of specific exceptions is enough.
+New Caissa code that can fail in structured ways should define specific exception classes
+rather than raising raw `RuntimeError` or `Exception`. Keep hierarchies shallow — a base
+class plus one level of specific exceptions is enough.
+
+**Module location:** `CaissaError` lives in `bin/Code/Rpa/Errors.py` — the first Caissa
+module that needed it. This file also hosts `RpaError` and the 15 RPA-specific exceptions.
+Domain-specific code in other Caissa areas may define their own base that inherits
+`CaissaError`, keeping `RpaError` as the pattern to follow.
 
 ```python
+# bin/Code/Rpa/Errors.py
 class CaissaError(Exception):
     """Base class for all errors raised by Caissa-specific code."""
+
+class RpaError(CaissaError):
+    """Base class for all errors raised by the RPA layer."""
 
 class ModeLoadError(CaissaError):
     """Raised when a mode JSON file cannot be parsed or loaded."""
@@ -22,6 +33,10 @@ class ModeLoadError(CaissaError):
 class OverlayLoadError(CaissaError):
     """Raised when a theme overlay JSON file is malformed."""
 ```
+
+The hierarchy is: `CaissaError` (repo-wide root) → domain base (`RpaError`, etc.) → specific
+exceptions. This is "base + one level" within each domain, with `CaissaError` as the
+cross-domain root the catch-all `except CaissaError` can use.
 
 ### 1.2 When to Use Built-in Exceptions
 

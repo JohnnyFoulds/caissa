@@ -8,3 +8,8 @@ bin/_fastercode/src/*.so
 bin/OS/linux/Engines/alouette/alouette64.cfg
 bin/OS/linux/Engines/arasan/games.pgn
 bin/OS/linux/Engines/fractal/chesslog
+
+# Caissa generated/build artefacts
+docs/_tmp/
+docs/rpa/api/
+docs/_build/

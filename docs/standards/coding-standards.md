@@ -63,11 +63,15 @@ The Lucas Chess R6 codebase has its own conventions. When modifying existing fil
 
 ### 3.2 New Code (Caissa additions)
 
-For new files added under `bin/Code/UIModes/` and other Caissa-owned directories:
+For new files added under `bin/Code/UIModes/`, `bin/Code/Rpa/`, and other Caissa-owned directories:
 
 - Python 3.13 features are acceptable in new code
 - PySide6 patterns match the existing codebase (`QDialog`, `QWidget`, `TFormLayout`, etc.)
-- Do not introduce ABCs (abstract base classes) — the codebase doesn't use them and the desktop app doesn't need the protocol enforcement they provide
+- Do not introduce ABCs (abstract base classes) or `typing.Protocol` — the codebase doesn't
+  use them and the desktop app doesn't need the protocol enforcement they provide.
+  `typing.Protocol` is built on `ABCMeta`, so this prohibition covers both.
+  Use plain base classes raising `NotImplementedError` instead — matching the pattern
+  established by `bin/Code/ManagerBase/Manager.py:61` (plain class, ~35 subclasses).
 
 ### 3.3 Section Dividers
 
@@ -96,17 +100,28 @@ Default to writing no comments. Only add one when the WHY is non-obvious: a hidd
 
 ## 5. Tool Configuration
 
-New Python files added to the Caissa codebase use `ruff` for linting where applicable. Target Python version: 3.13.
+New Python files added to the Caissa codebase use `ruff` for linting where applicable. Target
+Python version: 3.13.
 
-For linting Caissa-specific code only (not the Lucas Chess R6 base):
+The effective lint configuration lives in `ruff.toml` at the repository root, scoped by
+`include` to Caissa paths only (so the Lucas Chess R6 base is never linted):
+
 ```toml
-[tool.ruff]
-src = ["bin/Code/UIModes"]
+# ruff.toml — scoped to Caissa-owned paths
+include = ["bin/Code/Rpa/**", "bin/Code/Main/LogSetup.py", "tests/unit/rpa/**", "tools/caissa-rpa"]
 target-version = "py313"
 
-[tool.ruff.lint]
+[lint]
 select = ["E", "W", "F", "I", "UP"]
+# E722 is NOT suppressed here — new code must not use bare except:
 ```
+
+**`make lint` passes `--config ruff.toml` explicitly.** Ruff resolves config by walking up
+from each file, so without `--config`, Caissa files find `bin/pyproject.toml` first and
+inherit its `lint.ignore = ["E722"]` with no `select` — the new config would appear installed
+while doing nothing. `test_ruff_config_enforces_e722` asserts this cannot silently regress.
+
+The `bin/pyproject.toml` is left unchanged to avoid reformatting the upstream codebase.
 
 ---
 

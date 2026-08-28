@@ -12,6 +12,14 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 5 (Traps + virtual clock)**: `bin/Code/Retro/Traps.py` —
+  `VirtualClock` (deterministic tick counter, configurable 50 Hz PAL default, D4
+  implementation) and `AmigaTraps` (Amiga exec/dos library stubs: AllocMem bump
+  allocator from ALLOC_POOL 0x200000, OpenLibrary returning EXEC_BASE 0x800000,
+  unknown/FreeMem returning 0; mem hook for AbsExecBase pointer at address 0x4;
+  callbacks ignore the raw emulator arg and use `self._cpu` throughout — works
+  with FakeCpu and Unicorn68k). `tests/unit/retro/test_traps.py` (18 tests, all
+  `retro` marker, FakeCpu only).
 - **Retro Engine — Phase 4 (CPU seam + FakeCpu)**: `bin/Code/Retro/Cpu.py` abstract
   base (8 methods, `HOOK_CODE`/`HOOK_MEM_READ`/`HOOK_MEM_WRITE`/`HOOK_MEM_INVALID`
   constants, zero Unicorn import). `bin/Code/Retro/Fakes.py` FakeCpu (scripted trace

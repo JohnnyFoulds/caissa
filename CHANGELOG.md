@@ -16,6 +16,12 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 - **Coach mode theme pairing**: `coach.json` now sets `style: "Midnight"` and `icons: "MIDNIGHT"` as the plan specified
 
 ### Added
+- **RPA layer — Phase 4 (state model)**: `bin/Code/Rpa/AppState.py` — 8 state constants,
+  dialog-first `recognise(snapshot)`, `Transition` frozen dataclass, `TRANSITION_TABLE`
+  (9 transitions with force_cancel edges at min_settle_ms >= 600), `StateGraph` with
+  Dijkstra `plan()` and `reachable_from()`, module-level `DEFAULT_GRAPH`. 29 unit tests
+  in `tests/unit/rpa/test_appstate.py`. `docs/rpa/states.md` finalised against code.
+
 - **RPA layer — Phase 3 (targets + object resolver)**: `bin/Code/Rpa/Targets.py` —
   `Selector` (9 fields, two wire forms: JSON + compact string, `SelectorError` on missing
   discriminating field) and `Target` (selector + anchor/direction/distance/timeout).

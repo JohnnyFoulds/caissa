@@ -30,6 +30,17 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 _log = logging.getLogger(__name__)
 
+# ── pane specifications (order = top-to-bottom in the right column) ────────────
+
+from Code.Fritz.Types import PaneSpec  # noqa: E402 — after logging setup
+
+_PANE_SPECS = [
+    PaneSpec("player_header",  "Players",         60,  40),
+    PaneSpec("analysis_table", "Engine analysis", 280, 60),
+    PaneSpec("eval_graph",     "Eval profile",     80, 40),
+    PaneSpec("pgn",            "Notation",        220, 60),
+]
+
 # NAG colours come from dic_colors via ThemeGateway — no hardcoded hex here.
 def _nag_colors() -> dict:
     import Code
@@ -203,43 +214,65 @@ def _swap_home_to_analysis(procesador):
     from Code.UIModes.WFritzEvalGraph import WFritzEvalGraph
     eval_graph = WFritzEvalGraph(mw, bar)
 
-    # ── 3. Restructure right_col ─────────────────────────────────────────────
-    # Current right_col: [home(0), pgn_information(1)]
-    # Target:            [player_header(0), table(1), eval_graph(2), pgn(3)]
+    # ── 3. Wrap content widgets in WFritzPane ────────────────────────────────
+    from Code.Fritz.WFritzPane import WFritzPane
+    from Code.Fritz.PaneRegistry import PaneRegistry
 
-    # Replace home(0) with player_header
-    old_home = right_col.replaceWidget(0, player_header)
+    reg = PaneRegistry()
+    for s in _PANE_SPECS:
+        reg.register(s)
+
+    ph_pane  = WFritzPane(_PANE_SPECS[0], player_header)
+    tbl_pane = WFritzPane(_PANE_SPECS[1], table)
+    eg_pane  = WFritzPane(_PANE_SPECS[2], eval_graph)
+    pgn_pane = WFritzPane(_PANE_SPECS[3], mw.base.pgn)
+
+    # ── 4. Restructure right_col ─────────────────────────────────────────────
+    # Current right_col: [home(0), pgn_information(1)]
+    # Target:            [ph_pane(0), tbl_pane(1), eg_pane(2), pgn_pane(3)]
+
+    old_home = right_col.replaceWidget(0, ph_pane)
     if old_home is not None:
         old_home.hide()
         old_home.setParent(None)
 
-    # Insert table at position 1 (pushes pgn_information to 2)
-    right_col.insertWidget(1, table)
+    right_col.insertWidget(1, tbl_pane)
+    right_col.insertWidget(2, eg_pane)
 
-    # Insert eval_graph at position 2 (pushes pgn_information to 3)
-    right_col.insertWidget(2, eval_graph)
-
-    # Replace pgn_information(3) with mw.base.pgn
-    old_pgi = right_col.replaceWidget(3, mw.base.pgn)
-
-    # Put pgn_information back in main splitter (hidden)
+    old_pgi = right_col.replaceWidget(3, pgn_pane)
     if old_pgi is not None:
         mw.splitter.addWidget(old_pgi)
         old_pgi.hide()
 
     right_col.setSizes([60, 280, 80, 220])
 
-    # ── 4. Show and start the new widgets ────────────────────────────────────
-    player_header.show()
-    table.show()
-    eval_graph.show()
-    mw.base.pgn.show()
+    # ── 5. Wire pane API ─────────────────────────────────────────────────────
+    _pane_dict = {
+        "player_header":  ph_pane,
+        "analysis_table": tbl_pane,
+        "eval_graph":     eg_pane,
+        "pgn":            pgn_pane,
+    }
+    mw._fritz_panes         = _pane_dict
+    mw._fritz_pane_registry = reg
+    mw._fritz_pane_sizes    = {}
 
+    _api = {
+        "names": [s.key for s in _PANE_SPECS],
+        "get":   lambda key: bool(_pane_dict.get(key) and _pane_dict[key].isVisible()),
+        "set":   lambda key, vis: _set_pane_visible(mw, key, vis),
+    }
+    for _pane in _pane_dict.values():
+        _pane.wire_pane_api(_api, _PANE_SPECS)
+
+    # ── 6. Show and start the new widgets ────────────────────────────────────
+    for _p in _pane_dict.values():
+        _p.show()
     player_header.start()
     table.start()
     eval_graph.start()
 
-    # ── 5. Collapse WBase's internal right-panel widgets ─────────────────────
+    # ── 7. Collapse WBase's internal right-panel widgets ─────────────────────
     # Zero out min/max size so the layout gives back all the space to the board.
     # We intentionally skip mw.base.pgn (already reparented) and track everything
     # else so we can restore on mode exit.
@@ -323,6 +356,63 @@ def _fritz_new_game(procesador, from_home: bool = False):
     from Code.PlayAgainstEngine import ManagerPlayAgainstEngine
     manager = ManagerPlayAgainstEngine.ManagerPlayAgainstEngine(procesador)
     manager.start(dic)
+
+
+# ── pane visibility helper ────────────────────────────────────────────────────
+
+def _set_pane_visible(mw, key: str, visible: bool) -> None:
+    """Show or hide a Fritz pane, restoring its height from the registry.
+
+    :spec: §5.3
+    """
+    pane = getattr(mw, "_fritz_panes", {}).get(key)
+    if pane is None:
+        return
+    reg = getattr(mw, "_fritz_pane_registry", None)
+    right_col = getattr(mw, "_fritz_right_col", None)
+    if right_col is None:
+        pane.setVisible(visible)
+        return
+
+    pane_sizes = getattr(mw, "_fritz_pane_sizes", {})
+
+    # Locate pane index in the splitter
+    idx = None
+    for i in range(right_col.count()):
+        if right_col.widget(i) is pane:
+            idx = i
+            break
+
+    if visible:
+        stored = pane_sizes.get(key, 0)
+        restored_h = reg.restore_px(key, stored) if reg else pane.spec.default_px
+        pane.show()
+        if idx is not None:
+            sizes = right_col.sizes()
+            new_sizes = list(sizes)
+            new_sizes[idx] = restored_h
+            right_col.setSizes(new_sizes)
+    else:
+        if idx is not None:
+            sizes = right_col.sizes()
+            if idx < len(sizes):
+                pane_sizes[key] = sizes[idx]
+                mw._fritz_pane_sizes = pane_sizes
+        pane.hide()
+
+
+def pane_api(mw) -> dict:
+    """Return the pane capability dict consumed by ``WFritzPane.wire_pane_api``.
+
+    :returns: ``{"names": [...], "get": callable, "set": callable}``
+    :spec: §5.3
+    """
+    pane_dict = getattr(mw, "_fritz_panes", {})
+    return {
+        "names": [s.key for s in _PANE_SPECS],
+        "get":   lambda key: bool(pane_dict.get(key) and pane_dict[key].isVisible()),
+        "set":   lambda key, vis: _set_pane_visible(mw, key, vis),
+    }
 
 
 # ── mode exit ──────────────────────────────────────────────────────────────────
@@ -415,5 +505,12 @@ def on_mode_exit(procesador):
         mw.base.analysis_bar.force_hidden = False
     except Exception:
         pass
+
+    # Clean up pane-wrapper attrs
+    for _attr in ("_fritz_panes", "_fritz_pane_registry", "_fritz_pane_sizes"):
+        try:
+            delattr(mw, _attr)
+        except AttributeError:
+            pass
 
     _log.debug("Modern Fritz layout removed")

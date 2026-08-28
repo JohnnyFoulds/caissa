@@ -77,6 +77,8 @@ def _contains_pyside6(source: str, filename: str) -> bool:
 _PYSIDE6_ALLOWED_RELATIVE: set[str] = {
     "WFritzPane.py",
     "WFritzLCD.py",
+    # Phase 5: FritzEtiquetaPGN delegate — Qt allowlist tier.
+    "Delegates.py",
 }
 
 # Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted

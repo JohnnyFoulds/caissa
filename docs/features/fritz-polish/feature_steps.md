@@ -353,7 +353,7 @@ exist in source.
 
 ---
 
-## Phase 5 — Notation tab strip and NAG palette ⬜
+## Phase 5 — Notation tab strip and NAG palette ✅
 
 **Branch:** `feat/fritz-notation`
 

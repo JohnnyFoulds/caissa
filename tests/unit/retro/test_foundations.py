@@ -301,12 +301,6 @@ def test_think_result_has_move():
 # xfail stubs for future phases
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="Phase 6: Bridge.py not yet implemented")
-def test_bridge_fen_round_trip():
-    """Bridge FEN→struct→FEN must produce the original FEN."""
-    pytest.fail("xfail stub")
-
-
 @pytest.mark.xfail(strict=True, reason="Phase 7: Think.py not yet implemented")
 def test_think_produces_move_from_startpos():
     """Think.think() must return a non-null ThinkResult from the start position."""

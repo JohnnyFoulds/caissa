@@ -12,6 +12,14 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase 6 (Bridge — FEN↔board marshalling)**: `bin/Code/Retro/Bridge.py`
+  — stdlib-only FEN parser (`parse_fen`, `parse_piece_placement`); 0x88 square helpers
+  (`sq88`, `sq88_to_file_rank`, `sq88_to_alg`, `alg_to_sq88`); `Bridge` class that
+  writes FEN positions into the emulated piece-table struct (`write_position`), reads
+  back the AI's chosen move from `AI_BEST_MOVE_ADDR` (`read_best_move`, `clear_best_move`),
+  and configures player-type table (`set_computer_color`). All virtual addresses derived
+  from A4=0x7FFE recon offsets. `tests/unit/retro/test_bridge.py` (19 tests, all
+  `retro` marker, FakeCpu only). 88 retro tests passing, 1 xfail stub remaining (Think).
 - **Retro Engine — Phase 5 (Traps + virtual clock)**: `bin/Code/Retro/Traps.py` —
   `VirtualClock` (deterministic tick counter, configurable 50 Hz PAL default, D4
   implementation) and `AmigaTraps` (Amiga exec/dos library stubs: AllocMem bump

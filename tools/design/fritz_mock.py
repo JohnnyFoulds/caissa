@@ -131,6 +131,95 @@ def _save(pixmap, path: Path) -> None:
     pixmap.save(str(path))
 
 
+# ── shared LCD widget ─────────────────────────────────────────────────────────
+# Used by both the clocks scene and the full-window composition.
+
+_LCD_SEGS = {
+    "0": frozenset([0, 1, 2, 4, 5, 6]),
+    "1": frozenset([2, 5]),
+    "2": frozenset([0, 2, 3, 4, 6]),
+    "3": frozenset([0, 2, 3, 5, 6]),
+    "4": frozenset([1, 2, 3, 5]),
+    "5": frozenset([0, 1, 3, 5, 6]),
+    "6": frozenset([0, 1, 3, 4, 5, 6]),
+    "7": frozenset([0, 2, 5]),
+    "8": frozenset([0, 1, 2, 3, 4, 5, 6]),
+    "9": frozenset([0, 1, 2, 3, 5, 6]),
+    ":": None,
+    " ": frozenset(),
+}
+_LCD_DH = 38   # digit cell height
+_LCD_DW = 20   # digit cell width
+_LCD_T  = 4    # bar thickness
+_LCD_G  = 2    # gap at bar ends
+
+
+def _make_lcd_widget(text: str = "0:05:00"):
+    """Return a QWidget rendering seven-segment LCD digits for *text*."""
+    from PySide6 import QtCore, QtGui, QtWidgets
+
+    DH, DW, T, G = _LCD_DH, _LCD_DW, _LCD_T, _LCD_G
+
+    class _LCD(QtWidgets.QWidget):
+        LIT = QtGui.QColor("#30ff70")
+        DIM = QtGui.QColor("#0a2010")
+        BG  = QtGui.QColor("#000000")
+
+        def __init__(self, t):
+            super().__init__()
+            self._text = t
+            box_w = self._text_width(t) + 20
+            box_h = DH + 16
+            self.setFixedSize(box_w, box_h)
+
+        def _text_width(self, t):
+            w = 0
+            for ch in t:
+                w += (T + G * 2 + 2) if ch == ":" else (DW + G)
+            return w
+
+        def _seg_rect(self, sx, sy, seg):
+            if seg == 0:
+                return (sx + G, sy,             DW - 2*G, T)
+            if seg == 6:
+                return (sx + G, sy + DH - T,    DW - 2*G, T)
+            if seg == 3:
+                return (sx + G, sy + (DH-T)//2, DW - 2*G, T)
+            half = DH // 2
+            if seg == 1:
+                return (sx,        sy + G + T,  T, half - G - T - 1)
+            if seg == 2:
+                return (sx + DW-T, sy + G + T,  T, half - G - T - 1)
+            if seg == 4:
+                return (sx,        sy + half+1, T, half - G - T - 1)
+            if seg == 5:
+                return (sx + DW-T, sy + half+1, T, half - G - T - 1)
+            return (0, 0, 0, 0)
+
+        def paintEvent(self, _ev):
+            p = QtGui.QPainter(self)
+            p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+            p.fillRect(self.rect(), self.BG)
+            p.setPen(QtCore.Qt.PenStyle.NoPen)
+            x, y = 10, (self.height() - DH) // 2
+            for ch in self._text:
+                segs = _LCD_SEGS.get(ch)
+                if segs is None:
+                    dot = max(3, T)
+                    cx = x + G
+                    p.fillRect(cx, y + DH//3 - dot//2,   dot, dot, self.LIT)
+                    p.fillRect(cx, y + 2*DH//3 - dot//2, dot, dot, self.LIT)
+                    x += T + G * 2 + 2
+                else:
+                    for si in range(7):
+                        rx, ry, rw, rh = self._seg_rect(x, y, si)
+                        p.fillRect(rx, ry, rw, rh, self.LIT if si in segs else self.DIM)
+                    x += DW + G
+            p.end()
+
+    return _LCD(text)
+
+
 # ── scene: pane_titlebar ───────────────────────────────────────────────────────
 
 @scene("pane_titlebar")
@@ -259,81 +348,6 @@ def render_clocks(out_dir: Path, variant: str, width: int) -> Path:
         " ": frozenset(),
     }
 
-    # Explicit digit geometry — fully independent width/height so proportions are correct
-    DH = 38   # digit cell height
-    DW = 20   # digit cell width  (roughly 1:2 ratio, tall and narrow like a real display)
-    T  = 4    # bar thickness
-    G  = 2    # gap at bar ends
-
-    class _LCD(QtWidgets.QWidget):
-        """Seven-segment LCD clock widget (prototype for WFritzLCD)."""
-
-        LIT = QtGui.QColor("#30ff70")
-        DIM = QtGui.QColor("#0a2010")
-        BG  = QtGui.QColor("#000000")
-
-        def __init__(self, text: str = "0:05:00"):
-            super().__init__()
-            self.setObjectName("WFritzLCDMock")
-            self._text = text
-            box_w = self._text_width(text) + 20
-            box_h = DH + 16
-            self.setFixedSize(box_w, box_h)
-
-        def _text_width(self, text: str) -> int:
-            w = 0
-            for ch in text:
-                w += (T + G * 2 + 2) if ch == ":" else (DW + G)
-            return w
-
-        def _seg_rect(self, sx, sy, seg):
-            # Returns (x, y, w, h) for one segment bar
-            if seg == 0:  # top horizontal
-                return (sx + G, sy,              DW - 2*G, T)
-            if seg == 6:  # bottom horizontal
-                return (sx + G, sy + DH - T,     DW - 2*G, T)
-            if seg == 3:  # middle horizontal
-                return (sx + G, sy + (DH-T)//2,  DW - 2*G, T)
-            half = DH // 2
-            if seg == 1:  # top-left vertical
-                return (sx,         sy + G + T,  T, half - G - T - 1)
-            if seg == 2:  # top-right vertical
-                return (sx + DW-T,  sy + G + T,  T, half - G - T - 1)
-            if seg == 4:  # bot-left vertical
-                return (sx,         sy + half+1, T, half - G - T - 1)
-            if seg == 5:  # bot-right vertical
-                return (sx + DW-T,  sy + half+1, T, half - G - T - 1)
-            return (0, 0, 0, 0)
-
-        def paintEvent(self, _event):
-            p = QtGui.QPainter(self)
-            p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
-            p.fillRect(self.rect(), self.BG)
-            p.setPen(QtCore.Qt.PenStyle.NoPen)
-
-            x = 10
-            y = (self.height() - DH) // 2
-
-            for ch in self._text:
-                segs = _SEGS.get(ch)
-                if segs is None:  # colon
-                    dot = max(3, T)
-                    cx = x + G
-                    p.setBrush(self.LIT)
-                    p.fillRect(cx, y + DH//3 - dot//2,   dot, dot, self.LIT)
-                    p.fillRect(cx, y + 2*DH//3 - dot//2, dot, dot, self.LIT)
-                    x += T + G * 2 + 2
-                else:
-                    for seg_i in range(7):
-                        rx, ry, rw, rh = self._seg_rect(x, y, seg_i)
-                        color = self.LIT if seg_i in segs else self.DIM
-                        p.fillRect(rx, ry, rw, rh, color)
-                    x += DW + G
-
-            p.end()
-
-    # Fritz layout: each player row has TWO black LCD boxes side by side
-    # (main time left, increment/move time right), no player label in the clock pane
     container = QtWidgets.QWidget()
     container.setObjectName("WFritzClocksDemo")
     bg = "#1e1e1e" if variant == "dark" else "#d0d8e0"
@@ -342,12 +356,11 @@ def render_clocks(out_dir: Path, variant: str, width: int) -> Path:
     vly.setContentsMargins(12, 12, 12, 12)
     vly.setSpacing(8)
 
-    # Black on top, White on bottom — two boxes per row
     for main_t, inc_t in [("0:05:00", "0:00:16"), ("0:05:00", "0:00:00")]:
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(8)
-        row.addWidget(_LCD(main_t))
-        row.addWidget(_LCD(inc_t))
+        row.addWidget(_make_lcd_widget(main_t))
+        row.addWidget(_make_lcd_widget(inc_t))
         row.addStretch()
         vly.addLayout(row)
 
@@ -465,8 +478,7 @@ def render_nag_row(out_dir: Path, variant: str, width: int) -> Path:
         "⩲":  ("#ccaa88", "Black is slightly better"),
     }
 
-    btn_bg   = "#3c3c3c" if variant == "dark" else "#e0e8f0"
-    btn_fg   = "#d4d4d4" if variant == "dark" else "#1a1a1a"
+    btn_bg    = "#3c3c3c" if variant == "dark" else "#e0e8f0"
     btn_hover = "#505060" if variant == "dark" else "#c8d8e8"
 
     for row_syms in [ROW1, ROW2]:
@@ -480,8 +492,8 @@ def render_nag_row(out_dir: Path, variant: str, width: int) -> Path:
             btn.setFixedSize(36, 28)
             btn.setStyleSheet(
                 f"QToolButton {{ background:{btn_bg}; color:{color}; "
-                f"font-size:13px; font-weight:bold; border:1px solid #555; "
-                f"border-radius:3px; }}"
+                f"font-family:Arial; font-size:13px; font-weight:bold; "
+                f"border:1px solid #555; border-radius:3px; }}"
                 f"QToolButton:hover {{ background:{btn_hover}; }}"
             )
             row_ly.addWidget(btn)
@@ -734,182 +746,168 @@ def render_ribbon_home(out_dir: Path, variant: str, width: int) -> Path:
 
 @scene("full")
 def render_full(out_dir: Path, variant: str, width: int) -> Path:
-    """Full Fritz right-column mock: player header + analysis + eval graph + notation.
+    """Full Fritz window composition: board placeholder + complete right column.
 
-    This is the 'Round 1' full-window scene — the one that determines layout
-    direction and palette before any per-scene detail is reviewed.
+    This is the 'Round 1' full-window scene used in the design approval gate.
+    Rendered at 1100×700 regardless of *width* so proportions match Fritz.
     """
     from PySide6 import QtCore, QtWidgets
 
     qss = _load_qss(variant)
+    FULL_W, FULL_H = 1100, 700
+    RIGHT_W = 420
 
-    # Colour palette
-    bg        = "#252526" if variant == "dark" else "#f0f0f0"
-    surface   = "#2d2d2d" if variant == "dark" else "#ffffff"
-    border    = "#505050" if variant == "dark" else "#a0b4c8"
-    tc        = "#d4d4d4" if variant == "dark" else "#1a1a1a"
-    tc_dim    = "#858585" if variant == "dark" else "#5a6570"
-    accent    = "#0078d4" if variant == "dark" else "#0060b0"
-    grad_top  = "#3a3a3c" if variant == "dark" else "#dce6f0"
-    grad_bot  = "#2d2d2f" if variant == "dark" else "#b8ccdf"
+    from PySide6 import QtGui
 
-    outer = QtWidgets.QWidget()
-    outer.setObjectName("WFritzRightColDemo")
-    outer.setStyleSheet(f"background:{bg};")
-    vly = QtWidgets.QVBoxLayout(outer)
-    vly.setContentsMargins(0, 0, 0, 0)
-    vly.setSpacing(1)
+    bg       = "#252526" if variant == "dark" else "#eaeef2"
+    surface  = "#2d2d2d" if variant == "dark" else "#ffffff"
+    border   = "#505050" if variant == "dark" else "#a0b4c8"
+    tc       = "#d4d4d4" if variant == "dark" else "#1a1a1a"
+    tc_dim   = "#858585" if variant == "dark" else "#5a6570"
+    accent   = "#0078d4" if variant == "dark" else "#0060b0"
+    grad_top = "#3a3a3c" if variant == "dark" else "#dce6f0"
+    grad_bot = "#2d2d2f" if variant == "dark" else "#b8ccdf"
+    hi       = "#094771" if variant == "dark" else "#cce4ff"
 
-    def _pane(title: str, body_widget: QtWidgets.QWidget,
-              title_h: int = 22) -> QtWidgets.QWidget:
-        """Wrap body in a titled pane."""
-        from PySide6 import QtGui
-
+    # ── helper: titled pane ────────────────────────────────────────────────────
+    def _pane(title, body, body_h=None):
         pane = QtWidgets.QWidget()
-        pane.setObjectName(f"WFritzPane_{title.replace(' ', '_')}")
-        p_ly = QtWidgets.QVBoxLayout(pane)
-        p_ly.setContentsMargins(0, 0, 0, 0)
-        p_ly.setSpacing(0)
+        ply = QtWidgets.QVBoxLayout(pane)
+        ply.setContentsMargins(0, 0, 0, 0)
+        ply.setSpacing(0)
 
-        class _TitleBar(QtWidgets.QWidget):
+        class _TB(QtWidgets.QWidget):
             def __init__(self):
                 super().__init__()
-                self.setFixedHeight(title_h)
-                self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+                self.setFixedHeight(22)
                 ly = QtWidgets.QHBoxLayout(self)
                 ly.setContentsMargins(8, 0, 4, 0)
                 ly.setSpacing(0)
                 lbl = QtWidgets.QLabel(title)
-                f = QtGui.QFont()
-                f.setPointSize(8)
-                f.setBold(True)
+                f = QtGui.QFont(); f.setPointSize(8); f.setBold(True)
                 lbl.setFont(f)
                 lbl.setStyleSheet(f"color:{tc}; background:transparent;")
                 ly.addWidget(lbl, 1)
                 for ch in ["▾", "✕"]:
-                    btn = QtWidgets.QToolButton()
-                    btn.setText(ch)
-                    btn.setFixedSize(18, 18)
-                    btn.setStyleSheet(
-                        f"QToolButton {{ border:none; background:transparent; "
-                        f"color:{tc_dim}; font-size:11px; }}"
-                        f"QToolButton:hover {{ color:{accent}; }}"
-                    )
-                    ly.addWidget(btn)
-
-            def paintEvent(self, event):
+                    b = QtWidgets.QToolButton()
+                    b.setText(ch); b.setFixedSize(18, 18)
+                    b.setStyleSheet(f"QToolButton{{border:none;background:transparent;"
+                                    f"color:{tc_dim};font-size:11px;}}"
+                                    f"QToolButton:hover{{color:{accent};}}")
+                    ly.addWidget(b)
+            def paintEvent(self, _ev):
                 p = QtGui.QPainter(self)
-                grad = QtGui.QLinearGradient(0, 0, 0, self.height())
-                grad.setColorAt(0.0, QtGui.QColor(grad_top))
-                grad.setColorAt(1.0, QtGui.QColor(grad_bot))
-                p.fillRect(self.rect(), grad)
-                p.end()
-                super().paintEvent(event)
+                g = QtGui.QLinearGradient(0, 0, 0, self.height())
+                g.setColorAt(0, QtGui.QColor(grad_top))
+                g.setColorAt(1, QtGui.QColor(grad_bot))
+                p.fillRect(self.rect(), g); p.end()
+                super().paintEvent(_ev)
 
-        p_ly.addWidget(_TitleBar())
-        body_widget.setStyleSheet(f"background:{surface}; border:1px solid {border};")
-        p_ly.addWidget(body_widget, 1)
+        body.setStyleSheet(f"background:{surface}; border:1px solid {border};")
+        if body_h:
+            body.setFixedHeight(body_h)
+        ply.addWidget(_TB())
+        ply.addWidget(body, 1)
         return pane
 
-    # ── Player header (no title bar — it IS the title) ────────────────────────
-    player_hdr = QtWidgets.QWidget()
-    player_hdr.setFixedHeight(62)
-    player_hdr.setStyleSheet(f"background:{surface}; border-bottom:1px solid {border};")
-    ph_ly = QtWidgets.QVBoxLayout(player_hdr)
-    ph_ly.setContentsMargins(8, 4, 8, 4)
-    ph_ly.setSpacing(2)
-    for piece, name, clock in [("♛", "Stockfish 18", "01:27"), ("♙", "You", "04:55")]:
-        row = QtWidgets.QHBoxLayout()
-        row.setSpacing(6)
-        p_lbl = QtWidgets.QLabel(f"{piece}  {name}")
-        p_lbl.setStyleSheet(f"color:{tc}; font-size:11px; background:transparent;")
-        c_lbl = QtWidgets.QLabel(clock)
-        c_lbl.setStyleSheet(
-            f"color:{accent}; font-size:12px; font-family:monospace; "
-            f"background:#000; padding:1px 4px; border-radius:2px;"
-        )
-        c_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        row.addWidget(p_lbl, 1)
-        row.addWidget(c_lbl)
-        ph_ly.addLayout(row)
-    vly.addWidget(player_hdr)
-
-    # ── Engine analysis pane ──────────────────────────────────────────────────
-    analysis_body = QtWidgets.QWidget()
-    ab_ly = QtWidgets.QVBoxLayout(analysis_body)
-    ab_ly.setContentsMargins(4, 4, 4, 4)
-    ab_ly.setSpacing(2)
-    lines = [
-        ("∓", "#6699cc", "Black slightly better: ∓ (-0.60)  Depth: 24/45  51157kN"),
-        ("  ", tc_dim,   "  1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5"),
-        ("  ", tc_dim,   "  1. e4 c5 2. Nf3 d6 3. d4 cxd4"),
-    ]
-    for nag, color, text in lines:
-        lbl = QtWidgets.QLabel(f"{nag}  {text}")
-        lbl.setStyleSheet(
-            f"color:{color}; font-size:10px; font-family:monospace; "
-            f"background:transparent;"
-        )
-        ab_ly.addWidget(lbl)
-    ab_ly.addStretch()
-    analysis_body.setFixedHeight(80)
-    vly.addWidget(_pane("Engine analysis", analysis_body))
-
-    # ── Eval graph pane ────────────────────────────────────────────────────────
-    from PySide6 import QtGui
-
-    class _EvalGraphMock(QtWidgets.QWidget):
+    # ── board placeholder ──────────────────────────────────────────────────────
+    class _Board(QtWidgets.QWidget):
         def paintEvent(self, _ev):
             p = QtGui.QPainter(self)
-            p.fillRect(self.rect(), QtGui.QColor(surface))
-            # Draw a mock eval bar chart
-            import math
-            w, h = self.width(), self.height()
-            n = 20
-            bar_w = max(2, w // n - 1)
-            evals = [0.2, 0.3, 0.1, -0.1, -0.3, -0.5, -0.4, -0.2, -0.6,
-                     -0.5, -0.4, -0.3, -0.2, 0.0, 0.1, 0.2, 0.3, 0.1, -0.1, -0.2]
-            mid = h // 2
-            p.setPen(QtCore.Qt.PenStyle.NoPen)
-            for i, ev in enumerate(evals):
-                x = i * (bar_w + 1) + 4
-                bar_h = int(abs(ev) * h * 0.4)
-                if ev >= 0:
-                    p.setBrush(QtGui.QColor("#c8c8c8"))
-                    p.drawRect(x, mid - bar_h, bar_w, bar_h)
-                else:
-                    p.setBrush(QtGui.QColor("#505050"))
-                    p.drawRect(x, mid, bar_w, bar_h)
-            # zero line
-            p.setPen(QtGui.QColor(border))
-            p.drawLine(0, mid, w, mid)
+            sz = min(self.width(), self.height())
+            off_x = (self.width()  - sz) // 2
+            off_y = (self.height() - sz) // 2
+            sq = sz // 8
+            light = QtGui.QColor("#f0d9b5")
+            dark  = QtGui.QColor("#b58863")
+            for r in range(8):
+                for c in range(8):
+                    col = light if (r + c) % 2 == 0 else dark
+                    p.fillRect(off_x + c*sq, off_y + r*sq, sq, sq, col)
             p.end()
 
-    eval_body = _EvalGraphMock()
-    eval_body.setFixedHeight(70)
-    vly.addWidget(_pane("Eval profile", eval_body))
+    board = _Board()
 
-    # ── Notation pane ──────────────────────────────────────────────────────────
+    # ── right column ───────────────────────────────────────────────────────────
+    right = QtWidgets.QWidget()
+    right.setFixedWidth(RIGHT_W)
+    rly = QtWidgets.QVBoxLayout(right)
+    rly.setContentsMargins(0, 0, 0, 0)
+    rly.setSpacing(1)
+
+    # Clock pane — two LCD rows
+    clock_body = QtWidgets.QWidget()
+    cl = QtWidgets.QVBoxLayout(clock_body)
+    cl.setContentsMargins(8, 6, 8, 6)
+    cl.setSpacing(6)
+    for main_t, inc_t in [("0:05:00", "0:00:16"), ("0:05:00", "0:00:00")]:
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(_make_lcd_widget(main_t))
+        row.addWidget(_make_lcd_widget(inc_t))
+        row.addStretch()
+        cl.addLayout(row)
+    rly.addWidget(_pane("Clocks: Blitz 5min", clock_body, 116))
+
+    # Engine analysis pane
+    analysis_body = QtWidgets.QWidget()
+    ab = QtWidgets.QVBoxLayout(analysis_body)
+    ab.setContentsMargins(4, 4, 4, 4); ab.setSpacing(2)
+    for color, text in [
+        (accent,  "Black is slightly better: ∓ (-0.60)  Depth: 24/45  00:00:16  51157kN"),
+        (tc_dim,  "  1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5"),
+        (tc_dim,  "  1. e4 c5 2. Nf3 d6 3. d4 cxd4"),
+    ]:
+        lbl = QtWidgets.QLabel(text)
+        lbl.setStyleSheet(f"color:{color}; font-size:10px; font-family:monospace; background:transparent;")
+        ab.addWidget(lbl)
+    ab.addStretch()
+    rly.addWidget(_pane("Engine: Fritz 18 Popcnt", analysis_body, 80))
+
+    # NAG row — same symbols and colours as the dedicated nag_row scene
+    _NAG_ROWS = [
+        ["‼", "!", "!?", "?!", "?", "??"],
+        ["+−", "±", "∓", "=", "∞", "⩱", "⩲"],
+    ]
+    _NAG_COLORS = {
+        "‼": "#66cc66", "!": "#88cc44", "!?": "#aabb44", "?!": "#ccaa44",
+        "?": "#cc7744", "??": "#cc4444", "+−": "#cc6666", "±": "#99cc66",
+        "∓": "#6699cc", "=": "#888888", "∞": "#9988aa", "⩱": "#88aacc", "⩲": "#ccaa88",
+    }
+    nag_body = QtWidgets.QWidget()
+    nl = QtWidgets.QVBoxLayout(nag_body)
+    nl.setContentsMargins(4, 2, 4, 2); nl.setSpacing(2)
+    btn_bg = "#3c3c3c" if variant == "dark" else "#e0e8f0"
+    for row_syms in _NAG_ROWS:
+        row_hl = QtWidgets.QHBoxLayout(); row_hl.setSpacing(3)
+        for sym in row_syms:
+            color = _NAG_COLORS.get(sym, tc)
+            b = QtWidgets.QToolButton()
+            b.setText(sym); b.setFixedSize(30, 22)
+            b.setStyleSheet(f"QToolButton{{background:{btn_bg}; color:{color};"
+                            f"font-family:Arial; font-size:11px; font-weight:bold;"
+                            f"border:1px solid #555; border-radius:2px;}}"
+                            f"QToolButton:hover{{background:{accent}; color:#fff;}}")
+            row_hl.addWidget(b)
+        row_hl.addStretch()
+        nl.addLayout(row_hl)
+    rly.addWidget(_pane("", nag_body, 56))
+
+    # Notation pane with tabs
     notation_body = QtWidgets.QWidget()
-    nb_ly = QtWidgets.QVBoxLayout(notation_body)
-    nb_ly.setContentsMargins(0, 0, 0, 0)
-    nb_ly.setSpacing(0)
-
+    nb = QtWidgets.QVBoxLayout(notation_body)
+    nb.setContentsMargins(0, 0, 0, 0); nb.setSpacing(0)
     tabbar = QtWidgets.QTabBar()
-    tabbar.setObjectName("WFritzNotationTabBar")
-    tabbar.setExpanding(False)
-    tabbar.setDrawBase(False)
-    for tab in ["Notation", "Training", "Score sheet", "LiveBook"]:
-        tabbar.addTab(tab)
-
+    tabbar.setExpanding(False); tabbar.setDrawBase(False)
+    for t in ["Notation", "Training", "Score sheet", "LiveBook", "Openings Book", "My Moves"]:
+        tabbar.addTab(t)
     grid = QtWidgets.QWidget()
-    g_ly = QtWidgets.QGridLayout(grid)
-    g_ly.setContentsMargins(4, 2, 4, 2)
-    g_ly.setSpacing(1)
-    hi = "#094771" if variant == "dark" else "#cce4ff"
-    moves2 = [("1.", "e4", "e5"), ("2.", "Nf3", "Nc6"), ("3.", "Bc4", "Bc5"),
-              ("4.", "O-O", "Nf6"), ("5.", "d3", "d6")]
-    for r, (num, wm, bm) in enumerate(moves2):
+    gl = QtWidgets.QGridLayout(grid)
+    gl.setContentsMargins(4, 2, 4, 2); gl.setSpacing(1)
+    moves = [("1.", "e4", "e5"), ("2.", "Nf3", "Nc6"), ("3.", "Bc4", "Bc5"),
+             ("4.", "O-O", "Nf6"), ("5.", "d3", "d6"), ("6.", "c3", "Be7"),
+             ("7.", "Nbd2", "O-O"), ("8.", "Re1", "d5")]
+    for r, (num, wm, bm) in enumerate(moves):
         for c, text in enumerate([num, wm, bm]):
             lbl = QtWidgets.QLabel(text)
             lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -917,16 +915,21 @@ def render_full(out_dir: Path, variant: str, width: int) -> Path:
             if r == 1 and c == 1:
                 st += f" background:{hi}; border-radius:2px;"
             lbl.setStyleSheet(st)
-            g_ly.addWidget(lbl, r, c)
+            gl.addWidget(lbl, r, c)
+    nb.addWidget(tabbar)
+    nb.addWidget(grid, 1)
+    rly.addWidget(_pane("Notation + Openings Book", notation_body), 1)
 
-    nb_ly.addWidget(tabbar)
-    nb_ly.addWidget(grid, 1)
-    notation_body.setFixedHeight(120)
-    vly.addWidget(_pane("Notation", notation_body))
+    # ── outer window ──────────────────────────────────────────────────────────
+    window = QtWidgets.QWidget()
+    window.setStyleSheet(f"background:{bg};")
+    wly = QtWidgets.QHBoxLayout(window)
+    wly.setContentsMargins(0, 0, 0, 0)
+    wly.setSpacing(1)
+    wly.addWidget(board, 1)
+    wly.addWidget(right)
 
-    vly.addStretch()
-
-    px = _grab(outer, width, 440, qss)
+    px = _grab(window, FULL_W, FULL_H, qss)
     out = out_dir / f"full_{variant}.png"
     _save(px, out)
     return out

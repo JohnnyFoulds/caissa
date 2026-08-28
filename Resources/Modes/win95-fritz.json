@@ -1,0 +1,29 @@
+{
+  "name": "Win95 Fritz",
+  "description": "Windows 95 retro skin: classic grey, raised 3D buttons, navy selection.",
+  "icon": "Kibitzers",
+
+  "menu_keys": null,
+
+  "toolbar": [
+    "TB_OPTIONS",
+    "TB_CANCEL", "TB_CLOSE", "TB_QUIT",
+    "TB_STOP", "TB_TUTOR_STOP", "TB_END_REPLAY",
+    "TB_RESIGN", "TB_DRAW", "TB_TAKEBACK", "TB_REINIT",
+    "TB_PAUSE", "TB_CONTINUE",
+    "TB_CONFIG", "TB_UTILITIES",
+    "TB_ADVICE", "TB_HELP",
+    "TB_PREVIOUS", "TB_NEXT",
+    "TB_VARIATIONS", "TB_TOOLS",
+    "TB_PASTE_PGN", "TB_READ_PGN", "TB_SAVE", "TB_SAVE_AS", "TB_OPEN"
+  ],
+
+  "toolbar_inject": ["caissa:switch_mode"],
+
+  "config_section": null,
+  "style": "Win95 Fritz",
+  "icons": "NORMAL",
+  "font": null,
+  "defaults": {},
+  "layout": null
+}

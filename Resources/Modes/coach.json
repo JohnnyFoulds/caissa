@@ -27,7 +27,7 @@
     "TB_CLOSE", "TB_CANCEL", "TB_STOP", "TB_TUTOR_STOP", "TB_END_REPLAY",
     "TB_ACCEPT", "TB_ADJOURNMENTS", "TB_ADJOURN", "TB_CONFIG"
   ],
-  "toolbar_inject": ["caissa:coach_home"],
-  "style": null,
-  "icons": null
+  "toolbar_inject": ["caissa:coach_home", "caissa:switch_mode"],
+  "style": "Midnight",
+  "icons": "MIDNIGHT"
 }

@@ -22,6 +22,7 @@
     "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY", "TB_ACCEPT",
     "TB_CONFIG", "TB_OPTIONS", "TB_PREVIOUS", "TB_NEXT"
   ],
+  "toolbar_inject": ["caissa:switch_mode"],
   "style": null,
   "icons": null
 }

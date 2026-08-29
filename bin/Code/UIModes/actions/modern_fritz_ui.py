@@ -318,6 +318,11 @@ def on_mode_enter(procesador):
     from Code.Z.ManagerSolo import ManagerSolo as _ManagerSolo
     _ManagerSolo(procesador).start({"PLAY_AGAINST_ENGINE": False, "ANALYSIS_BAR": True})
 
+    # 5b. ManagerSolo.start() triggers Qt layout events that collapse right_col to 0.
+    #     Re-assert the sizes immediately, then again after the event loop drains.
+    _reapply_fritz_right_col_sizes(mw)
+    QtCore.QTimer.singleShot(150, lambda: _reapply_fritz_right_col_sizes(mw))
+
     # 6. Register ribbon dropdowns for has_dropdown buttons.
     _register_ribbon_dropdowns(mw, procesador)
 
@@ -325,6 +330,24 @@ def on_mode_enter(procesador):
 
 
 # ── right column builder ───────────────────────────────────────────────────────
+
+def _reapply_fritz_right_col_sizes(mw) -> None:
+    """Re-assert right_col width if Qt collapsed it during ManagerSolo.start().
+
+    Qt may redistribute splitter sizes when child widget visibility or minimum
+    sizes change (ManagerSolo calls active_information_pgn, pon_toolbar, etc.).
+    This guard re-applies the 380 px right-column target whenever it has been
+    pushed below its minimum.
+    """
+    rc = getattr(mw, "_fritz_right_col", None)
+    if rc is None:
+        return
+    total = mw.splitter.width()
+    if total < 400:
+        return
+    if mw.splitter.sizes()[-1] < 200:
+        mw.splitter.setSizes([total - 380, 380])
+
 
 def _build_fritz_right_col(mw) -> None:
     """Build the Fritz right column and wire pane API.
@@ -394,6 +417,8 @@ def _build_fritz_right_col(mw) -> None:
     fritz_col_width = max(pgn_width, 380)
     mw.splitter.setSizes([max(wbase_width - (fritz_col_width - pgn_width), 600),
                           fritz_col_width])
+    mw.splitter.setChildrenCollapsible(False)
+    right_col.setMinimumWidth(200)
     right_col.setSizes([_PANE_SPECS[0].default_px, _PANE_SPECS[1].default_px,
                         _PANE_SPECS[2].default_px, _PANE_SPECS[3].default_px])
     right_col.show()
@@ -587,18 +612,14 @@ _FRITZ_GAME_DIC_KEY = "FRITZ_LAST_GAME_DIC"
 def _fritz_new_game(procesador):
     """New Game — restart immediately with last-used settings (no dialog).
 
-    Fritz behaviour: clicking New Game never shows a dialog.  It restarts
-    with the most recently configured level/time settings.  If no settings
-    have been stored yet (first ever run) the level picker is opened instead
-    so the user can configure a level before play begins.
+    Fritz behaviour: New Game never shows a dialog.  On first run, when no
+    level has been configured yet, it is a no-op — the board stays in
+    Infinite Analysis.  Use Levels to pick a level before starting a game.
     """
     import Code
     stored = Code.configuration.read_variables(_FRITZ_GAME_DIC_KEY)
     if stored and "RIVAL" in stored:
         _start_fritz_engine_game(procesador, stored)
-    else:
-        # First run — no level configured yet; fall back to the picker.
-        _fritz_pick_level(procesador)
 
 
 def _fritz_pick_level(procesador):

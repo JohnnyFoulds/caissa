@@ -19,7 +19,12 @@
     "TB_PASTE_PGN", "TB_READ_PGN", "TB_SAVE", "TB_SAVE_AS", "TB_OPEN"
   ],
 
-  "toolbar_inject": ["caissa:fritz_level", "caissa:switch_mode", "caissa:switch_theme"],
+  "toolbar_inject": [
+    "caissa:fritz_level", "caissa:switch_mode", "caissa:switch_theme",
+    "caissa:flip_board", "caissa:piece_style", "caissa:sq_color",
+    "caissa:kibitzer", "caissa:std_layout", "caissa:fullscreen",
+    "caissa:select_engine"
+  ],
 
   "config_section": null,
   "ribbon": "modern-fritz",

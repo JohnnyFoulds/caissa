@@ -170,9 +170,9 @@ class ManagerSolo(Manager.Manager):
             _fritz_pick_level(self.procesador)
 
         elif key == TB_STOP:
-            # "Play Now" in Analysis tab — same as Levels (start engine game).
-            from Code.UIModes.actions.modern_fritz_ui import _fritz_pick_level
-            _fritz_pick_level(self.procesador)
+            # "Play Now" — start engine game with last-used settings (no dialog).
+            from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
+            _fritz_new_game(self.procesador)
 
         else:
             self.routine_default(key)

@@ -22,13 +22,15 @@
   ],
 
   "toolbar_inject": [
-    "caissa:fritz_level", "caissa:switch_mode", "caissa:switch_theme",
+    "caissa:fritz_level", "caissa:infinite_analysis",
+    "caissa:switch_mode", "caissa:switch_theme",
     "caissa:flip_board", "caissa:piece_style", "caissa:sq_color",
     "caissa:kibitzer", "caissa:std_layout", "caissa:fullscreen",
     "caissa:select_engine"
   ],
 
   "config_section": null,
+  "ribbon": "modern-fritz",
   "style": "Modern Fritz",
   "icons": "MIDNIGHT",
   "font": null,

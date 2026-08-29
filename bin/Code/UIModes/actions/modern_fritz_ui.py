@@ -345,7 +345,7 @@ def _reapply_fritz_right_col_sizes(mw) -> None:
     total = mw.splitter.width()
     if total < 400:
         return
-    if mw.splitter.sizes()[-1] < 200:
+    if mw.splitter.sizes()[-1] < 360:
         mw.splitter.setSizes([total - 380, 380])
 
 
@@ -418,7 +418,7 @@ def _build_fritz_right_col(mw) -> None:
     mw.splitter.setSizes([max(wbase_width - (fritz_col_width - pgn_width), 600),
                           fritz_col_width])
     mw.splitter.setChildrenCollapsible(False)
-    right_col.setMinimumWidth(200)
+    right_col.setMinimumWidth(360)
     right_col.setSizes([_PANE_SPECS[0].default_px, _PANE_SPECS[1].default_px,
                         _PANE_SPECS[2].default_px, _PANE_SPECS[3].default_px])
     right_col.show()
@@ -592,15 +592,14 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
         "caissa:board_hints":       lambda _: None,
     })
 
-    # ── Toggle API: TB_STOP checked state reflects play_against_engine ────────
-    # TB_STOP is "Play Now" — checked means the engine is playing (not analysis).
-    # The toggle_get function is re-called on every ribbon.sync(), so it always
-    # reflects the current manager's state even after a ManagerSolo restart.
+    # ── Toggle API: caissa:infinite_analysis checked = currently in analysis mode ──
+    # Checked means play_against_engine is False (engine analyses, never replies).
+    # The toggle_get is re-called on every ribbon.sync() so it tracks live state.
     def _get_toggle(key):
         import Code
         mgr = getattr(getattr(Code, "procesador", None), "manager", None)
-        if key == "TB_STOP" and mgr and hasattr(mgr, "play_against_engine"):
-            return mgr.play_against_engine
+        if key == "caissa:infinite_analysis" and mgr and hasattr(mgr, "play_against_engine"):
+            return not mgr.play_against_engine  # checked when in analysis mode
         return None
 
     ribbon.set_toggle_api(_get_toggle)

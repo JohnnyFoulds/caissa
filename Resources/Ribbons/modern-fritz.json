@@ -112,10 +112,10 @@
           "id": "analysis.engine",
           "label": "Engine",
           "slots": [
-            { "key": "TB_STOP",       "size": "large", "label": "Play Now", "toggle": true },
-            { "key": "TB_PAUSE",      "size": "small", "label": "Pause" },
-            { "key": "TB_CONTINUE",   "size": "small", "label": "Continue" },
-            { "key": "TB_TUTOR_STOP", "size": "small", "label": "Stop Tutor" }
+            { "key": "caissa:infinite_analysis", "size": "large", "label": "Analyse", "toggle": true },
+            { "key": "TB_STOP",                  "size": "small", "label": "Play Now" },
+            { "key": "TB_PAUSE",                 "size": "small", "label": "Pause" },
+            { "key": "TB_CONTINUE",              "size": "small", "label": "Continue" }
           ]
         },
         {

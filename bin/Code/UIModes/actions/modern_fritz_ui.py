@@ -329,6 +329,9 @@ def on_mode_enter(procesador):
     # crash on macOS with Qt6/Metal.
     mw.base.analysis_bar.force_hidden = True
     mw.base.analysis_bar.setVisible(False)
+    # Collapse the layout space — setVisible alone still reserves the widget's
+    # preferred width (≈70 px) in the HBoxLayout, pushing the board rightward.
+    mw.base.analysis_bar.setMaximumWidth(0)
     mw.active_information_pgn(True)
     # active_information_pgn(True) calls show() internally — hide it on home screen
     mw.pgn_information.hide()
@@ -715,6 +718,7 @@ def on_mode_exit(procesador):
     # Restore analysis bar visibility control so other modes work normally
     try:
         mw.base.analysis_bar.force_hidden = False
+        mw.base.analysis_bar.setMaximumWidth(16777215)  # Qt QWIDGETSIZE_MAX
     except Exception:
         pass
 

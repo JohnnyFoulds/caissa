@@ -734,7 +734,7 @@ WFritzPlayerHeader
     background-color: #1e1e1e;
     qproperty-bgColor: #1e1e1e;
     qproperty-borderColor: #505050;
-    qproperty-rowHeight: 30;
+    qproperty-rowHeight: 38;
 }
 
 #WFritzPlayerHeaderSep
@@ -1018,8 +1018,8 @@ WFritzLCD
 qproperty-litColor: #00ff88;
 qproperty-dimColor: #103a18;
 qproperty-boxHeight: 34;
-qproperty-boxWidth: 108;
-qproperty-segmentThickness: 4;
+qproperty-boxWidth: 150;
+qproperty-segmentThickness: 8;
 background-color: #000000;
 border-radius: 2px;
 }
@@ -1029,6 +1029,258 @@ border-radius: 2px;
 font-size: 8pt;
 color: #cccccc;
 padding: 2px 8px;
+}
+
+/* RIBBON ─────────────────────────────────────────────────────────────────────── */
+/* Dark-theme sibling of Fritz.qss ribbon block.                                */
+/* Structure mirrors Fritz.qss exactly; colours adapted for dark palette.       */
+
+WRibbon
+{
+background-color: #2d2d2d;
+border-bottom: 1px solid #4a4a4a;
+font-family: "Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", Arial, sans-serif;
+qproperty-tabRowHeight: 24;
+qproperty-contentHeight: 88;
+qproperty-largeBtnHeight: 64;
+qproperty-largeIconSize: 28;
+}
+
+#WRibbonTabRow
+{
+background-color: #2d2d2d;
+}
+
+#WRibbonQAT
+{
+background-color: transparent;
+}
+
+#WRibbonTabBar
+{
+background: transparent;
+border: none;
+}
+
+#WRibbonTabBar::tab
+{
+background: transparent;
+color: #cccccc;
+padding: 4px 13px;
+border: none;
+font-size: 8pt;
+}
+
+#WRibbonTabBar::tab:first
+{
+background-color: #0078d4;
+color: #ffffff;
+}
+
+#WRibbonTabBar::tab:selected
+{
+background-color: #2d2d2d;
+color: #ffffff;
+border-top: 1px solid #4a4a4a;
+border-left: 1px solid #4a4a4a;
+border-right: 1px solid #4a4a4a;
+border-bottom: none;
+}
+
+#WRibbonTabBar::tab:first:selected
+{
+background-color: #0078d4;
+color: #ffffff;
+border-top: 1px solid #0060aa;
+border-left: 1px solid #0060aa;
+border-right: 1px solid #0060aa;
+border-bottom: none;
+}
+
+#WRibbonTabBar::tab:hover:!selected:!first
+{
+background-color: #383838;
+color: #ffffff;
+}
+
+#WRibbonRule
+{
+color: #2d2d2d;
+background-color: #2d2d2d;
+max-height: 1px;
+}
+
+#WRibbonPages
+{
+background-color: #2d2d2d;
+}
+
+#WRibbonPages > QWidget
+{
+background-color: #2d2d2d;
+}
+
+#WRibbonGroupCaption
+{
+font-size: 10pt;
+color: #cccccc;
+padding: 0px 2px;
+}
+
+#WRibbonGroupSep
+{
+background-color: #4a4a4a;
+margin: 8px 3px;
+}
+
+#WRibbonQAT QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+padding: 1px;
+}
+
+#WRibbonQAT QToolButton:hover
+{
+background-color: #3c3c3c;
+border-color: #606060;
+}
+
+#WRibbonPages QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+color: #cccccc;
+font-size: 10pt;
+padding: 1px 4px;
+}
+
+#WRibbonPages QToolButton:hover
+{
+background-color: #3c3c3c;
+border-color: #606060;
+}
+
+#WRibbonPages QToolButton:checked
+{
+background-color: #0078d4;
+border-color: #0060aa;
+color: #ffffff;
+}
+
+#WRibbonPages QToolButton:pressed
+{
+background-color: #0060aa;
+border-color: #004080;
+color: #ffffff;
+}
+
+#WRibbonPages QToolButton:disabled
+{
+color: #555555;
+}
+
+#WRibbonPages QCheckBox
+{
+color: #cccccc;
+font-size: 10pt;
+spacing: 5px;
+}
+
+#WRibbonPages QCheckBox:disabled
+{
+color: #555555;
+}
+
+#WRibbonPages QCheckBox::indicator
+{
+width: 11px;
+height: 11px;
+border: 1px solid #606060;
+border-radius: 0px;
+background-color: #1e1e1e;
+image: none;
+}
+
+#WRibbonPages QCheckBox::indicator:checked
+{
+background-color: #0078d4;
+border-color: #0060aa;
+image: none;
+}
+
+#WRibbonPages QCheckBox::indicator:hover
+{
+border-color: #0078d4;
+}
+
+#WRibbonPages QCheckBox::indicator:disabled
+{
+background-color: #252525;
+border-color: #404040;
+}
+
+/* BACKSTAGE PANEL (File tab) -------------------------------------------------- */
+
+#WRibbonBackstageSidebar
+{
+background-color: #2a4e7a;
+}
+
+#WRibbonBackstageTitle
+{
+color: #d4d4d4;
+font-size: 14pt;
+font-weight: bold;
+background-color: transparent;
+}
+
+#WRibbonBackstageSubtitle
+{
+color: #8baac4;
+font-size: 8pt;
+background-color: transparent;
+}
+
+#WRibbonBackstageContent
+{
+background-color: #2d2d2d;
+}
+
+#WRibbonBackstageItem
+{
+background: transparent;
+border: none;
+border-radius: 0px;
+color: #d4d4d4;
+font-size: 9pt;
+padding: 2px 12px;
+text-align: left;
+}
+
+#WRibbonBackstageItem:hover
+{
+background-color: #3c4a5a;
+}
+
+#WRibbonBackstageItem:pressed
+{
+background-color: #1e3a5a;
+}
+
+#WRibbonBackstageItem:disabled
+{
+color: #858585;
+}
+
+#WRibbonBackstageSep
+{
+color: #505050;
+background-color: #505050;
+max-height: 1px;
+margin: 2px 8px;
 }
 
 /* NAG BACKGROUND COLOURS (also reachable from Options -> Colours) ------------ */

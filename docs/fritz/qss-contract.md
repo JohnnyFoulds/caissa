@@ -161,3 +161,29 @@ Each widget's full table will be added here when its phase lands.
 3. Each widget instantiated with **no** stylesheet still renders with non-`#000000`
    foreground (the Python defaults-are-sane rule).
 4. `WA_StyledBackground` is set on every custom-painted widget.
+
+---
+
+## Known Pitfalls (verified against this codebase)
+
+### Font cascade does not work through QSS
+
+`font-size` on a parent QSS selector does **not** cascade to child widgets. Each widget selector
+that needs a specific font size must carry its own `font-size` rule. See D16.
+
+### macOS ignores `border-radius: 0` on `QTabBar`
+
+macOS AppKit renders native rounded tab shapes regardless of QSS or `QProxyStyle`. Full
+`paintEvent` ownership is required for rectangular tabs. See D14.
+
+### `QFrame.VLine` does not produce a reliable 1px separator
+
+`QFrame.VLine` has internal sizing behaviour that overrides Python `setFixedWidth(1)` and QSS
+`min-width`/`max-width` at polish time. Use a plain `QWidget` with `WA_StyledBackground` and
+`setFixedWidth(1)` for a guaranteed 1px line. See D15.
+
+### Layout spacing and QSS margin both contribute to visual width
+
+`QHBoxLayout.setSpacing(N)` and QSS `margin: T Hpx` both add to the visual gap between widgets.
+To keep gaps predictable, pick one mechanism — either layout spacing or QSS margin — for each axis
+and zero out the other. See D17.

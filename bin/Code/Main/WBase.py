@@ -129,10 +129,12 @@ class WBase(QtWidgets.QWidget):
 
         self.li_hide_replay = []
 
-        if self.configuration.x_tb_orientation_horizontal:
-            ly_ai = Colocacion.H().relleno().otroi(ly_t).otroi(ly_bi).relleno().margen(0)
-            ly = Colocacion.V().control(self.tb).relleno().otro(ly_ai).relleno().margen(2)
-        else:
+        # Ribbon always goes at the top regardless of x_tb_orientation_horizontal.
+        if self.ribbon_spec:
+            # Fritz/ribbon mode: toolbar at top, board flush-left, no centering.
+            ly_ai = Colocacion.H().otroi(ly_t).otroi(ly_bi).relleno().margen(0)
+            ly = Colocacion.V().control(self.tb).otro(ly_ai).margen(2)
+        elif self.configuration.x_tb_orientation_horizontal:
             ly_ai = Colocacion.H().set_separation(0).control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
             ly = Colocacion.V().relleno().otro(ly_ai).relleno().margen(0)
 

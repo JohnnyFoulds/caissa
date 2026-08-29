@@ -734,7 +734,7 @@ WFritzPlayerHeader
     background-color: #f0f4f8;
     qproperty-bgColor: #f0f4f8;
     qproperty-borderColor: #a0b4c8;
-    qproperty-rowHeight: 30;
+    qproperty-rowHeight: 38;
 }
 
 #WFritzPlayerHeaderSep
@@ -1018,8 +1018,8 @@ WFritzLCD
 qproperty-litColor: #00ee77;
 qproperty-dimColor: #104020;
 qproperty-boxHeight: 34;
-qproperty-boxWidth: 108;
-qproperty-segmentThickness: 4;
+qproperty-boxWidth: 150;
+qproperty-segmentThickness: 8;
 background-color: #000000;
 border-radius: 2px;
 }
@@ -1029,6 +1029,274 @@ border-radius: 2px;
 font-size: 8pt;
 color: #1a1a1a;
 padding: 2px 8px;
+}
+
+/* RIBBON ─────────────────────────────────────────────────────────────────────── */
+/* Measured against Fritz 18 ribbon_home.png (Board tab, 820x242).              */
+/* See docs/fritz/ribbon.md "Measured reference" for the full spec.             */
+
+QToolBar#BASIC
+{
+background-color: #ffffff;
+border: none;
+padding: 0px;
+spacing: 0px;
+}
+
+WRibbon
+{
+background-color: #ffffff;
+border-bottom: 1px solid #cccedb;
+font-family: "Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", Arial, sans-serif;
+font-size: 10pt;
+qproperty-tabRowHeight: 24;
+qproperty-contentHeight: 88;
+qproperty-largeBtnHeight: 64;
+qproperty-largeIconSize: 28;
+}
+
+#WRibbonQAT
+{
+background-color: transparent;
+}
+
+#WRibbonTabRow
+{
+background-color: #d4d5d9;
+}
+
+#WRibbonTabBar
+{
+background: transparent;
+border: none;
+}
+
+#WRibbonTabBar::tab
+{
+background: transparent;
+color: #1e1e1e;
+padding: 4px 13px;
+border: none;
+border-radius: 0;
+font-size: 8pt;
+}
+
+#WRibbonTabBar::tab:first
+{
+background-color: #007acc;
+color: #ffffff;
+border-radius: 0;
+}
+
+#WRibbonTabBar::tab:selected
+{
+background-color: #ffffff;
+color: #005b99;
+border-top: 1px solid #9daab8;
+border-left: 1px solid #9daab8;
+border-right: 1px solid #9daab8;
+border-bottom: none;
+border-radius: 0;
+}
+
+#WRibbonTabBar::tab:first:selected
+{
+background-color: #007acc;
+color: #ffffff;
+border-top: 1px solid #0060a0;
+border-left: 1px solid #0060a0;
+border-right: 1px solid #0060a0;
+border-bottom: none;
+border-radius: 0;
+}
+
+#WRibbonTabBar::tab:hover:!selected:!first
+{
+background-color: #e4e6f0;
+color: #1e1e1e;
+}
+
+#WRibbonRule
+{
+color: #ffffff;
+background-color: #ffffff;
+max-height: 1px;
+}
+
+#WRibbonPages
+{
+background-color: #ffffff;
+}
+
+#WRibbonPages > QWidget
+{
+background-color: #ffffff;
+}
+
+QWidget[ribbonGroup="1"]
+{
+background-color: #ffffff;
+}
+
+#WRibbonGroupCaption
+{
+font-size: 10pt;
+color: #1e1e1e;
+padding: 0px 2px;
+}
+
+#WRibbonGroupSep
+{
+background-color: #c8cacf;
+margin: 8px 3px;
+}
+
+#WRibbonQAT QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+padding: 1px;
+}
+
+#WRibbonQAT QToolButton:hover
+{
+background-color: #d8dae8;
+border-color: #cccedb;
+}
+
+#WRibbonPages QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+color: #1e1e1e;
+font-size: 10pt;
+padding: 1px 4px;
+}
+
+#WRibbonPages QToolButton:hover
+{
+background-color: #d8dae8;
+border-color: #cccedb;
+}
+
+#WRibbonPages QToolButton:checked
+{
+background-color: #007acc;
+border-color: #005b99;
+color: #ffffff;
+}
+
+#WRibbonPages QToolButton:pressed
+{
+background-color: #005b99;
+border-color: #004070;
+color: #ffffff;
+}
+
+#WRibbonPages QToolButton:disabled
+{
+color: #a2a4a5;
+}
+
+#WRibbonPages QCheckBox
+{
+color: #1e1e1e;
+font-size: 10pt;
+spacing: 5px;
+}
+
+#WRibbonPages QCheckBox:disabled
+{
+color: #a2a4a5;
+}
+
+#WRibbonPages QCheckBox::indicator
+{
+width: 11px;
+height: 11px;
+border: 1px solid #a2a4a5;
+border-radius: 0px;
+background-color: #ffffff;
+}
+
+#WRibbonPages QCheckBox::indicator:checked
+{
+background-color: #ffffff;
+border-color: #a2a4a5;
+}
+
+#WRibbonPages QCheckBox::indicator:hover
+{
+border-color: #007acc;
+}
+
+#WRibbonPages QCheckBox::indicator:disabled
+{
+background-color: #f0f0f0;
+border-color: #a2a4a5;
+}
+
+/* BACKSTAGE PANEL (File tab) -------------------------------------------------- */
+
+#WRibbonBackstageSidebar
+{
+background-color: #007acc;
+}
+
+#WRibbonBackstageTitle
+{
+color: #ffffff;
+font-size: 14pt;
+font-weight: bold;
+background-color: transparent;
+}
+
+#WRibbonBackstageSubtitle
+{
+color: #c8e0f0;
+font-size: 8pt;
+background-color: transparent;
+}
+
+#WRibbonBackstageContent
+{
+background-color: #ffffff;
+}
+
+#WRibbonBackstageItem
+{
+background: transparent;
+border: none;
+border-radius: 0px;
+color: #1e1e1e;
+font-size: 9pt;
+padding: 2px 12px;
+text-align: left;
+}
+
+#WRibbonBackstageItem:hover
+{
+background-color: #e4e6f0;
+}
+
+#WRibbonBackstageItem:pressed
+{
+background-color: #cdd0e4;
+}
+
+#WRibbonBackstageItem:disabled
+{
+color: #a2a4a5;
+}
+
+#WRibbonBackstageSep
+{
+color: #e0e0e0;
+background-color: #e0e0e0;
+max-height: 1px;
+margin: 2px 8px;
 }
 
 /* NAG BACKGROUND COLOURS (also reachable from Options -> Colours) ------------ */

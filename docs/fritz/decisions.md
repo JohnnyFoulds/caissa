@@ -156,3 +156,89 @@ the polygon route themeable at no extra cost. The Phase 0 mockup renders a font-
 alongside the polygon one so the shape is still reviewed; only the implementation mechanism is decided.  
 **Alternative considered:** `QFontDatabase.addApplicationFont` with a bundled seven-segment `.ttf` —
 rejected on cost and licensing grounds relative to polygons.
+
+---
+
+## D12 — Raster Pillow mockup precedes the PySide6 widget harness
+
+**Resolved:** 2026-08-29  
+**Decision:** Design iteration starts with a pure-Pillow raster script (`tools/design/fritz_compare.py`)
+before any PySide6 widget code is written. The PySide6 harness (`tools/design/fritz_mock.py`) is
+used only once the raster design is approved.  
+**Rationale:** The Pillow loop is seconds per render, requires no Qt display, and produces a
+side-by-side comparison image that is easy to review. The PySide6 harness renders real widgets with
+real QSS, which is accurate but slower to iterate on and requires an offscreen display. Separating
+the two phases keeps the design loop fast during the visual exploration stage.  
+**How to apply:** Raster mockup approval comes first. Once the layout and group choices are signed
+off in the raster mockup, the PySide6 harness is updated to match the agreed design.
+
+---
+
+## D13 — Hint / Suggestion are plain action buttons; Coaching group uses `?` icon
+
+**Resolved:** 2026-08-29  
+**Decision:** The Caissa "Coaching" ribbon group contains two small flat buttons — Hint and
+Suggestion — each using a `?` icon. They are not radio buttons, not toggles, and not grouped as a
+selection control.  
+**Rationale:** Confirmed from Fritz 18 manual p.63: "functions Hint and Suggestion in the Help menu"
+are plain one-shot actions. An earlier mockup used a circle outline icon that visually resembled a
+radio button; this was incorrect and has been replaced with the `?` icon.  
+**Alternative considered:** Radio buttons / toggle buttons — rejected because the Fritz manual
+confirms these are one-time actions, not mode selections.
+
+---
+
+## D14 — macOS QTabBar tab shapes require a full custom paintEvent
+
+**Resolved:** 2026-08-29  
+**Decision:** `_FlatTabBar` subclasses `QTabBar` and owns `paintEvent` entirely. No QSS selector
+or `QProxyStyle.drawControl` override is used for tab shape.  
+**Rationale:** macOS AppKit bypasses Qt's QSS rendering for native tab shapes. `border-radius: 0`
+in QSS and `QStyleFactory.create("Fusion")` both fail to remove rounded corners on macOS.
+Owning `paintEvent` gives full platform-independent control of tab geometry and colour.
+Same pattern as `_FritzPaneCheckBox` in the same file.  
+**Alternative considered:** `QProxyStyle.drawControl(CE_TabBarTabShape)` — rejected; it also
+routes through the native style on macOS and produces the same rounded result.
+
+---
+
+## D15 — `QFrame.VLine` is unreliable for 1px separators; use plain `QWidget`
+
+**Resolved:** 2026-08-29  
+**Decision:** Ribbon group separators are plain `QWidget` instances with `WA_StyledBackground`,
+`setFixedWidth(1)`, and `background-color` set via QSS.  
+**Rationale:** `QFrame.VLine` with `Plain` shadow still renders a thick bar on macOS because its
+internal minimum-size heuristics override Python `setFixedWidth(1)` when QSS is applied at polish
+time. `background-color` in QSS also paints the full implicit widget area rather than a 1px line.
+A plain `QWidget` with `WA_StyledBackground` and `setFixedWidth(1)` has no such baggage — `background-color`
+paints exactly the 1px-wide widget.  
+**Alternative considered:** `QFrame.VLine` + `min-width: 1px; max-width: 1px` in QSS — rejected;
+QSS width constraints are overridden by the frame's own size policy at polish time.
+
+---
+
+## D16 — QSS `font-size` on a parent selector does not cascade to child widgets
+
+**Resolved:** 2026-08-29  
+**Decision:** Every ribbon child widget selector that requires a specific font size carries its own
+explicit `font-size` rule in QSS (`#WRibbonPages QToolButton`, `#WRibbonGroupCaption`,
+`#WRibbonPages QCheckBox`).  
+**Rationale:** Qt's QSS `font-size` on a parent widget (e.g. `WRibbon { font-size: 10pt; }`) does
+not cascade through the widget hierarchy to child widgets. Each widget is styled independently.
+Python `setFont()` on a parent widget does cascade, but is overridden by any explicit QSS rule on
+a child — so an explicit QSS font on a child trumps a Python parent font.  
+**Alternative considered:** Python `setFont()` on the parent — rejected; child QSS rules override it,
+creating an order-of-operations trap where the visible font depends on which stylesheet is loaded.
+
+---
+
+## D17 — Layout `setSpacing` and QSS `margin` both contribute to visual gaps; use only one
+
+**Resolved:** 2026-08-29  
+**Decision:** Ribbon group separator `QWidget` carries `margin: 8px 0px` in QSS (top/bottom only).
+Horizontal spacing between groups comes entirely from the `QHBoxLayout.setSpacing(4)` on the page
+layout.  
+**Rationale:** If the separator has both a QSS horizontal margin (e.g. `margin: 4px 6px`) and the
+layout has `setSpacing(4)`, the visual gap between groups is the sum of both — `4 + 6 + 1 + 6 + 4
+= 21px` — which looks fat even though the line itself is 1px. Setting horizontal margin to 0 on the
+separator and letting layout spacing control horizontal gaps keeps the total gap predictable.

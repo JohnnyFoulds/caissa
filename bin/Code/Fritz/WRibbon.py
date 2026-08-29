@@ -532,6 +532,30 @@ class WRibbon(QtWidgets.QWidget):
 
     # ── dropdown / toggle public API ──────────────────────────────────────────
 
+    def set_pane_api(self, api: dict) -> None:
+        """Re-register the pane visibility API and immediately sync checkboxes.
+
+        Called after the mode hook builds the right column so that the pane
+        checkboxes reflect actual visibility rather than the stale build-time
+        snapshot (which had no panes yet).
+
+        :param api: ``{"names": [...], "get": callable, "set": callable}``
+        """
+        self._pane_api = api
+        set_fn = api.get("set")
+        # _pane_checkboxes maps key → list[QCheckBox] (same key may appear on
+        # multiple tabs — Home and View — so we wire/sync every instance).
+        for pane_key, cbs in getattr(self, "_pane_checkboxes", {}).items():
+            for cb in cbs:
+                try:
+                    cb.toggled.disconnect()
+                except RuntimeError:
+                    pass
+                if set_fn:
+                    cb.toggled.connect(lambda checked, k=pane_key: set_fn(k, checked))
+        # Defer visual sync so Qt has processed the show events.
+        QtCore.QTimer.singleShot(50, self._sync_panes)
+
     def set_display_api(self, api: dict[str, Any]) -> None:
         """Register set-callbacks for Board ▸ Display checkboxes.
 
@@ -933,14 +957,21 @@ class WRibbon(QtWidgets.QWidget):
     def _build_panes_group(
         self, group: dict[str, Any], parent: QtWidgets.QWidget
     ) -> QtWidgets.QWidget:
-        """Build a 2-column grid of pane-visibility checkboxes."""
+        """Build a 2-column grid of pane-visibility checkboxes.
+
+        Accumulates into ``_pane_checkboxes`` rather than replacing it, because
+        the same panes group may appear on multiple ribbon tabs (Home and View).
+        ``set_pane_api`` / ``_sync_panes`` sync every checkbox for each key.
+        """
         container = QtWidgets.QWidget(parent)
         container.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         container.setProperty("ribbonGroup", "1")
         grid = QtWidgets.QGridLayout(container)
         grid.setContentsMargins(2, 0, 2, 0)
         grid.setSpacing(1)
-        self._pane_checkboxes: dict[str, QtWidgets.QCheckBox] = {}
+        # Accumulate: _pane_checkboxes maps key → list[QCheckBox] across all groups.
+        if not hasattr(self, "_pane_checkboxes"):
+            self._pane_checkboxes: dict[str, list[QtWidgets.QCheckBox]] = {}
 
         get_fn = self._pane_api.get("get") if self._pane_api else None
         set_fn = self._pane_api.get("set") if self._pane_api else None
@@ -956,11 +987,10 @@ class WRibbon(QtWidgets.QWidget):
             if get_fn:
                 cb.setChecked(bool(get_fn(pane_key)))
             else:
-                # Use the declared default state from the JSON spec
                 cb.setChecked(bool(pane.get("default", False)))
             if set_fn:
                 cb.toggled.connect(lambda checked, k=pane_key: set_fn(k, checked))
-            self._pane_checkboxes[pane_key] = cb
+            self._pane_checkboxes.setdefault(pane_key, []).append(cb)
             if idx < n_left:
                 grid.addWidget(cb, idx, 0)
             else:
@@ -969,14 +999,19 @@ class WRibbon(QtWidgets.QWidget):
         return container
 
     def _sync_panes(self) -> None:
-        """Re-read pane visibility and update checkboxes under blockSignals."""
+        """Re-read pane visibility and update ALL checkboxes (across tabs) per key."""
         get_fn = self._pane_api.get("get") if self._pane_api else None
         if not get_fn:
             return
-        for pane_key, cb in getattr(self, "_pane_checkboxes", {}).items():
-            cb.blockSignals(True)
-            cb.setChecked(bool(get_fn(pane_key)))
-            cb.blockSignals(False)
+        for pane_key, cbs in getattr(self, "_pane_checkboxes", {}).items():
+            try:
+                state = bool(get_fn(pane_key))
+            except RuntimeError:
+                return  # C++ pane objects already deleted (app close / mode exit)
+            for cb in cbs:
+                cb.blockSignals(True)
+                cb.setChecked(state)
+                cb.blockSignals(False)
 
     # ── slots ─────────────────────────────────────────────────────────────────
 

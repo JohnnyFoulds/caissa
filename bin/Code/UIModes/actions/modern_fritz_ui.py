@@ -352,10 +352,16 @@ def on_mode_enter(procesador):
         saved = GeometryStore.load_splitters("fritz")
         if saved:
             rc = getattr(mw, "_fritz_right_col", None)
-            if rc is not None and "right_col" in saved:
-                rc.setSizes(saved["right_col"])
-            if "main" in saved:
-                mw.splitter.setSizes(saved["main"])
+            # Validate before applying: reject if any size is 0 or if count
+            # doesn't match the current pane count (stale from a previous layout).
+            rc_sizes = saved.get("right_col")
+            if (rc is not None and rc_sizes and len(rc_sizes) == rc.count()
+                    and all(s > 0 for s in rc_sizes)):
+                rc.setSizes(rc_sizes)
+            main_sizes = saved.get("main")
+            if (main_sizes and len(main_sizes) == mw.splitter.count()
+                    and all(s > 0 for s in main_sizes)):
+                mw.splitter.setSizes(main_sizes)
     except Exception:
         _log.debug("Fritz: GeometryStore load failed", exc_info=True)
 

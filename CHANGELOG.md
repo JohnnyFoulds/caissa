@@ -11,6 +11,9 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
+### Fixed
+- **Fritz ribbon "New Game" icon**: Changed from gear (`Configurar`) to `NuevaPartida` (chess game icon) to match the button's purpose.
+
 ### Changed
 - **Fritz ribbon height**: Increased from 113 px to 142 px to match Fritz 18 proportions.
   QAT strip (quick-access buttons) is now a separate 29 px row above the 21 px tab bar;

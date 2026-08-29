@@ -187,6 +187,7 @@ class ManagerSolo(Manager.Manager):
             TB_REPLAY,
             TB_CONFIG,
             TB_UTILITIES,
+            TB_LEVEL,
         ]
         self.set_toolbar(li)
 

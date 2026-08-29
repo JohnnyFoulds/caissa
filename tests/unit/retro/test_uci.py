@@ -151,8 +151,10 @@ def test_uci_position_fen_sets_state():
 # go without ROM
 # ---------------------------------------------------------------------------
 
-def test_uci_go_without_rom_returns_info_error_and_null_move():
+def test_uci_go_without_rom_returns_info_error_and_null_move(monkeypatch):
     """go without a ROM configured must emit info string error + bestmove 0000 (FR-2)."""
+    import Code.Retro.Manifest as _manifest_mod
+    monkeypatch.setattr(_manifest_mod, "default_rom_path", lambda: None)
     lines = _run("uci\ngo movetime 100\nquit\n")
     info_errors = [ln for ln in lines if ln.startswith("info string error")]
     bestmove = [ln for ln in lines if ln.startswith("bestmove")]

@@ -23,8 +23,8 @@ pytestmark = pytest.mark.retro
 
 _STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-# e2e4: from_sq=0x14 (20), to_sq=0x34 (52), flags=0, piece=1, legal=1
-_E2E4_RAW = struct.pack(">HHHBB", 0x14, 0x34, 0, 1, 1)
+# e2e4: to_sq=0x34 (e4) at offset 0, from_sq=0x14 (e2) at offset 2 (confirmed entry format)
+_E2E4_RAW = struct.pack(">HH4x", 0x34, 0x14)
 
 
 def _cpu_that_plays_e2e4() -> FakeCpu:

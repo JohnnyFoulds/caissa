@@ -10,17 +10,23 @@ reads back the AI's chosen move from the ``ai_best_move`` buffer.
     PIECE_TABLE_ADDR    0x3322  array   8 bytes/entry, piece list
     PLAYER1_COLOR_ADDR  0x331E  word    0=White, 1=Black (side to move)
     PLAYER2_COLOR_ADDR  0x331C  word    0=White, 1=Black (other side)
-    AI_BEST_MOVE_ADDR   0x365A  8 bytes [from_sq, to_sq, flags, piece, legal]
+    AI_BEST_MOVE_ADDR   0x3662  8 bytes [to_sq, from_sq, state, ...]
     PLAYER_TYPE_BASE    0x07D4  array   1=Human, 2=Computer; entry[color*2]
+    BOARD_ARRAY_ADDR    0x30F4  array   128*4 bytes; [sq*4]=type, [sq*4+1]=color
+    PAWN_DIR_TABLE      0x07A2  array   2 words; [0]=white_dir (+0x10), [1]=black_dir (-0x10)
+    SEARCH_SKIP_FLAG    0x07D2  word    non-zero → AI skips search at 0x824C
 
-**Piece-table entry** (8 bytes, hypothesis from Phase 1-B recon)::
+**Piece-table entry** (8 bytes, confirmed from disassembly of 0xD960–0xD97A)::
 
     offset  size  field        encoding
-    0       2     square       0x88 index, big-endian
-    2       2     color        0=White / 1=Black, big-endian
-    4       1     piece_type   1=pawn … 6=king
-    5       1     flags        0=active
-    6       2     reserved     0
+    0       2     to_sq        0x88 index; filled by search, 0 initially
+    2       2     from_sq      0x88 index; current piece position (FROM square)
+    4       2     search_state filled by search, 0 initially
+    6       2     reserved     filled by search, 0 initially
+
+**Board-array type codes** (written to BOARD_ARRAY_ADDR, confirmed from recon)::
+
+    1=King  2=Queen  3=Rook  4=Bishop  5=Knight  6=Pawn
 
 **Zero third-party imports** — stdlib + Code.Retro only.
 
@@ -45,22 +51,30 @@ PIECE_COUNTER_ADDR: int = A4 - 0x4CDE  # 0x3320
 PIECE_TABLE_ADDR: int = A4 - 0x4CDC    # 0x3322
 PLAYER1_COLOR_ADDR: int = A4 - 0x4CE0  # 0x331E
 PLAYER2_COLOR_ADDR: int = A4 - 0x4CE2  # 0x331C
-AI_BEST_MOVE_ADDR: int = A4 - 0x49A4   # 0x365A
+# AI_BEST_MOVE_ADDR = PIECE_TABLE + 0x68*8: confirmed from disassembly of write at 0xD97A
+AI_BEST_MOVE_ADDR: int = PIECE_TABLE_ADDR + 0x68 * 8  # 0x3662
 PLAYER_TYPE_BASE: int = A4 - 0x782A    # 0x07D4
+BOARD_ARRAY_ADDR: int = A4 - 0x4F0A   # 0x30F4  (128 entries * 4 bytes each)
+PAWN_DIR_TABLE: int = A4 - 0x785C     # 0x07A2  (2 words: white_dir, black_dir)
+SEARCH_SKIP_FLAG: int = A4 - 0x782C   # 0x07D2  (non-zero skips search at 0x824C)
 
 PIECE_ENTRY_SIZE: int = 8
 MAX_PIECES: int = 32   # 16 per side
 
-AI_INIT_ADDR: int = 0x8230        # ai_phase0_init (kept for backward compat)
-AI_OUTER_DRIVER_ADDR: int = 0x81DC  # ai_outer_driver — entry for a complete think run
+# Confirmed from disassembly: 0x8230 = AI_INIT entry (link.w a5, #-0x3C)
+# 0x81DC = outer driver entry (used for iterative deepening; AI_INIT is sufficient for one ply)
+AI_INIT_ADDR: int = 0x8230
+AI_OUTER_DRIVER_ADDR: int = 0x81DC
 
 # ---------------------------------------------------------------------------
 # FEN piece-character → (color, piece_type) mapping
+# Board-array type codes confirmed from recon (BOARD_ARRAY_ADDR):
+#   1=King  2=Queen  3=Rook  4=Bishop  5=Knight  6=Pawn
 # ---------------------------------------------------------------------------
 
 _FEN_PIECE: dict[str, tuple[int, int]] = {
-    'P': (0, 1), 'N': (0, 2), 'B': (0, 3), 'R': (0, 4), 'Q': (0, 5), 'K': (0, 6),
-    'p': (1, 1), 'n': (1, 2), 'b': (1, 3), 'r': (1, 4), 'q': (1, 5), 'k': (1, 6),
+    'K': (0, 1), 'Q': (0, 2), 'R': (0, 3), 'B': (0, 4), 'N': (0, 5), 'P': (0, 6),
+    'k': (1, 1), 'q': (1, 2), 'r': (1, 3), 'b': (1, 4), 'n': (1, 5), 'p': (1, 6),
 }
 
 
@@ -209,26 +223,29 @@ def parse_fen(fen: str) -> dict:
 # Piece-table entry packing
 # ---------------------------------------------------------------------------
 
-def _make_entry(sq: int, color: int, piece_type: int) -> bytes:
+def _make_entry(sq: int) -> bytes:
     """Pack one 8-byte piece-table entry.
 
-    :param sq: 0x88 square index.
-    :param color: 0=White, 1=Black.
-    :param piece_type: 1=pawn … 6=king.
+    :param sq: 0x88 square index (FROM square — current piece position).
     :return: 8-byte big-endian struct.
+
+    Layout confirmed from disassembly of 0xD972 (reads FROM at +2) and
+    0xD97A (writes TO at +0 during search):
+      offset 0 (WORD): TO square  — 0 initially, filled during search
+      offset 2 (WORD): FROM square — current piece position
+      offset 4-7:      0 — search state, filled during search
     """
-    # Layout: square(H=2), color(H=2), piece_type(B=1), flags(B=1), reserved(H=2)
-    return struct.pack(">HHBBH", sq, color, piece_type, 0, 0)
+    return struct.pack(">HH4x", 0, sq)
 
 
-def _read_entry(data: bytes) -> tuple[int, int, int]:
+def _read_entry(data: bytes) -> tuple[int, int]:
     """Unpack one 8-byte piece-table entry.
 
     :param data: Exactly 8 bytes.
-    :return: ``(sq, color, piece_type)``
+    :return: ``(to_sq, from_sq)`` — to_sq is 0 before search runs.
     """
-    sq, color, piece_type, _flags, _reserved = struct.unpack(">HHBBH", data)
-    return sq, color, piece_type
+    to_sq, from_sq = struct.unpack(">HH", data[:4])
+    return to_sq, from_sq
 
 
 # ---------------------------------------------------------------------------
@@ -247,12 +264,13 @@ class Bridge:
         :param cpu: Emulator backend.
         """
         self._cpu = cpu
+        self._piece_count: int = 0
 
     def write_position(self, fen: str) -> None:
         """Write a FEN position into the emulated board struct.
 
-        Zeroes the piece table, writes one entry per piece, sets the piece counter
-        to -1 (ready state), and writes the player-color globals.
+        Writes the board array, piece table, pawn direction table, and player
+        color globals.  Clears the search-skip flag so the AI runs.
 
         :param fen: FEN position string.
         :raises BridgeError: If *fen* is malformed.
@@ -262,13 +280,28 @@ class Bridge:
         if len(pieces) > MAX_PIECES:
             raise BridgeError(f"FEN has {len(pieces)} pieces; max is {MAX_PIECES}")
 
-        # Zero the entire piece table
-        self._cpu.mem_write(PIECE_TABLE_ADDR, b"\x00" * PIECE_ENTRY_SIZE * MAX_PIECES)
+        # Write BOARD_ARRAY (128 entries * 4 bytes): [sq*4]=type, [sq*4+1]=color.
+        # The move generator reads piece type and occupancy from here.
+        board_data = bytearray(128 * 4)
+        for sq, color, piece_type in pieces:
+            board_data[sq * 4]     = piece_type
+            board_data[sq * 4 + 1] = color
+        self._cpu.mem_write(BOARD_ARRAY_ADDR, bytes(board_data))
 
-        # Write each piece entry
-        for idx, (sq, color, piece_type) in enumerate(pieces):
-            entry = _make_entry(sq, color, piece_type)
+        # Pawn direction table: game startup writes these at runtime, but we bypass
+        # startup.  Without these the pawn move generator computes garbage TO squares.
+        # +0x10 = north (+1 rank), 0xFFF0 = south (−1 rank, −0x10 in signed 16-bit).
+        self._cpu.mem_write(PAWN_DIR_TABLE, struct.pack(">HH", 0x0010, 0xFFF0))
+
+        # Allow the AI to run (0 = search enabled at 0x824C).
+        self._cpu.mem_write(SEARCH_SKIP_FLAG, struct.pack(">H", 0))
+
+        # Zero the entire piece table, then write one entry per piece.
+        self._cpu.mem_write(PIECE_TABLE_ADDR, b"\x00" * PIECE_ENTRY_SIZE * MAX_PIECES)
+        for idx, (sq, _color, _piece_type) in enumerate(pieces):
+            entry = _make_entry(sq)
             self._cpu.mem_write(PIECE_TABLE_ADDR + idx * PIECE_ENTRY_SIZE, entry)
+        self._piece_count = len(pieces)
 
         # Set piece counter to -1 (ai_phase0_init ready state)
         self._cpu.mem_write(PIECE_COUNTER_ADDR, struct.pack(">h", -1))
@@ -281,14 +314,21 @@ class Bridge:
     def read_best_move(self) -> MoveSpec | None:
         """Read the AI's chosen move from the ``ai_best_move`` buffer.
 
-        :return: :class:`~Code.Retro.Types.MoveSpec` if a move is present,
-            ``None`` if the buffer is all-zero (no move yet).
+        Entry format (confirmed from disassembly):
+          offset 0 (WORD): TO square   — destination
+          offset 2 (WORD): FROM square — source (piece's original position)
+
+        :return: :class:`~Code.Retro.Types.MoveSpec` if a valid move is present,
+            ``None`` if the buffer is all-zero or squares fail 0x88 validation.
         """
-        raw = self._cpu.mem_read(AI_BEST_MOVE_ADDR, 8)
-        from_sq, to_sq, flags, piece, legal = struct.unpack(">HHHBB", raw)
+        raw = bytes(self._cpu.mem_read(AI_BEST_MOVE_ADDR, 8))
+        to_sq   = struct.unpack(">H", raw[0:2])[0]
+        from_sq = struct.unpack(">H", raw[2:4])[0]
         if from_sq == 0 and to_sq == 0:
             return None
-        return MoveSpec(from_sq=from_sq, to_sq=to_sq, flags=flags, piece=piece, legal=legal)
+        if (from_sq & 0x88) or (to_sq & 0x88):
+            return None
+        return MoveSpec(from_sq=from_sq, to_sq=to_sq, flags=0, piece=0, legal=1)
 
     def clear_best_move(self) -> None:
         """Zero the ``ai_best_move`` buffer so a new move can be detected.
@@ -311,16 +351,19 @@ class Bridge:
         self._cpu.mem_write(PLAYER_TYPE_BASE + human * 2, struct.pack(">H", 1))
         self._cpu.mem_write(PLAYER_TYPE_BASE + color * 2, struct.pack(">H", 2))
 
-    def read_piece_entries(self) -> list[tuple[int, int, int]]:
-        """Read all non-zero piece entries from the piece table.
+    def read_piece_entries(self) -> list[tuple[int, int]]:
+        """Read piece entries written by the most recent :meth:`write_position` call.
 
-        :return: List of ``(sq, color, piece_type)`` for every non-zero entry.
+        :return: List of ``(to_sq, from_sq)`` for every piece written.
+            ``to_sq`` is 0 before the search has run.
         """
+        count = self._piece_count
+        if count == 0:
+            return []
+        raw = bytes(self._cpu.mem_read(PIECE_TABLE_ADDR, PIECE_ENTRY_SIZE * count))
         entries = []
-        raw = self._cpu.mem_read(PIECE_TABLE_ADDR, PIECE_ENTRY_SIZE * MAX_PIECES)
-        for i in range(MAX_PIECES):
+        for i in range(count):
             chunk = raw[i * PIECE_ENTRY_SIZE:(i + 1) * PIECE_ENTRY_SIZE]
-            if any(chunk):
-                sq, color, piece_type = _read_entry(chunk)
-                entries.append((sq, color, piece_type))
+            to_sq, from_sq = _read_entry(chunk)
+            entries.append((to_sq, from_sq))
         return entries

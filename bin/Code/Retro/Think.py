@@ -31,8 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from Code.Retro.Bridge import A4 as _A4_VALUE
-from Code.Retro.Bridge import AI_BEST_MOVE_ADDR, AI_OUTER_DRIVER_ADDR, Bridge
-from Code.Retro.Cpu import HOOK_CODE, Cpu
+from Code.Retro.Bridge import AI_INIT_ADDR, Bridge
+from Code.Retro.Cpu import HOOK_CODE, HOOK_MEM_INVALID, Cpu
 from Code.Retro.Errors import EmulatorUnavailableError, RomNotFoundError, ThinkError
 from Code.Retro.Types import Level, ThinkResult
 
@@ -53,8 +53,20 @@ _STACK_TOP: int = 0x1F0000
 # Must not collide with any mapped region.
 _SENTINEL: int = 0xFFFF0000
 
-# Safety cap: ~50 M instructions is far more than a 1-ply 1988 AI needs.
-_MAX_INSTRUCTIONS: int = 50_000_000
+# Safety cap: the AI runs ~88k write events at 1 ply; budget 2 billion instructions.
+_MAX_INSTRUCTIONS: int = 2_000_000_000
+
+# Amiga OS stubs that crash if executed — pop return address and return immediately.
+# Confirmed from recon: 0x8820 timer/event, 0x8D32/0x7CCE/0x857E pre-search inits,
+# 0x005A event pump, 0x015C/0x00E4/0x0138/0x17D2 other OS stubs.
+_BYPASS_NOOP: frozenset[int] = frozenset({
+    0x8820, 0x8D32, 0x7CCE, 0x857E, 0x005A, 0x015C, 0x00E4, 0x0138, 0x17D2,
+})
+
+# Time-check vector: set abort flag so iterative deepening stops after one pass.
+_TIME_CHECK_ADDR: int = 0x008A
+# [A4 - 0x35B4] = 0x4A4A — abort-search flag read by the iterative deepening loop.
+_ABORT_FLAG_ADDR: int = _A4_VALUE - 0x35B4  # 0x4A4A
 
 
 @dataclass
@@ -166,31 +178,55 @@ class ThinkSession:
         bridge.write_position(request.fen)
         bridge.set_computer_color(request.computer_color)
 
-        # Restore A4 (global data pointer) and reset the stack for each call.
-        # The AI may leave these in an arbitrary state after one run.
+        # Restore A4 and reset the stack before each call.
         cpu.reg_write("A4", _A4_VALUE)
         sp = _STACK_TOP - 4
-        # Push sentinel so a clean RTS stops emulation.
         cpu.mem_write(sp, struct.pack(">I", _SENTINEL))
         cpu.reg_write("A7", sp)
 
-        # Stop emulation at the game-loop exit point (0x01EA) once the best move
-        # has been written.  This address is the natural fall-through point where
-        # all AI phases converge before the game updates the display.
-        _GAME_LOOP_EXIT = 0x01EA
+        _mapped: set[int] = set()
 
-        def _stop_at_exit(_emu, address: int, _size: int, _user: object = None) -> None:
-            if address == _GAME_LOOP_EXIT:
-                raw = cpu.mem_read(AI_BEST_MOVE_ADDR, 8)
-                if any(raw):
-                    cpu.emu_stop()
+        def _code_hook(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            if addr == _TIME_CHECK_ADDR:
+                # Set abort flag so the iterative-deepening loop stops after one pass.
+                cpu.mem_write(_ABORT_FLAG_ADDR, struct.pack(">H", 1))
+                # Pop return address and return to caller.
+                try:
+                    a7 = cpu.reg_read("A7")
+                    ret = struct.unpack(">I", bytes(cpu.mem_read(a7, 4)))[0]
+                    cpu.reg_write("A7", a7 + 4)
+                    cpu.reg_write("PC", ret)
+                except Exception:
+                    pass
+                return
+            if addr in _BYPASS_NOOP:
+                try:
+                    a7 = cpu.reg_read("A7")
+                    ret = struct.unpack(">I", bytes(cpu.mem_read(a7, 4)))[0]
+                    cpu.reg_write("A7", a7 + 4)
+                    cpu.reg_write("PC", ret)
+                except Exception:
+                    pass
 
-        hook = cpu.hook_add(HOOK_CODE, _stop_at_exit)
-        logger.debug("starting emulation from 0x%X", AI_OUTER_DRIVER_ADDR)
+        def _mem_invalid(_emu: object, _acc: int, addr: int, _sz: int, _v: int, _u: object = None) -> bool:
+            page = addr & 0xFFFF0000
+            if page not in _mapped:
+                try:
+                    cpu.map_region(page, 0x10000)
+                    cpu.mem_write(page, bytes(0x10000))
+                    _mapped.add(page)
+                except Exception:
+                    pass
+            return True
+
+        hook_code = cpu.hook_add(HOOK_CODE, _code_hook)
+        hook_mem  = cpu.hook_add(HOOK_MEM_INVALID, _mem_invalid)
+        logger.debug("starting emulation from 0x%X", AI_INIT_ADDR)
         try:
-            cpu.emu_start(AI_OUTER_DRIVER_ADDR, until=_SENTINEL, count=_MAX_INSTRUCTIONS)
+            cpu.emu_start(AI_INIT_ADDR, until=_SENTINEL, count=_MAX_INSTRUCTIONS)
         finally:
-            cpu.hook_del(hook)
+            cpu.hook_del(hook_code)
+            cpu.hook_del(hook_mem)
 
         move = bridge.read_best_move()
         if move is None:

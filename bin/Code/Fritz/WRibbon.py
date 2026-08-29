@@ -197,6 +197,7 @@ class WRibbon(QtWidgets.QWidget):
         header = QtWidgets.QWidget(self)
         header.setObjectName("WRibbonHeader")
         header.setFixedHeight(_HEADER_H)
+        header.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         hbox = QtWidgets.QHBoxLayout(header)
         hbox.setContentsMargins(0, 0, 4, 0)
         hbox.setSpacing(0)
@@ -252,6 +253,7 @@ class WRibbon(QtWidgets.QWidget):
         """Build one ribbon page (stacked-widget child) for a tab."""
         page = QtWidgets.QWidget()
         page.setObjectName(f"WRibbonPage_{tab.get('id', '')}")
+        page.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         hbox = QtWidgets.QHBoxLayout(page)
         hbox.setContentsMargins(4, 2, 4, 2)
         hbox.setSpacing(4)

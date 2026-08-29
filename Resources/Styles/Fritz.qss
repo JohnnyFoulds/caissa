@@ -734,7 +734,7 @@ WFritzPlayerHeader
     background-color: #f0f4f8;
     qproperty-bgColor: #f0f4f8;
     qproperty-borderColor: #a0b4c8;
-    qproperty-rowHeight: 30;
+    qproperty-rowHeight: 38;
 }
 
 #WFritzPlayerHeaderSep
@@ -1018,8 +1018,8 @@ WFritzLCD
 qproperty-litColor: #00ee77;
 qproperty-dimColor: #104020;
 qproperty-boxHeight: 34;
-qproperty-boxWidth: 108;
-qproperty-segmentThickness: 4;
+qproperty-boxWidth: 150;
+qproperty-segmentThickness: 8;
 background-color: #000000;
 border-radius: 2px;
 }
@@ -1029,6 +1029,152 @@ border-radius: 2px;
 font-size: 8pt;
 color: #1a1a1a;
 padding: 2px 8px;
+}
+
+/* RIBBON ─────────────────────────────────────────────────────────────────────── */
+
+WRibbon
+{
+background-color: #dce6f0;
+border-bottom: 1px solid #a0b4c8;
+}
+
+#WRibbonHeader
+{
+background-color: #c8d8e8;
+border-bottom: 1px solid #a0b4c8;
+}
+
+#WRibbonTabBar
+{
+background: transparent;
+border: none;
+}
+
+#WRibbonTabBar::tab
+{
+background: transparent;
+color: #1a1a1a;
+padding: 5px 14px;
+border: none;
+min-width: 44px;
+font-size: 9pt;
+}
+
+#WRibbonTabBar::tab:selected
+{
+background-color: #dce6f0;
+color: #000000;
+border-top: 2px solid #0060b0;
+border-left: 1px solid #a0b4c8;
+border-right: 1px solid #a0b4c8;
+border-bottom: none;
+}
+
+#WRibbonTabBar::tab:hover:!selected
+{
+background-color: #e8f0f8;
+color: #000000;
+}
+
+#WRibbonRule
+{
+color: #a0b4c8;
+background-color: #a0b4c8;
+max-height: 1px;
+}
+
+#WRibbonPages
+{
+background-color: #dce6f0;
+}
+
+#WRibbonPages > QWidget
+{
+background-color: #dce6f0;
+}
+
+#WRibbonGroupCaption
+{
+font-size: 8pt;
+color: #5a6570;
+padding: 1px 4px;
+}
+
+#WRibbonGroupSep
+{
+color: #a0b4c8;
+background-color: #a0b4c8;
+max-width: 1px;
+margin: 6px 4px;
+}
+
+#WRibbonQAT QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+padding: 1px;
+}
+
+#WRibbonQAT QToolButton:hover
+{
+background-color: #b8ccdf;
+border-color: #8098b0;
+}
+
+#WRibbonPages QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 3px;
+color: #1a1a1a;
+font-size: 8pt;
+}
+
+#WRibbonPages QToolButton:hover
+{
+background-color: #b8ccdf;
+border-color: #8098b0;
+}
+
+#WRibbonPages QToolButton:pressed
+{
+background-color: #0060b0;
+border-color: #004080;
+color: #ffffff;
+}
+
+#WRibbonPages QToolButton:disabled
+{
+color: #909090;
+}
+
+#WRibbonPages QCheckBox
+{
+color: #1a1a1a;
+font-size: 8pt;
+spacing: 4px;
+}
+
+#WRibbonPages QCheckBox::indicator
+{
+width: 13px;
+height: 13px;
+border: 1px solid #8098b0;
+border-radius: 2px;
+background-color: #ffffff;
+}
+
+#WRibbonPages QCheckBox::indicator:checked
+{
+background-color: #0060b0;
+border-color: #0060b0;
+}
+
+#WRibbonPages QCheckBox::indicator:hover
+{
+border-color: #0060b0;
 }
 
 /* NAG BACKGROUND COLOURS (also reachable from Options -> Colours) ------------ */

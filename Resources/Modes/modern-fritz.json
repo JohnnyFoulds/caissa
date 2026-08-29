@@ -1,6 +1,6 @@
 {
   "name": "Modern Fritz",
-  "description": "Fritz-inspired skin: home screen, multi-PV analysis, eval graph, direct game start.",
+  "description": "Fritz-inspired skin: boots into Infinite Analysis, multi-PV engine lines, eval graph, pane layout.",
   "icon": "Kibitzers",
 
   "menu_keys": null,

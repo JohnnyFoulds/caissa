@@ -30,11 +30,11 @@ _log = logging.getLogger(__name__)
 from Code.Fritz.Types import PaneSpec  # noqa: E402 — after logging setup
 
 _PANE_SPECS = [
-    PaneSpec("player_header",  "Players",         60,  40),
-    PaneSpec("analysis_table", "Engine analysis", 280, 60),
-    PaneSpec("eval_graph",     "Eval profile",     80, 40),
-    PaneSpec("pgn",            "Notation",        220, 60),
-    PaneSpec("eval_bar",       "Eval bar",         30, 30),
+    PaneSpec("player_header",  "Players",          55,  40),
+    PaneSpec("analysis_table", "Engine analysis",  110, 60),
+    PaneSpec("eval_graph",     "Eval profile",      50, 40),
+    PaneSpec("pgn",            "Notation",         280, 80),
+    PaneSpec("eval_bar",       "Eval bar",          30, 30),
 ]
 
 # NAG colours come from dic_colors via ThemeGateway — no hardcoded hex here.
@@ -536,6 +536,7 @@ def _build_fritz_right_col(mw) -> None:
 
     right_col.setSizes([_PANE_SPECS[0].default_px, _PANE_SPECS[1].default_px,
                         _PANE_SPECS[2].default_px, _PANE_SPECS[3].default_px])
+    right_col.setStretchFactor(3, 1)   # Notation pane takes surplus on resize
     right_col.show()
 
     # ── 6. Wire pane API ──────────────────────────────────────────────────────

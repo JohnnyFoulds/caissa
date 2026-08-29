@@ -11,6 +11,12 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
+### Changed
+- **Fritz ribbon height**: Increased from 113 px to 142 px to match Fritz 18 proportions.
+  QAT strip (quick-access buttons) is now a separate 29 px row above the 21 px tab bar;
+  content band grows to 91 px. Adds `qatRowHeight` qproperty to `WRibbon`; all three Fritz
+  QSS files (`fritz-widgets.qss`, `Fritz.qss`, `Modern Fritz.qss`) updated accordingly.
+
 ### Added
 - **Retro Engine — Phase A ground-truth attempt (A5 documented negative result)**:
   `docs/retro/reverse-engineering.md` now records two failed boot attempts: `vamos` crashes

@@ -26,7 +26,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 _logger = logging.getLogger(__name__)
 
 # Default pixel metrics — overridable via qproperty- from the active .qss.
-_TAB_ROW_H = 24     # Tab row (houses both tab bar and QAT buttons)
+_QAT_ROW_H  = 29    # QAT row (top strip, houses quick-access buttons)
+_TAB_ROW_H  = 21    # Tab bar row (below QAT, houses named tabs only)
 
 
 class _FritzPaneCheckBox(QtWidgets.QCheckBox):
@@ -305,13 +306,15 @@ class WRibbon(QtWidgets.QWidget):
     (and ``Modern Fritz.qss``) fully control pixel geometry without any Python
     changes:
 
-    - ``qproperty-tabRowHeight: 26;``       — tab row height (contains tab bar + QAT)
+    - ``qproperty-qatRowHeight: 29;``       — QAT strip height (top row, quick-access buttons)
+    - ``qproperty-tabRowHeight: 21;``       — tab bar row height (named tabs only)
     - ``qproperty-contentHeight: 91;``      — content band height in pixels
     - ``qproperty-largeBtnHeight: 66;``     — large button total height
     - ``qproperty-largeIconSize: 32;``      — large button icon edge length
     """
 
     # ── E1 backing store ──────────────────────────────────────────────────────
+    _qat_row_height: int = _QAT_ROW_H
     _tab_row_height: int = _TAB_ROW_H
     _content_height: int = _CONTENT_H
     _large_btn_height: int = _LARGE_BTN_H
@@ -364,6 +367,17 @@ class WRibbon(QtWidgets.QWidget):
 
     # ── E1 qproperty- setters / getters ──────────────────────────────────────
 
+    def _get_qat_row_height(self) -> int:
+        return self._qat_row_height
+
+    def _set_qat_row_height(self, v: int) -> None:
+        self._qat_row_height = v
+        if hasattr(self, "_qat_row"):
+            self._qat_row.setFixedHeight(v)
+        self._apply_metrics()
+
+    qatRowHeight = QtCore.Property(int, _get_qat_row_height, _set_qat_row_height)
+
     def _get_tab_row_height(self) -> int:
         return self._tab_row_height
 
@@ -407,7 +421,7 @@ class WRibbon(QtWidgets.QWidget):
 
     def _apply_metrics(self) -> None:
         """Recompute total height from current band metrics and resize."""
-        total = self._tab_row_height + _RULE_H + self._content_height
+        total = self._qat_row_height + self._tab_row_height + _RULE_H + self._content_height
         self.setFixedHeight(total)
 
     def _rebuild_large_buttons(self) -> None:
@@ -620,13 +634,25 @@ class WRibbon(QtWidgets.QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # ── Tab row — tab bar on the left, QAT buttons on the right ──────────
+        # ── QAT row (top strip) — quick-access buttons right-aligned ─────────
+        self._qat_row = QtWidgets.QWidget(self)
+        self._qat_row.setObjectName("WRibbonQATRow")
+        self._qat_row.setFixedHeight(self._qat_row_height)
+        self._qat_row.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        qat_hbox = QtWidgets.QHBoxLayout(self._qat_row)
+        qat_hbox.setContentsMargins(0, 0, 4, 0)
+        qat_hbox.setSpacing(0)
+        qat_hbox.addStretch(1)
+        self._build_qat_into(qat_hbox, self._qat_row)
+        root.addWidget(self._qat_row)
+
+        # ── Tab row — named tabs only ──────────────────────────────────────────
         self._tab_row = QtWidgets.QWidget(self)
         self._tab_row.setObjectName("WRibbonTabRow")
         self._tab_row.setFixedHeight(self._tab_row_height)
         self._tab_row.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         tab_hbox = QtWidgets.QHBoxLayout(self._tab_row)
-        tab_hbox.setContentsMargins(0, 0, 4, 0)
+        tab_hbox.setContentsMargins(0, 0, 0, 0)
         tab_hbox.setSpacing(0)
 
         self._tab_bar = _FlatTabBar(self._tab_row)
@@ -638,11 +664,6 @@ class WRibbon(QtWidgets.QWidget):
             self._tab_bar.addTab(tab.get("label", ""))
         self._tab_bar.currentChanged.connect(self._on_tab_changed)
         tab_hbox.addWidget(self._tab_bar)
-        tab_hbox.addStretch(1)
-
-        # QAT — icon-only buttons, right-aligned in the tab row
-        self._qat_row = self._tab_row   # alias for property setter compatibility
-        self._build_qat_into(tab_hbox, self._tab_row)
         root.addWidget(self._tab_row)
 
         # ── Horizontal rule ───────────────────────────────────────────────────

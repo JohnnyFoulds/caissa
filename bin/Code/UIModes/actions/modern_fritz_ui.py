@@ -228,6 +228,12 @@ def _build_notation_widget(mw) -> QtWidgets.QWidget:
         _pgn.setVisible(is_score)
 
     tab_bar.currentChanged.connect(_on_tab_change)
+    # Force initial state — currentChanged does not fire for the default tab 0.
+    _on_tab_change(tab_bar.currentIndex())
+
+    # Store refs so on_mode_enter can re-apply after ManagerSolo re-shows pgn.
+    mw._fritz_notation_tab_bar = tab_bar
+    mw._fritz_notation_on_tab_change = _on_tab_change
 
     return container
 
@@ -390,10 +396,18 @@ def on_mode_enter(procesador):
     QtCore.QTimer.singleShot(150, lambda: _reapply_fritz_right_col_sizes(mw))
 
     # 5c. ManagerSolo.active_game(True) calls pgn.setVisible(True), re-showing the
-    #     pgn table.  Re-hide it because the Notation tab (flowing text) is default.
-    mw.base.pgn.hide()
-    QtCore.QTimer.singleShot(0, lambda: mw.base.pgn.hide()
-                             if getattr(mw, "_fritz_right_col", None) is not None else None)
+    #     pgn table.  Re-apply the current notation tab's visibility state to undo it.
+    def _reapply_notation_visibility():
+        if getattr(mw, "_fritz_right_col", None) is None:
+            return
+        fn = getattr(mw, "_fritz_notation_on_tab_change", None)
+        tb = getattr(mw, "_fritz_notation_tab_bar", None)
+        if fn and tb:
+            fn(tb.currentIndex())
+
+    _reapply_notation_visibility()
+    QtCore.QTimer.singleShot(0,   _reapply_notation_visibility)
+    QtCore.QTimer.singleShot(200, _reapply_notation_visibility)
 
     # 6. Register ribbon dropdowns for has_dropdown buttons.
     _register_ribbon_dropdowns(mw, procesador)
@@ -944,7 +958,8 @@ def on_mode_exit(procesador):
 
     # Clean up pane-wrapper attrs
     for _attr in ("_fritz_panes", "_fritz_pane_registry", "_fritz_pane_sizes",
-                  "_fritz_notation_flowing", "_fritz_rc_wrapper"):
+                  "_fritz_notation_flowing", "_fritz_notation_tab_bar",
+                  "_fritz_notation_on_tab_change", "_fritz_rc_wrapper"):
         try:
             delattr(mw, _attr)
         except AttributeError:

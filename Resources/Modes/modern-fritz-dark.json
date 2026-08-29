@@ -21,7 +21,12 @@
     "TB_LEVEL", "TB_SETTINGS", "TB_ENGINES"
   ],
 
-  "toolbar_inject": ["caissa:fritz_level", "caissa:switch_mode"],
+  "toolbar_inject": [
+    "caissa:fritz_level", "caissa:switch_mode", "caissa:switch_theme",
+    "caissa:flip_board", "caissa:piece_style", "caissa:sq_color",
+    "caissa:kibitzer", "caissa:std_layout", "caissa:fullscreen",
+    "caissa:select_engine"
+  ],
 
   "config_section": null,
   "style": "Modern Fritz",

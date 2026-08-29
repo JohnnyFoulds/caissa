@@ -72,6 +72,9 @@ def _resolve_toolbar_set(mode: dict) -> frozenset | None:
 
 
 def allows_toolbar(key) -> bool:
+    # Extension keys (caissa: prefix) are never filtered — they are not TB_* int keys.
+    if isinstance(key, str) and key.startswith("caissa:"):
+        return True
     if key in NEVER_FILTER_TOOLBAR:
         return True
     mode = active_mode()

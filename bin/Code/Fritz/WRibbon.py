@@ -320,6 +320,9 @@ class WRibbon(QtWidgets.QWidget):
     _large_btn_height: int = _LARGE_BTN_H
     _large_icon_size: int = _LARGE_ICON_SZ
 
+    # int TB_* → "TB_*" string, populated lazily on first instantiation
+    _int_to_tb_name: dict = {}
+
     def __init__(
         self,
         spec: dict[str, Any],
@@ -339,6 +342,12 @@ class WRibbon(QtWidgets.QWidget):
         self._toggle_get_fn: Any | None = None   # callable(key) → bool | None
         self._dropdowns: dict[str, Any] = {}     # key → WDropdownPanel
         self._display_api: dict[str, Any] = {}   # key → set_fn(bool)
+        # int TB_* → "TB_*" name map, used in sync() to expand li_acciones
+        if not WRibbon._int_to_tb_name:
+            from Code.Base import Constantes
+            WRibbon._int_to_tb_name = {
+                v: k for k, v in vars(Constantes).items() if k.startswith("TB_")
+            }
 
         self._build_ui()
         self._apply_metrics()
@@ -464,7 +473,15 @@ class WRibbon(QtWidgets.QWidget):
         """
         from Code.Fritz import RibbonModel
 
-        slot_state = RibbonModel.state(self._spec, li_acciones)
+        # Ribbon JSON uses string keys ("TB_RESIGN"); li_acciones carries integer
+        # TB_* values.  Expand the active set so both forms match.
+        normalised = list(li_acciones)
+        for k in li_acciones:
+            name = self._int_to_tb_name.get(k) if isinstance(k, int) else None
+            if name:
+                normalised.append(name)
+
+        slot_state = RibbonModel.state(self._spec, normalised)
         for key, (visible, enabled, _tab_id) in slot_state.items():
             action = self._dic_toolbar.get(key)
             if action is None:
@@ -474,7 +491,7 @@ class WRibbon(QtWidgets.QWidget):
 
         # auto-switch tab unless user has pinned one
         if self._user_tab is None:
-            tab_id = RibbonModel.best_tab(self._spec, li_acciones)
+            tab_id = RibbonModel.best_tab(self._spec, normalised)
             self._set_current_tab(tab_id)
 
         # sync panes checkboxes

@@ -93,6 +93,39 @@ Enforced by `tests/unit/<feature>/test_completeness.py` using transitive AST imp
 
 ---
 
+## Non-Negotiable: Real Execution Before Done
+
+**A feature is not done until it has been run for real and the output verified.**
+
+Mock/fake tests (FakeCpu, FakeDriver, StringIO, synthetic fixtures) prove internal code
+consistency only. They do not prove the feature works. Before any feature with a
+real-execution tier is declared complete:
+
+1. **Run it** — actually execute the feature against real inputs (real binary, real process,
+   real hardware).
+2. **Observe the output** — a real move, a real response, a real file written. Not
+   "it should work" or "the unit tests pass."
+3. **Verify correctness** — the output matches expectations, not just "non-null."
+
+For any opt-in test tier (`retro_rom`, `rpa_ui`, `rpa_cv`, etc.):
+- Real assertions only — `pytest.skip()` is for environment capability checks,
+  never a permanent placeholder for unwritten tests.
+- The tier must actually run and pass before the feature closes.
+- Evidence of the run goes in the PR body.
+
+This applies to work done by fork agents too: agents must execute the end-to-end path
+and report observed output — green unit-test-with-fakes is not sufficient evidence.
+
+**Retro Engine smoke test** (run this before calling it done):
+```bash
+printf 'uci\nisready\nposition startpos\ngo\nquit\n' | tools/caissa-retro
+# Must produce:  bestmove <real-move>  (NOT bestmove 0000)
+```
+
+Full rule: `docs/process/sdd-workflow.md` §Test Management, Gate D, Gate E.
+
+---
+
 ## Standards
 
 Full standards documents are in `docs/standards/`. Summary of key rules:

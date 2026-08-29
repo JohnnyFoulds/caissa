@@ -6,12 +6,13 @@ emulation. It plays identically to the 1988 original and responds in millisecond
 
 ## Quick links
 
-- [Legal policy](legal.md) — what may be committed; the ROM model
-- [ROM setup](rom-setup.md) — how to point the shim at your copy of the binary
+- [Architecture](architecture.md) — full technical deep-dive: emulation, memory layout, AI internals
+- [Reverse engineering notes](reverse-engineering.md) — recon findings: addresses, structs, traps
+- [ROM setup](rom-setup.md) — bundled binaries; using your own copy
 - [UCI options](uci-options.md) — `EmuLevel`, `EmuClockRate`, `EmuStrictOriginal`
-- [Reverse engineering notes](reverse-engineering.md) — how the think function was found
 - [Testing guide](testing.md) — four test tiers; running without a ROM
 - [Troubleshooting](troubleshooting.md) — common errors and fixes
+- [Legal policy](legal.md) — what may be committed; the ROM model
 
 ## How it works
 
@@ -33,4 +34,7 @@ a multi-minute think into a sub-second one.
 
 ## Status
 
-See [feature_steps.md](../features/retro-engine/feature_steps.md) for current phase.
+Both binaries are committed to `Resources/Retro/`. The Amiga engine is being wired
+and tested end-to-end. The DOS engine awaits the x86 recon phase.
+
+Feature archive: `docs/features/_archive/retro-engine/`.

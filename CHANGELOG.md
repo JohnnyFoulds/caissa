@@ -12,6 +12,31 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase A ground-truth attempt (A5 documented negative result)**:
+  `docs/retro/reverse-engineering.md` now records two failed boot attempts: `vamos` crashes
+  at PC=0xFFFF807C (exec library stubs not mapped); FS-UAE + AROS quits on
+  `my_resolvesoftlink` stub before the startup-sequence runs.  Path forward documented:
+  licensed Kickstart 1.3 (Amiga Forever), AROS+Workbench HDF, or DOSBox-X+DOS CHESS.EXE.
+- **Retro Engine — real-execution reset (Phase A prep)**: `docs/retro/architecture.md`
+  (494-line technical deep-dive; §Layout Paradox flags unresolved BSS-clear contradiction);
+  `manifest.json` corrected hunk_code_size 72988 (was 84872, confirmed by hunktool); Level
+  enum expanded L1-L9 (was NOVICE/EASY/INTERMEDIATE/HARD/EXPERT, 5 levels); `caissa-retro
+  identify <path>` subcommand; `tools/caissa-retro` made executable; B1a/B3 recon docs
+  (`reverse-engineering.md`, `rom-setup.md`, `uci-options.md`); 67 Phase 1-B recon scripts
+  in `tools/recon/`.
+- **Engineering standards**: CLAUDE.md and `sdd-workflow.md` add explicit "Mock tests ≠ real
+  execution" rule; Gate D and Gate E require evidence of a real run before any feature with
+  an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
+
+### Fixed
+- **Retro — Traps.py buffer overflow**: `AmigaTraps.install()` was writing
+  `b"\x4e\x75" * size` (2×size bytes) into a size-byte region; corrected to `*(size//2)`.
+- **Retro — Rom.py silent truncation**: hunk parser now emits one clear warning on the
+  Dragon-crack non-standard bytes and stops (was silently dropping them with no count on
+  how many times it warned); module-level logger added.
+- **Retro — Uci.py**: EmuLevel max corrected 4→9; `default_rom_path()` fallback wired so
+  `go` works without explicit `setoption`; `Level.NOVICE` reference removed.
+
 - **Fritz Polish — Phase 9 (Production Readiness)**: Gate E complete; 94.22 % branch
   coverage for `Code.Fritz` per `fritz.coveragerc`; `make docs` clean (zero Sphinx
   warnings); `docs/features/fritz-polish/production_readiness.md` with 8-section

@@ -17,10 +17,13 @@ encode memory-type flags (CHIP/FAST) and are masked off before comparison.
 
 from __future__ import annotations
 
+import logging
 import struct
 
 from Code.Retro.Errors import PackedBinaryError, RomError
 from Code.Retro.Types import MemRegion
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["detect_packer", "parse_amiga_hunk"]
 
@@ -143,8 +146,11 @@ def parse_amiga_hunk(data: bytes) -> list[MemRegion]:
     # ── Hunk data blocks ────────────────────────────────────────────────────
     regions: list[MemRegion] = []
     load_address = 0
+    _stop = False  # set to True when non-standard data is detected
 
     for hunk_idx in range(n_hunks):
+        if _stop:
+            break
         hunk_done = False
         while not hunk_done:
             if pos + 4 > len(data):
@@ -202,10 +208,21 @@ def parse_amiga_hunk(data: bytes) -> list[MemRegion]:
                 pos += (size_longs & _MEMF_MASK) * 4
 
             else:
-                raise RomError(
-                    f"unexpected hunk type 0x{hunk_type:X} at file offset {pos - 4} "
-                    f"(hunk index {hunk_idx})"
+                # The Dragon Inc crack of BattleChess.amiga appends non-standard code
+                # after the final HUNK_END (0x6600014C = bne.w, not a hunk type).
+                # hunktool confirms only hunk 0 (HUNK_CODE, 72988 bytes) is valid.
+                # Stop parsing here — the AI code is fully contained in hunk 0.
+                trailing = len(data) - (pos - 4)
+                logger.warning(
+                    "non-standard hunk type 0x%X (raw 0x%X) at file offset %d "
+                    "(hunk index %d) — stopping; %d trailing bytes are "
+                    "Dragon-crack data, not standard HUNK blocks",
+                    hunk_type, raw_type, pos - 4, hunk_idx, trailing,
                 )
+                # Stop here; remaining declared hunks in HUNK_HEADER are fictitious
+                # (the Dragon crack populated the header but not the data).
+                hunk_done = True
+                _stop = True
 
     if not regions:
         raise RomError("no loadable CODE, DATA, or BSS hunks found in the binary")

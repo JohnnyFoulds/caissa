@@ -88,6 +88,24 @@ inherits all prior work.
 - Bug fixes add `@pytest.mark.regression` in the same commit as the fix.
 - Phase 9 asserts that every test name in `feature_steps.md` exists in the suite.
 
+### Mock tests vs real-execution tests — the hard line
+
+Mock/fake tests (FakeCpu, FakeDriver, StringIO, synthetic fixtures) prove internal
+consistency of the code structure. **They do not prove the feature works.**
+
+Any feature that has an opt-in real-execution tier (`retro_rom`, `rpa_ui`, `rpa_cv`,
+or equivalent) must satisfy all three before the feature is declared done:
+
+1. **Implemented** — the tier has real assertions, not `pytest.skip()` as permanent code.
+   `pytest.skip()` is for environment capability checks (e.g. "skip if binary not present"),
+   never as a permanent placeholder for unwritten tests.
+2. **Executed** — the tier has been run at least once and produced output.
+3. **Verified** — the output has been inspected and confirmed correct.
+
+"We'll add the real test later" is not acceptable. A phase that cannot satisfy these
+three items is not done — it is incomplete infrastructure waiting for the thing it was
+meant to test.
+
 ---
 
 ## Gate Table
@@ -130,6 +148,9 @@ Gates are tickable checklists. Every item must be checked before the gate passes
 - [ ] No other tests broken
 - [ ] Living docs updated with any corrections
 - [ ] Commit pushed; PR open (or on the queue)
+- [ ] **If this session touches real-execution code** (emulators, external processes,
+  hardware, binaries): the code has been actually executed with real inputs and the
+  output observed — not just inferred from unit tests with fakes.
 
 ### Gate E — Production Readiness
 *Checked after the final phase, before the final PR.*
@@ -143,6 +164,9 @@ Gates are tickable checklists. Every item must be checked before the gate passes
 - [ ] `quickstart.md` executed verbatim as its own acceptance test
 - [ ] No regression in existing test suites (`test_remote_control.py`, `test_classical_invariant.py`)
 - [ ] Classical Invariant confirmed by `workflows/classical_invariant.py` run
+- [ ] **All opt-in real-execution test tiers** (`retro_rom`, `rpa_ui`, `rpa_cv`, etc.)
+  have been run and pass — not skipped, not stubbed. Evidence of the run (output or
+  log excerpt) is included in the PR body or linked from it.
 
 ### Gate F — PR Sign-Off
 *Checked per PR.*

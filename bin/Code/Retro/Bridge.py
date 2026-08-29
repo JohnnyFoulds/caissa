@@ -51,7 +51,8 @@ PLAYER_TYPE_BASE: int = A4 - 0x782A    # 0x07D4
 PIECE_ENTRY_SIZE: int = 8
 MAX_PIECES: int = 32   # 16 per side
 
-AI_INIT_ADDR: int = 0x8230  # ai_phase0_init
+AI_INIT_ADDR: int = 0x8230        # ai_phase0_init (kept for backward compat)
+AI_OUTER_DRIVER_ADDR: int = 0x81DC  # ai_outer_driver — entry for a complete think run
 
 # ---------------------------------------------------------------------------
 # FEN piece-character → (color, piece_type) mapping

@@ -45,7 +45,7 @@ def _cpu_that_plays_e2e4() -> FakeCpu:
 def test_think_session_with_scripted_cpu_returns_move():
     """ThinkSession with FakeCpu scripted to write e2e4 must return ThinkResult."""
     session = ThinkSession(cpu=_cpu_that_plays_e2e4())
-    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
     assert result.move is not None
     assert result.move.to_uci() == "e2e4"
 
@@ -53,22 +53,22 @@ def test_think_session_with_scripted_cpu_returns_move():
 def test_think_session_returns_correct_level():
     """ThinkResult.level must reflect the requested level."""
     session = ThinkSession(cpu=_cpu_that_plays_e2e4())
-    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
-    assert result.level == Level.NOVICE
+    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
+    assert result.level == Level.L1
 
 
 def test_think_session_has_move_true():
     """ThinkResult.has_move must be True when a move is returned."""
     session = ThinkSession(cpu=_cpu_that_plays_e2e4())
-    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
     assert result.has_move is True
 
 
 def test_think_session_deterministic_across_two_calls():
     """Two identical think calls on the same session must return identical moves."""
     session = ThinkSession(cpu=_cpu_that_plays_e2e4())
-    r1 = session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
-    r2 = session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+    r1 = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
+    r2 = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
     assert r1.move == r2.move
     assert r1.move.to_uci() == r2.move.to_uci()
 
@@ -86,7 +86,7 @@ def test_think_session_clears_best_move_before_run():
 
     cpu.set_emu_callback(_callback)
     session = ThinkSession(cpu=cpu)
-    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
     # Even if we get e2e4 here, the important thing is clear_best_move was called
     # (the Bridge tests cover that; here we just verify think() succeeded)
     assert result.move is not None
@@ -97,7 +97,7 @@ def test_think_session_no_move_raises_think_error():
     cpu = FakeCpu()  # no callback → AI_BEST_MOVE_ADDR stays zeroed
     session = ThinkSession(cpu=cpu)
     with pytest.raises(ThinkError):
-        session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+        session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ def test_think_session_without_rom_raises_rom_not_found_error(tmp_path):
     missing = tmp_path / "nonexistent_rom.bin"
     session = ThinkSession(rom_path=missing)
     with pytest.raises(RomNotFoundError) as exc_info:
-        session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+        session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
     assert str(missing) in str(exc_info.value)
 
 
@@ -118,7 +118,7 @@ def test_rom_not_found_error_has_path_attribute(tmp_path):
     missing = tmp_path / "battle_chess.bin"
     session = ThinkSession(rom_path=missing)
     with pytest.raises(RomNotFoundError) as exc_info:
-        session.think(ThinkRequest(fen=_STARTPOS, level=Level.NOVICE))
+        session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
     assert exc_info.value.path == str(missing)
 
 

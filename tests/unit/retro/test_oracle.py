@@ -62,7 +62,7 @@ def test_corpus_entry_fields():
     entries = load_corpus(_CORPUS_FIXTURES / "startpos_level1.jsonl")
     e = entries[0]
     assert e.fen == _STARTPOS
-    assert e.level == Level.NOVICE
+    assert e.level == Level.L1
     assert len(e.expected_uci) == 4  # e.g. "e2e4"
 
 
@@ -95,7 +95,7 @@ def test_oracle_load_missing_key_raises(tmp_path):
 def test_oracle_verifies_entry_against_scripted_cpu():
     """verify_corpus_entry must return True when the session returns the expected move."""
     oracle = Oracle()
-    entry = CorpusEntry(fen=_STARTPOS, level=Level.NOVICE, expected_uci="e2e4")
+    entry = CorpusEntry(fen=_STARTPOS, level=Level.L1, expected_uci="e2e4")
     session = _session_returns(_E2E4_RAW)
     assert oracle.verify_corpus_entry(entry, session) is True
 
@@ -103,7 +103,7 @@ def test_oracle_verifies_entry_against_scripted_cpu():
 def test_oracle_detects_wrong_move():
     """verify_corpus_entry must return False when the session returns a different move."""
     oracle = Oracle()
-    entry = CorpusEntry(fen=_STARTPOS, level=Level.NOVICE, expected_uci="e2e4")
+    entry = CorpusEntry(fen=_STARTPOS, level=Level.L1, expected_uci="e2e4")
     session = _session_returns(_D2D4_RAW)  # returns d2d4, not e2e4
     assert oracle.verify_corpus_entry(entry, session) is False
 
@@ -111,7 +111,7 @@ def test_oracle_detects_wrong_move():
 def test_oracle_verify_no_move_returns_false():
     """verify_corpus_entry must return False when think() raises ThinkError."""
     oracle = Oracle()
-    entry = CorpusEntry(fen=_STARTPOS, level=Level.NOVICE, expected_uci="e2e4")
+    entry = CorpusEntry(fen=_STARTPOS, level=Level.L1, expected_uci="e2e4")
     cpu = FakeCpu()  # no callback → ThinkError
     session = ThinkSession(cpu=cpu)
     assert oracle.verify_corpus_entry(entry, session) is False

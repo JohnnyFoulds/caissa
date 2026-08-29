@@ -40,7 +40,7 @@ _DEFAULT_OPTIONS: dict[str, object] = {
 }
 
 _OPTION_LINES = [
-    "option name EmuLevel type spin default 1 min 1 max 4",
+    "option name EmuLevel type spin default 1 min 1 max 9",
     "option name EmuClockRate type spin default 50 min 1 max 200",
     "option name EmuStrictOriginal type check default true",
     "option name EmuRomPath type string default <empty>",
@@ -150,6 +150,9 @@ class UciSession:
     def _handle_go(self, _rest: str) -> None:
         rom_path_str = str(self._options.get("EmuRomPath", "")).strip()
         if not rom_path_str:
+            from Code.Retro.Manifest import default_rom_path
+            rom_path_str = default_rom_path() or ""
+        if not rom_path_str:
             self._emit("info string error: no ROM configured; set EmuRomPath via setoption")
             self._emit("bestmove 0000")
             return
@@ -161,7 +164,7 @@ class UciSession:
         try:
             level = Level(int(self._options.get("EmuLevel", 1)))
         except (ValueError, KeyError):
-            level = Level.NOVICE
+            level = Level.L1
 
         try:
             result = self._session.think(ThinkRequest(fen=self._fen, level=level))
@@ -206,10 +209,75 @@ class UciSession:
                 logger.debug("ignored unknown command: %r", cmd)
 
 
+def _identify(path_str: str) -> None:
+    """Print identification information for an Amiga HUNK binary.
+
+    Outputs: sha256, file size, packer detection (if any), and the hunk table
+    parsed from the binary header.  Also checks the manifest for a matching entry.
+
+    :param path_str: Path to the binary to identify.
+    """
+    import hashlib
+
+    from Code.Retro.Rom import detect_packer, parse_amiga_hunk
+
+    path = Path(path_str)
+    if not path.exists():
+        print(f"error: file not found: {path}", file=sys.stderr)
+        sys.exit(1)
+
+    data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    print(f"path:    {path}")
+    print(f"size:    {len(data)} bytes")
+    print(f"sha256:  {digest}")
+
+    packer = detect_packer(data)
+    if packer:
+        print(f"packer:  {packer} — binary must be unpacked before use")
+        return
+
+    try:
+        regions = parse_amiga_hunk(data)
+        print(f"hunks:   {len(regions)} loadable region(s)")
+        for i, r in enumerate(regions):
+            print(f"  hunk {i}: {r.label:10s}  load_addr=0x{r.load_address:06X}"
+                  f"  size={r.size} bytes  file_offset={r.offset}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"parse error: {exc}")
+
+    # Manifest lookup
+    try:
+        from Code.Retro.Manifest import load as load_manifest
+        _MANIFEST = Path(__file__).parents[3] / "Resources" / "Retro" / "manifest.json"
+        entries = load_manifest(_MANIFEST)
+        match = next((e for e in entries if e.get("sha256") == digest), None)
+        if match:
+            print(f"manifest: MATCH — {match.get('label', '(no label)')}")
+            print(f"          supported={match.get('supported')}")
+        else:
+            print("manifest: NOT IN MANIFEST — unknown binary")
+    except Exception as exc:  # noqa: BLE001
+        print(f"manifest: (lookup failed: {exc})")
+
+
 def main(inp: IO[str] | None = None, out: IO[str] | None = None) -> None:
     """Entry point for the ``caissa-retro`` tool.
 
-    :param inp: Input stream override (for testing).
-    :param out: Output stream override (for testing).
+    Supports an optional sub-command::
+
+        tools/caissa-retro identify /path/to/binary
+
+    Without a sub-command, starts a UCI session on stdin/stdout.
+
+    :param inp: Input stream override (for testing, UCI mode only).
+    :param out: Output stream override (for testing, UCI mode only).
     """
+    if len(sys.argv) >= 2 and sys.argv[1] == "identify":
+        if len(sys.argv) < 3:
+            print("usage: caissa-retro identify <path>", file=sys.stderr)
+            sys.exit(1)
+        _identify(sys.argv[2])
+        return
+
     UciSession(inp=inp, out=out).run()

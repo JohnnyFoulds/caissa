@@ -1,78 +1,82 @@
 # ROM Setup
 
-The Retro Engine does not ship the original binary. You must supply your own copy.
+Both the Amiga and DOS binaries are committed to the repository at
+`Resources/Retro/`. The engine finds them automatically — no configuration
+is needed for standard use.
 
 ---
 
-## Getting the binary
+## Bundled files
 
-You need the **Amiga version** of Battle Chess (1988) — the true original. The binary
-is the single `BattleChess` executable file from the Amiga disk.
+| File | Type | SHA256 (first 16 chars) |
+|---|---|---|
+| `Resources/Retro/BattleChess.amiga` | Amiga 68000 executable (Dragon Inc crack, 1988) | `d4fc6137d7addf97` |
+| `Resources/Retro/BattleChess.dos` | DOS x86 executable (1.2 MB floppy, 1988-12-10) | `c32d4f6bc732b67e` |
+| `Resources/Retro/ChessStuff` | Amiga game data (animations + opening book) | `3917b15831cc6198` |
 
-For the DOS version (Phase 9, secondary target): the DOS release ships inside an
-installer. See [reverse-engineering.md](reverse-engineering.md) for unpacking notes.
+`Code.Retro.Manifest.default_rom_path()` resolves the Amiga binary automatically.
+The engine uses it without any environment variable or GUI setting.
 
----
+### ChessStuff — the data companion
 
-## Verifying your copy
+`ChessStuff` is the Amiga game's data file, loaded at startup via AmigaDOS
+`Open("ChessStuff", ...)`. It contains two things:
 
-```bash
-tools/caissa-retro identify /path/to/BattleChess
-```
+1. **Animation data** — all piece-capture battle animations (the majority of the 706 KB file).
+2. **Opening book** — the built-in opening theory library referenced in the manual.
 
-This prints the sha256, size, and hunk layout, and tells you whether the file matches
-a known-good entry in `Resources/Retro/manifest.json`.
-
----
-
-## Pointing the shim at your binary
-
-**Option 1 — environment variable (recommended):**
-
-```bash
-export CAISSA_RETRO_ROM=/path/to/BattleChess
-tools/caissa-retro  # picks it up automatically
-```
-
-**Option 2 — UCI option:**
-
-In the chess GUI, set the `EmuRomPath` option to the full path of your binary.
-
-**Option 3 — default search path:**
-
-The shim also searches `UserData/Retro/Roms/BattleChess` (relative to the Caissa
-data directory). Copy your binary there and no configuration is needed.
+The Dragon Inc crack (our `BattleChess.amiga`) stripped this file from the floppy;
+the bundled copy comes from the WHDLoad v1.1 install (2006, verified against the
+retail disk content). The opening book data is embedded somewhere within
+`ChessStuff` at an offset not yet identified by recon (tracked in
+`docs/retro/reverse-engineering.md`).
 
 ---
 
-## If your binary is not in the manifest
+## Using a different copy
+
+If you want to use your own copy of the binary (e.g., ripped from a Steam/GOG install):
+
+**Option 1 — environment variable:**
 
 ```bash
-tools/caissa-retro identify /path/to/BattleChess
+export CAISSA_RETRO_ROM=/path/to/your/BattleChess
+tools/caissa-retro
 ```
 
-If the file is a real Battle Chess binary but from a different release or region, open
-an issue with the sha256 output. Do not attach the binary itself.
+**Option 2 — UCI setoption:**
 
-If you want to run an unverified binary during development:
+```
+setoption name EmuRomPath value /path/to/your/BattleChess
+```
+
+The engine verifies the SHA256 of whatever binary you point at. If it matches an
+entry in `Resources/Retro/manifest.json`, it loads. If it does not match, it refuses
+with an error and the SHA256 it found, so you can report the new digest.
+
+---
+
+## Verifying a binary
 
 ```bash
-CAISSA_RETRO_ALLOW_UNKNOWN=1 tools/caissa-retro
+python3 -c "
+import sys; sys.path.insert(0,'bin')
+from Code.Retro.Manifest import sha256_file, load
+digest = sha256_file('/path/to/BattleChess')
+print('sha256:', digest)
+entries = load()
+match = next((e for e in entries if e['sha256'] == digest), None)
+print('manifest:', match['label'] if match else 'NOT IN MANIFEST')
+"
 ```
-
-Note: `--allow-unknown` strips the `EmuStrictOriginal` guarantee from the UCI `id`
-string. The engine runs but the bit-exactness claim does not apply.
 
 ---
 
 ## If the binary is packed
 
-Some copies of Battle Chess use PowerPacker or Imploder compression. The shim detects
-this automatically and unpacks in memory before loading. If it cannot unpack:
+Some copies of Battle Chess use PowerPacker or Imploder compression on the Amiga.
+`Rom.detect_packer()` checks for the common signatures. If packing is detected,
+the error message names the packer and points to suitable unpacking tools
+(`ppami`, `imploder`, or a UAE-based extractor).
 
-```bash
-tools/caissa-retro identify /path/to/BattleChess
-# Look for "Packer detected: ..."
-```
-
-See [troubleshooting.md](troubleshooting.md) if unpacking fails.
+The bundled Amiga binary and the DOS floppy binary are both unpacked.

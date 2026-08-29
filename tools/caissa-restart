@@ -1,0 +1,15 @@
+#!/bin/bash
+# Kill, relaunch, and print window_info once the socket is up.
+set -e
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RC="$REPO/tools/caissa-rc"
+
+pkill -f "python3 LucasR.py" 2>/dev/null || true
+sleep 1
+nohup "$REPO/tools/caissa" > /tmp/caissa.log 2>&1 &
+for i in $(seq 1 20); do
+    sleep 1
+    [ -S /tmp/caissa-control.sock ] && break
+done
+sleep 2
+"$RC" window_info

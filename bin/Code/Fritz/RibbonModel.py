@@ -62,6 +62,12 @@ def all_slot_keys(spec: dict[str, Any]) -> list[str]:
                 if key and key not in seen:
                     seen.add(key)
                     result.append(key)
+        # backstage tabs use "items" instead of groups/slots
+        for item in tab.get("items", []):
+            key = item.get("key", "")
+            if key and key not in seen:
+                seen.add(key)
+                result.append(key)
     return result
 
 
@@ -97,6 +103,13 @@ def state(
                     continue
                 enabled = (key in active) if policy == "disable" else True
                 result[key] = (True, enabled, tab_id)
+        # backstage tabs use "items" instead of groups/slots
+        for item in tab.get("items", []):
+            key = item.get("key", "")
+            if not key:
+                continue
+            enabled = (key in active) if policy == "disable" else True
+            result[key] = (True, enabled, tab_id)
 
     return result
 

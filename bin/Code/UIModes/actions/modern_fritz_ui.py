@@ -333,6 +333,7 @@ def on_mode_enter(procesador):
     _reapply_fritz_right_col_sizes(mw)
     QtCore.QTimer.singleShot(150, lambda: _reapply_fritz_right_col_sizes(mw))
 
+
     # 6. Register ribbon dropdowns for has_dropdown buttons.
     _register_ribbon_dropdowns(mw, procesador)
 

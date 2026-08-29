@@ -22,9 +22,10 @@ Ribbon design decisions (from Fritz 18 manual, pages 31-35, 62-63, 73):
   - Tabs: File (blue), Home, Board, Analysis, Engine, View.
 """
 
-from PIL import Image, ImageDraw, ImageFont
 import os
 from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
 
 # ── colours (pixel-sampled from Fritz 18 screenshots) ─────────────────────────
 BG         = "#efeff2"   # ribbon background (near-white, slight blue-grey)
@@ -193,7 +194,7 @@ def draw_chess_piece(draw, cx, cy, size, color=ICON_DARK):
 def draw_color_swatch(draw, cx, cy, size, color=ICON_DARK):
     """Checkered square swatch for square color."""
     s = size // 2
-    q = s // 2
+    q = s // 2  # noqa: F841
     draw.rectangle([cx-s, cy-s, cx+s, cy+s], outline=color, width=max(1, S(1)))
     draw.rectangle([cx-s, cy-s, cx, cy], fill="#8b6040")
     draw.rectangle([cx, cy, cx+s, cy+s], fill="#8b6040")
@@ -247,7 +248,7 @@ def draw_gear(draw, cx, cy, size, color=ICON_DARK):
     draw.ellipse([cx-s//2, cy-s//2, cx+s//2, cy+s//2], outline=color, width=S(2))
     for angle in range(0, 360, 45):
         import math
-        ra, rb = math.radians(angle), math.radians(angle+20)
+        ra, rb = math.radians(angle), math.radians(angle+20)  # noqa: F841
         x1, y1 = cx + int(s*0.55*math.cos(ra)), cy + int(s*0.55*math.sin(ra))
         x2, y2 = cx + int(s*math.cos(ra)), cy + int(s*math.sin(ra))
         draw.line([(x1, y1), (x2, y2)], fill=color, width=S(2))
@@ -371,7 +372,7 @@ def _draw_caption_row(draw, cap_y, groups, sw):
 def _large_btn(draw, bx, by, w, icon_fn, icon_color, label, lbh,
                active=False, dropdown=False):
     """Draw a large ribbon button (icon + text + optional ▼)."""
-    bg = BTN_ACTIVE if active else None
+    bg = BTN_ACTIVE if active else None  # noqa: F841
     if active:
         draw.rectangle([bx, by, bx+w, by+lbh], fill=BTN_ACTIVE)
     if icon_fn:
@@ -491,7 +492,7 @@ def _draw_home_content(d, cy0, cy1, cap_y, sw, show_dropdown=False):
 def _draw_board_content(d, cy0, cy1, cap_y, sw):
     cx = S(6)
     LBH = S(CONT_H - 4)
-    SM_H = (S(CONT_H) - S(8)) // 2
+    SM_H = (S(CONT_H) - S(8)) // 2  # noqa: F841
 
     # ─ Appearance group: Flip Board (active/toggled), Piece Style▼, Square Color▼ ─
     LBW = S(58)
@@ -604,7 +605,7 @@ def _draw_analysis_content(d, cy0, cy1, cap_y, sw):
 def _draw_engine_content(d, cy0, cy1, cap_y, sw):
     cx = S(6)
     LBH = S(CONT_H - 4)
-    SM_H = (S(CONT_H) - S(8)) // 2
+    SM_H = (S(CONT_H) - S(8)) // 2  # noqa: F841
     SM_W = S(110)
     LBW  = S(68)
     ICON_R = S(9)
@@ -641,11 +642,11 @@ def _draw_engine_content(d, cy0, cy1, cap_y, sw):
 def _draw_view_content(d, cy0, cy1, cap_y, sw):
     cx = S(6)
     LBH = S(CONT_H - 4)
-    SM_H = (S(CONT_H) - S(8)) // 2
+    SM_H = (S(CONT_H) - S(8)) // 2  # noqa: F841
     LBW  = S(62)
-    SM_W = S(90)
+    SM_W = S(90)  # noqa: F841
     CB   = S(12)
-    ICON_R = S(9)
+    ICON_R = S(9)  # noqa: F841
 
     # ─ Layout group: Standard Layouts▼ (large), Full Screen (large toggle) ─
     layout_x0 = cx

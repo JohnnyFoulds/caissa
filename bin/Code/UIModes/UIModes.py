@@ -11,11 +11,10 @@ The "classical" mode is the safety net: null allowlists leave everything intact.
 """
 import json
 import os
-from typing import Optional
 
 import Code
-from Code.Menus import BaseMenu
 from Code.Base import Constantes
+from Code.Menus import BaseMenu
 
 # Resolve TB_* name → int once at import time
 _TB_BY_NAME = {k: v for k, v in vars(Constantes).items() if k.startswith("TB_")}
@@ -42,7 +41,7 @@ def load_modes() -> list:
     return modes
 
 
-def find_mode(name: str) -> Optional[dict]:
+def find_mode(name: str) -> dict | None:
     for m in load_modes():
         if m.get("name", "").lower() == name.lower():
             return m
@@ -56,7 +55,7 @@ def active_mode() -> dict:
 
 # ── toolbar filtering ─────────────────────────────────────────────────────────
 
-def _resolve_toolbar_set(mode: dict) -> Optional[frozenset]:
+def _resolve_toolbar_set(mode: dict) -> frozenset | None:
     """Return frozenset of allowed TB_* int values, or None if mode allows all."""
     raw = mode.get("toolbar")
     if raw is None:

@@ -29,7 +29,9 @@ if str(_BIN) not in sys.path:
     sys.path.insert(0, str(_BIN))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from tools.design import DESIGN_OUT, FRITZ_REF, SCENE_REF  # noqa: E402
+from PIL import Image  # noqa: E402
+
+from tools.design import DESIGN_OUT, FRITZ_REF  # noqa: E402
 from tools.design.compare import (  # noqa: E402
     chrome_mask,
     diff_heatmap,
@@ -38,7 +40,6 @@ from tools.design.compare import (  # noqa: E402
     row_ink_profile,
     score_label,
 )
-from PIL import Image  # noqa: E402
 
 # ── measured Fritz targets ────────────────────────────────────────────────────
 

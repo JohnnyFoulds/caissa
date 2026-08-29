@@ -536,6 +536,19 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
         [(_("Choose Engine…"), _select_engine)],
     )
 
+    # ── Toggle API: TB_STOP checked state reflects play_against_engine ────────
+    # TB_STOP is "Play Now" — checked means the engine is playing (not analysis).
+    # The toggle_get function is re-called on every ribbon.sync(), so it always
+    # reflects the current manager's state even after a ManagerSolo restart.
+    def _get_toggle(key):
+        import Code
+        mgr = getattr(getattr(Code, "procesador", None), "manager", None)
+        if key == "TB_STOP" and mgr and hasattr(mgr, "play_against_engine"):
+            return mgr.play_against_engine
+        return None
+
+    ribbon.set_toggle_api(_get_toggle)
+
 
 def _fritz_new_game(procesador):
     """Show the Fritz level picker and start a game against the engine."""

@@ -14,10 +14,12 @@ from Code.Base.Constantes import (
     TB_CLOSE,
     TB_CONFIG,
     TB_FILE,
+    TB_LEVEL,
     TB_PGN_LABELS,
     TB_REINIT,
     TB_REPLAY,
     TB_SAVE_AS,
+    TB_STOP,
     TB_TAKEBACK,
     TB_UTILITIES,
 )
@@ -147,6 +149,25 @@ class ManagerSolo(Manager.Manager):
 
         elif key == TB_SAVE_AS:
             self.save_as()
+
+        elif key == "caissa:infinite_analysis":
+            # Toggle: analysis mode ↔ game mode (manual §000128, Alt-F2 equivalent).
+            if self.play_against_engine:
+                # Return to Infinite Analysis: stop the engine and resume analysis.
+                self.play_against_engine = False
+                if self.manager_rival:
+                    self.manager_rival.terminate()
+                    self.manager_rival = None
+                self.play_next_move()
+            else:
+                # Switch to game mode: open level picker.
+                from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
+                _fritz_new_game(self.procesador)
+
+        elif key in (TB_STOP, TB_LEVEL):
+            # "Play Now" / "Levels": open the Fritz level picker to start a game.
+            from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
+            _fritz_new_game(self.procesador)
 
         else:
             self.routine_default(key)

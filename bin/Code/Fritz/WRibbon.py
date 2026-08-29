@@ -332,6 +332,9 @@ class WRibbon(QtWidgets.QWidget):
         self._dic_toolbar = self._normalise_dic_toolbar(dic_toolbar)
         self._pane_api = pane_api or {}
         self._user_tab: str | None = None  # tab explicitly chosen by user
+        self._toggle_btns: dict[str, Any] = {}   # key → QToolButton for toggle slots
+        self._toggle_get_fn: Any | None = None   # callable(key) → bool | None
+        self._dropdowns: dict[str, Any] = {}     # key → WDropdownPanel
 
         self._build_ui()
         self._apply_metrics()
@@ -462,6 +465,16 @@ class WRibbon(QtWidgets.QWidget):
         # sync panes checkboxes
         self._sync_panes()
 
+        # sync toggle button checked state (FR-17)
+        if self._toggle_get_fn is not None:
+            for key, btn in self._toggle_btns.items():
+                try:
+                    state = self._toggle_get_fn(key)
+                    if state is not None:
+                        btn.setChecked(bool(state))
+                except Exception:
+                    pass
+
     def current_tab(self) -> str:
         """Return the id of the currently selected ribbon tab."""
         idx = self._tab_bar.currentIndex()
@@ -484,6 +497,42 @@ class WRibbon(QtWidgets.QWidget):
                 self._pages.setCurrentIndex(i)
                 return True
         return False
+
+    # ── dropdown / toggle public API ──────────────────────────────────────────
+
+    def set_toggle_api(self, get_fn: Any) -> None:
+        """Register a callable that returns the checked state of a toggle slot.
+
+        :param get_fn: ``callable(key: str) -> bool | None``.  Return ``None``
+            to leave the button's current state unchanged for that key.
+        :spec: FR-17
+        """
+        self._toggle_get_fn = get_fn
+
+    def set_dropdown(
+        self,
+        key: str,
+        title: str,
+        items: list[tuple[str, Any]],
+    ) -> None:
+        """Register dropdown items for the slot identified by *key*.
+
+        Creates a :class:`~Code.Fritz.WDropdownPanel.WDropdownPanel` and stores it.
+        Calling again replaces the previous panel.
+
+        :param key: Slot key (e.g. ``"TB_LEVEL"`` or ``"caissa:fritz_level"``).
+        :param title: Blue header title shown in the panel.
+        :param items: ``(label, callback)`` pairs — at least one required.
+        :spec: FR-16
+        """
+        from Code.Fritz.WDropdownPanel import WDropdownPanel
+        self._dropdowns[key] = WDropdownPanel(self, title, items)
+
+    def _on_dropdown_click(self, key: str, button: Any) -> None:
+        """Open the registered dropdown for *key* below *button*."""
+        panel = self._dropdowns.get(key)
+        if panel is not None:
+            panel.popup(button)
 
     def ribbon_info(self) -> dict[str, Any]:
         """
@@ -738,6 +787,8 @@ class WRibbon(QtWidgets.QWidget):
                 _logger.warning("Ribbon: key %r not in dic_toolbar — slot disabled", key)
                 continue
             btn = QtWidgets.QToolButton(container)
+            _is_toggle = bool(slot.get("toggle"))
+
             if slot.get("size") == "large":
                 btn.setIconSize(icon_sz)
                 btn.setFixedHeight(self._large_btn_height)
@@ -759,9 +810,16 @@ class WRibbon(QtWidgets.QWidget):
                             )
                     except Exception:
                         pass
-                # ▾ chevron below the label matches the approved Office-ribbon design
+                # ▼ shown only when the slot declares has_dropdown — real WDropdownPanel
+                # trigger (FR-16). Slots without has_dropdown get a plain label.
                 _base = slot["label"] if slot.get("label") else action.text()
-                _lbl = _base + "\n▼"
+                if slot.get("has_dropdown"):
+                    _lbl = _base + "\n▼"
+                    btn.clicked.connect(
+                        lambda _checked=False, _k=key, _b=btn: self._on_dropdown_click(_k, _b)
+                    )
+                else:
+                    _lbl = _base
                 btn.setText(_lbl)
                 action.changed.connect(
                     lambda _b=btn, _l=_lbl: _b.setText(_l)
@@ -784,6 +842,12 @@ class WRibbon(QtWidgets.QWidget):
                 small_grid.addWidget(btn, row, col)
                 small_idx += 1
                 has_small = True
+
+            # Toggle support (FR-17): must come AFTER setDefaultAction so it is
+            # not reset by Qt's action→button state sync.
+            if _is_toggle:
+                btn.setCheckable(True)
+                self._toggle_btns[key] = btn
 
         if has_small:
             hbox.addWidget(small_col)

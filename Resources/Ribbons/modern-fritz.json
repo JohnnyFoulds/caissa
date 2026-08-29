@@ -37,8 +37,8 @@
           "id": "home.play",
           "label": "Play",
           "slots": [
-            { "key": "caissa:fritz_level", "size": "large", "label": "New Game" },
-            { "key": "TB_LEVEL",           "size": "large", "label": "Levels" }
+            { "key": "caissa:fritz_level", "size": "large", "label": "New Game", "has_dropdown": true },
+            { "key": "TB_LEVEL",           "size": "large", "label": "Levels",   "has_dropdown": true }
           ]
         },
         {
@@ -88,8 +88,8 @@
           "id": "board.pieces",
           "label": "Pieces",
           "slots": [
-            { "key": "caissa:piece_style", "size": "large", "label": "Piece Style" },
-            { "key": "caissa:sq_color",    "size": "large", "label": "Square Color" }
+            { "key": "caissa:piece_style", "size": "large", "label": "Piece Style",   "has_dropdown": true },
+            { "key": "caissa:sq_color",    "size": "large", "label": "Square Color", "has_dropdown": true }
           ]
         },
         {
@@ -112,7 +112,7 @@
           "id": "analysis.engine",
           "label": "Engine",
           "slots": [
-            { "key": "TB_STOP",       "size": "large", "label": "Play Now" },
+            { "key": "TB_STOP",       "size": "large", "label": "Play Now", "toggle": true },
             { "key": "TB_PAUSE",      "size": "small", "label": "Pause" },
             { "key": "TB_CONTINUE",   "size": "small", "label": "Continue" },
             { "key": "TB_TUTOR_STOP", "size": "small", "label": "Stop Tutor" }
@@ -146,7 +146,7 @@
           "id": "engine.select",
           "label": "Engine",
           "slots": [
-            { "key": "caissa:select_engine", "size": "large", "label": "Select Engine" }
+            { "key": "caissa:select_engine", "size": "large", "label": "Select Engine", "has_dropdown": true }
           ]
         },
         {
@@ -174,7 +174,7 @@
           "id": "view.layout",
           "label": "Layout",
           "slots": [
-            { "key": "caissa:std_layout", "size": "large", "label": "Standard Layouts" },
+            { "key": "caissa:std_layout", "size": "large", "label": "Standard Layouts", "has_dropdown": true },
             { "key": "caissa:fullscreen", "size": "large", "label": "Full Screen" }
           ]
         },

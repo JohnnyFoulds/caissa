@@ -82,6 +82,8 @@ _PYSIDE6_ALLOWED_RELATIVE: set[str] = {
     # Phase 7: Ribbon widget and wiring — Qt allowlist tier.
     "WRibbon.py",
     "Ribbon.py",
+    # Phase 2 (fritz-mode-phase2): Dropdown panel — Qt allowlist tier.
+    "WDropdownPanel.py",
 }
 
 # Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted

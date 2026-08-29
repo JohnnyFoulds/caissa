@@ -495,3 +495,44 @@ background-color: {CHROME_BORDER};
 max-height: 1px;
 margin: 2px 8px;
 }
+
+/* DROPDOWN PANEL (WDropdownPanel) -------------------------------------------- */
+
+#WDropdownPanel
+{
+    background-color: {CHROME_SURFACE};
+    border: 1px solid {CHROME_BORDER};
+    border-radius: 3px;
+}
+
+#WDropdownPanelHeader
+{
+    background-color: {CHROME_ACCENT};
+    color: {FOREGROUND};
+    font-size: 9pt;
+    font-weight: bold;
+    padding: 4px 10px;
+    qproperty-alignment: AlignLeft;
+}
+
+#WDropdownPanelItem
+{
+    background-color: transparent;
+    border: none;
+    border-radius: 0px;
+    color: {FOREGROUND};
+    font-size: 9pt;
+    padding: 3px 10px;
+    text-align: left;
+    min-width: 120px;
+}
+
+#WDropdownPanelItem:hover
+{
+    background-color: {CHROME_SURFACE_2};
+}
+
+#WDropdownPanelItem:pressed
+{
+    background-color: {CHROME_BORDER};
+}

@@ -40,7 +40,7 @@ _DEFAULT_OPTIONS: dict[str, object] = {
 }
 
 _OPTION_LINES = [
-    "option name EmuLevel type spin default 1 min 1 max 4",
+    "option name EmuLevel type spin default 1 min 1 max 9",
     "option name EmuClockRate type spin default 50 min 1 max 200",
     "option name EmuStrictOriginal type check default true",
     "option name EmuRomPath type string default <empty>",
@@ -150,6 +150,9 @@ class UciSession:
     def _handle_go(self, _rest: str) -> None:
         rom_path_str = str(self._options.get("EmuRomPath", "")).strip()
         if not rom_path_str:
+            from Code.Retro.Manifest import default_rom_path
+            rom_path_str = default_rom_path() or ""
+        if not rom_path_str:
             self._emit("info string error: no ROM configured; set EmuRomPath via setoption")
             self._emit("bestmove 0000")
             return
@@ -161,7 +164,7 @@ class UciSession:
         try:
             level = Level(int(self._options.get("EmuLevel", 1)))
         except (ValueError, KeyError):
-            level = Level.NOVICE
+            level = Level.L1
 
         try:
             result = self._session.think(ThinkRequest(fen=self._fen, level=level))

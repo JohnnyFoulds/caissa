@@ -143,7 +143,8 @@ class AmigaTraps:
         base = EXEC_BASE - LIB_RANGE
         size = LIB_RANGE * 2
         self._cpu.map_region(base, size)
-        self._cpu.mem_write(base, b"\x4e\x75" * size)
+        # Each RTS opcode is 2 bytes; repeat size//2 times to fill `size` bytes.
+        self._cpu.mem_write(base, b"\x4e\x75" * (size // 2))
         return self._cpu.hook_add(HOOK_CODE, self._dispatch)
 
     def uninstall(self, handle: int) -> None:

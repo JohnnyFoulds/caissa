@@ -138,20 +138,33 @@ class MoveSpec:
 class Level(Enum):
     """Battle Chess AI difficulty levels.
 
-    Maps to the internal ``level`` byte stored at ``-$4CE0(A4)`` in the original binary.
+    Maps to the internal level byte written into game state before the AI runs.
+    The original binary has nine levels labelled "Level 1" through "Level 9" in
+    its string table; levels 1–9 map directly to integer values 1–9.
 
-    :cvar NOVICE:       Level 1 — weakest.
-    :cvar EASY:         Level 2.
-    :cvar INTERMEDIATE: Level 3.
-    :cvar HARD:         Level 4.
-    :cvar EXPERT:       Level 5 — strongest.
+    Lower values allow the timed state machine less clock time per move; higher
+    values allow more time (harder play). Level 9 is the strongest.
+
+    :cvar L1: Level 1 — weakest; minimal search time.
+    :cvar L2: Level 2.
+    :cvar L3: Level 3.
+    :cvar L4: Level 4.
+    :cvar L5: Level 5 — mid-range.
+    :cvar L6: Level 6.
+    :cvar L7: Level 7.
+    :cvar L8: Level 8.
+    :cvar L9: Level 9 — strongest; maximum search time.
     """
 
-    NOVICE = 1
-    EASY = 2
-    INTERMEDIATE = 3
-    HARD = 4
-    EXPERT = 5
+    L1 = 1
+    L2 = 2
+    L3 = 3
+    L4 = 4
+    L5 = 5
+    L6 = 6
+    L7 = 7
+    L8 = 8
+    L9 = 9
 
 
 @dataclass(frozen=True)

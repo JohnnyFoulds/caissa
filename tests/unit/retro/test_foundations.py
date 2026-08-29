@@ -292,9 +292,9 @@ def test_think_result_has_move():
     """
     from Code.Retro.Types import Level, MoveSpec, ThinkResult
     m = MoveSpec(from_sq=0x14, to_sq=0x34, flags=0, piece=1, legal=1)
-    tr = ThinkResult(move=m, level=Level.NOVICE, instructions=1000)
+    tr = ThinkResult(move=m, level=Level.L1, instructions=1000)
     assert tr.has_move is True
-    empty = ThinkResult(move=None, level=Level.NOVICE, instructions=0)
+    empty = ThinkResult(move=None, level=Level.L1, instructions=0)
     assert empty.has_move is False
 
 

@@ -28,6 +28,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode Behaviour — Phase 3 (Home + Board Tab Wiring)**:
+  `caissa:flip_board` now calls `Board.rotate_board()` (fixes coordinate labels,
+  arrow repositioning, and captures-panel flip — was direct `is_white_bottom` mutation);
+  `WFritzNewGame.get_dic()` `"HINTS"` changed from 0→3 (enables `TB_ADVICE` Hint button
+  in games); `TB_LEVEL` dispatched in `ManagerPlayAgainstEngine.run_action` → opens
+  WFritzNewGame level picker in-game; ribbon dropdowns registered in `on_mode_enter`
+  for `caissa:fritz_level`, `TB_LEVEL`, `caissa:piece_style` (Alpha/Berlin/Cburnett/
+  Leipzig/Merida/Regular/Staunton 3D + More…), `caissa:sq_color`, `caissa:std_layout`,
+  `caissa:select_engine` — all `has_dropdown: true` buttons now open real panels.
 - **Fritz Mode Behaviour — Phase 2 (Dropdown + Toggle Infrastructure)**:
   `WDropdownPanel` — blue-header floating selection panel (Qt.Popup semantics,
   checkmark support, `popup(button)` positions below anchor); QSS rules added to

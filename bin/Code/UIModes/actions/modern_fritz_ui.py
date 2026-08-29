@@ -498,27 +498,42 @@ def _build_fritz_right_col(mw) -> None:
     right_col.addWidget(eg_pane)
     right_col.addWidget(pgn_pane)
 
-    # ── 5. Attach right_col to main splitter via a wrapper ────────────────────
-    # rc_wrapper holds a fixed-height spacer (= ribbon height) above right_col
-    # so the panel physically starts below the ribbon, not at y=0.
-    _tb_h = mw.base.tb.height() or 142
-    rc_wrapper = QtWidgets.QWidget(mw)
-    rc_wrapper.setObjectName("WFritzRightColWrapper")
-    _wly = QtWidgets.QVBoxLayout(rc_wrapper)
-    _wly.setContentsMargins(0, 0, 0, 0)
-    _wly.setSpacing(0)
-    _ribbon_spacer = QtWidgets.QWidget(rc_wrapper)
-    _ribbon_spacer.setObjectName("WFritzRibbonSpacer")
-    _ribbon_spacer.setFixedHeight(_tb_h)
-    _wly.addWidget(_ribbon_spacer)
-    _wly.addWidget(right_col, 1)
+    # ── 5. Restructure layout: ribbon above [board | right_col] (Fritz 9 style) ──
+    # Extract the toolbar from WBase and place it above the horizontal splitter
+    # so it spans the full window width.  Then [board | right_col] sit below it,
+    # both starting at the same y — exactly the Fritz 9/18 layout.
+    wbase_layout = mw.base.layout()
+    if wbase_layout is not None:
+        wbase_layout.removeWidget(mw.base.tb)
 
-    mw.splitter.addWidget(rc_wrapper)
+    fritz_container = QtWidgets.QWidget(mw)
+    fritz_container.setObjectName("WFritzOuterContainer")
+    fritz_vbox = QtWidgets.QVBoxLayout(fritz_container)
+    fritz_vbox.setContentsMargins(0, 0, 0, 0)
+    fritz_vbox.setSpacing(0)
+    fritz_vbox.addWidget(mw.base.tb)       # toolbar spans full width at top
+
+    _mw_layout = mw.layout()
+    _splitter_idx = 0
+    if _mw_layout is not None:
+        for _i in range(_mw_layout.count()):
+            _item = _mw_layout.itemAt(_i)
+            if _item is not None and _item.widget() is mw.splitter:
+                _splitter_idx = _i
+                break
+        _mw_layout.removeWidget(mw.splitter)
+    fritz_vbox.addWidget(mw.splitter, 1)   # board + right_col below toolbar
+    if _mw_layout is not None:
+        _mw_layout.insertWidget(_splitter_idx, fritz_container)
+
+    mw._fritz_container    = fritz_container
+    mw._fritz_splitter_idx = _splitter_idx
+
+    mw.splitter.addWidget(right_col)
     fritz_col_width = max(pgn_width, 380)
     mw.splitter.setSizes([max(wbase_width - (fritz_col_width - pgn_width), 600),
                           fritz_col_width])
     mw.splitter.setChildrenCollapsible(False)
-    rc_wrapper.setMinimumWidth(360)
     right_col.setMinimumWidth(360)
 
     right_col.setSizes([_PANE_SPECS[0].default_px, _PANE_SPECS[1].default_px,
@@ -582,7 +597,6 @@ def _build_fritz_right_col(mw) -> None:
 
     # ── 10. Store state attrs ─────────────────────────────────────────────────
     mw._fritz_right_col      = right_col
-    mw._fritz_rc_wrapper     = rc_wrapper
     mw._fritz_home           = None
     mw._fritz_player_header  = player_header
     mw._fritz_analysis_table = table
@@ -813,6 +827,43 @@ def pane_api(mw) -> dict:
 
 # ── mode exit ──────────────────────────────────────────────────────────────────
 
+def _restore_fritz_structural_layout(mw):
+    """Reverse the Fritz layout restructure: return toolbar to WBase, splitter to mw."""
+    fritz_container = getattr(mw, "_fritz_container", None)
+    if fritz_container is None:
+        return
+    _mw_layout = mw.layout()
+    wbase_layout = mw.base.layout()
+    saved_idx = getattr(mw, "_fritz_splitter_idx", 0)
+    fritz_vbox = fritz_container.layout()
+
+    # Detach splitter from fritz_container and restore it to mw's layout
+    if fritz_vbox is not None:
+        fritz_vbox.removeWidget(mw.splitter)
+    mw.splitter.setParent(mw)
+    if _mw_layout is not None:
+        _mw_layout.removeWidget(fritz_container)
+        _mw_layout.insertWidget(saved_idx, mw.splitter)
+
+    # Detach toolbar from fritz_container and restore it to WBase's layout at position 0
+    if fritz_vbox is not None:
+        fritz_vbox.removeWidget(mw.base.tb)
+    mw.base.tb.setParent(mw.base)
+    if wbase_layout is not None:
+        wbase_layout.insertWidget(0, mw.base.tb)
+
+    fritz_container.hide()
+    fritz_container.setParent(None)
+    try:
+        del mw._fritz_container
+    except AttributeError:
+        pass
+    try:
+        del mw._fritz_splitter_idx
+    except AttributeError:
+        pass
+
+
 def _restore_main_splitter_pre_fritz(mw):
     """Remove the Fritz right_col from mw.splitter and restore pgn_information.
 
@@ -823,16 +874,15 @@ def _restore_main_splitter_pre_fritz(mw):
     right_col = getattr(mw, "_fritz_right_col", None)
     if right_col is None:
         return
-    rc_wrapper = getattr(mw, "_fritz_rc_wrapper", None)
     try:
         mw.splitter.addWidget(mw.pgn_information)
-        target = rc_wrapper if rc_wrapper is not None else right_col
-        target.hide()
-        target.setParent(None)
+        right_col.hide()
+        right_col.setParent(None)
     except Exception:
         _log.debug("_restore_main_splitter_pre_fritz error", exc_info=True)
+    _restore_fritz_structural_layout(mw)
     # Clear all Fritz state attrs so on_mode_enter starts fresh.
-    for attr in ("_fritz_right_col", "_fritz_rc_wrapper", "_fritz_home",
+    for attr in ("_fritz_right_col", "_fritz_home",
                  "_fritz_analysis_table", "_fritz_eval_graph", "_fritz_player_header",
                  "_fritz_pgn_restore"):
         try:
@@ -920,9 +970,8 @@ def on_mode_exit(procesador):
     if right_col is not None:
         try:
             mw.splitter.addWidget(mw.pgn_information)
-            target = getattr(mw, "_fritz_rc_wrapper", None) or right_col
-            target.hide()
-            target.setParent(None)
+            right_col.hide()
+            right_col.setParent(None)
         except Exception:
             _log.debug("Fritz right_col removal error", exc_info=True)
         finally:
@@ -930,6 +979,9 @@ def on_mode_exit(procesador):
                 del mw._fritz_right_col
             except AttributeError:
                 pass
+
+    # Restore structural layout: ribbon back into WBase, splitter back to mw
+    _restore_fritz_structural_layout(mw)
 
     # ── Destroy remaining Fritz widgets ───────────────────────────────────────
     for widget, attr in [
@@ -959,7 +1011,7 @@ def on_mode_exit(procesador):
     # Clean up pane-wrapper attrs
     for _attr in ("_fritz_panes", "_fritz_pane_registry", "_fritz_pane_sizes",
                   "_fritz_notation_flowing", "_fritz_notation_tab_bar",
-                  "_fritz_notation_on_tab_change", "_fritz_rc_wrapper"):
+                  "_fritz_notation_on_tab_change"):
         try:
             delattr(mw, _attr)
         except AttributeError:

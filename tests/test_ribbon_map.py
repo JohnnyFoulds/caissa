@@ -34,11 +34,36 @@ def _load_all_ribbons() -> list[tuple[str, dict]]:
 
 
 def _all_slot_keys(data: dict) -> list[str]:
-    """Flat list of every key in slots + quick_access (with duplicates preserved)."""
+    """Flat list of every key in slots + quick_access + backstage items (with duplicates preserved)."""
     keys: list[str] = []
     for key in data.get("quick_access", []):
         keys.append(key)
     for tab in data.get("tabs", []):
+        for group in tab.get("groups", []):
+            for slot in group.get("slots", []):
+                k = slot.get("key", "")
+                if k:
+                    keys.append(k)
+        # backstage tabs use "items" instead of groups/slots
+        for item in tab.get("items", []):
+            k = item.get("key", "")
+            if k:
+                keys.append(k)
+    return keys
+
+
+def _non_backstage_slot_keys(data: dict) -> list[str]:
+    """Keys in regular-tab slots + quick_access only (excluding backstage items).
+
+    Backstage items (File menu) legitimately duplicate regular slots — e.g.
+    "New Game" appears in File backstage AND in Home > Play, like every Office ribbon app.
+    """
+    keys: list[str] = []
+    for key in data.get("quick_access", []):
+        keys.append(key)
+    for tab in data.get("tabs", []):
+        if tab.get("kind") == "backstage":
+            continue
         for group in tab.get("groups", []):
             for slot in group.get("slots", []):
                 k = slot.get("key", "")
@@ -83,9 +108,14 @@ def test_unique_tab_and_group_ids():
 
 
 def test_no_duplicate_slot_keys():
-    """T-RMAP-03: No key appears more than once across slots + quick_access."""
+    """T-RMAP-03: No key appears more than once across regular-tab slots + quick_access.
+
+    Backstage items are excluded: it is standard Office ribbon behaviour for a File
+    backstage to duplicate entries that also appear as prominent ribbon buttons
+    (e.g. New Game in both File backstage and Home > Play).
+    """
     for basename, data in _load_all_ribbons():
-        all_keys = _all_slot_keys(data)
+        all_keys = _non_backstage_slot_keys(data)
         seen: set[str] = set()
         dups: list[str] = []
         for k in all_keys:
@@ -153,7 +183,7 @@ def test_all_fritz_toolbar_keys_in_slot_or_quick_access():
 def test_never_filter_keys_in_quick_access():
     """T-RMAP-06: All NEVER_FILTER_TOOLBAR members appear in quick_access."""
     from Code.Base import Constantes
-    from Code.UIModes.UIModes import NEVER_FILTER_TOOLBAR
+    from Code.Base.Constantes import NEVER_FILTER_TOOLBAR
 
     # Resolve TB_* int values back to names for readable error messages
     int_to_name = {v: k for k, v in vars(Constantes).items() if k.startswith("TB_")}

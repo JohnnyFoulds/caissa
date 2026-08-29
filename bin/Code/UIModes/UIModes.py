@@ -20,11 +20,7 @@ from Code.Base import Constantes
 # Resolve TB_* name → int once at import time
 _TB_BY_NAME = {k: v for k, v in vars(Constantes).items() if k.startswith("TB_")}
 
-# TB_* values that must NEVER be filtered — closeEvent depends on them.
-NEVER_FILTER_TOOLBAR = frozenset({
-    Constantes.TB_QUIT, Constantes.TB_CLOSE, Constantes.TB_CANCEL,
-    Constantes.TB_STOP, Constantes.TB_TUTOR_STOP, Constantes.TB_END_REPLAY,
-})
+NEVER_FILTER_TOOLBAR = Constantes.NEVER_FILTER_TOOLBAR
 
 
 def _modes_folder() -> str:

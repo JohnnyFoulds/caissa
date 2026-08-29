@@ -49,6 +49,28 @@ a starting point for implementation. Light theme follows in Phase 6 from the sam
 
 ---
 
+## Round 3 — Ribbon Tab Design (all tabs)
+
+**Status:** Approved — raster mockup sign-off 2026-08-29
+**Date:** 2026-08-29
+**Signed off by:** JohnnyFoulds
+
+Design rendered via `tools/design/fritz_compare.py`.
+**Approved mockup committed:** [`docs/fritz/assets/ribbon_mockup_approved_2026-08-29.png`](assets/ribbon_mockup_approved_2026-08-29.png)
+
+| Panel | Approved | Notes |
+|---|---|---|
+| FILE backstage panel | ✅ | Blue sidebar + white item list (New Game, Open, Recent, Save, Save As, separator, Options, Engines, Quit) |
+| HOME tab | ✅ | Play (New Game▼, Levels▼), Game (Resign/Draw/Abort/Takeback 2×2), Coaching (Hint/Suggestion), Panes checkboxes |
+| BOARD tab | ✅ | Appearance (Flip Board active=blue, Piece Style▼, Square Color▼), View checkboxes |
+| ANALYSIS tab | ✅ | Play (Play Now), Tutor (Pause/Continue grayed/Stop), Navigate (Prev/Next), Tools (Config/Utilities) |
+| ENGINE tab | ✅ | Engine (Select Engine▼), Settings (Engine Properties, UCI Options, Kibitzer) |
+| VIEW tab | ✅ | Layout (Standard Layouts▼, Full Screen), Panes checkboxes |
+
+Tabs confirmed: **Home, Board, Analysis, Engine, View** (Training and Opening removed; File is backstage, not a content tab).
+
+---
+
 ## Gate Status
 
 Gate **PASSED**. Phases 3–7 may proceed.

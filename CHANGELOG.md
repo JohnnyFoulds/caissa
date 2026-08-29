@@ -12,6 +12,10 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Fixed
+- **Fritz right column vertical alignment**: Right-column panes now start below the ribbon (aligned with the board) instead of at y=0 (behind the ribbon header).
+- **Fritz notation tabs**: Switching between Notation and Score Sheet tabs in the right column now shows/hides the move list and NAG palette correctly.
+- **Fritz Levels button**: Clicking Levels now opens the level/time-control picker dialog directly, without also opening a dropdown panel.
+- **Fritz player header clocks**: Replaced unreadable seven-segment LCD display with a plain monospace QLabel showing readable time/eval text.
 - **Fritz ribbon "New Game" icon**: Changed from gear (`Configurar`) to `NuevaPartida` (chess game icon) to match the button's purpose.
 
 ### Changed

@@ -112,6 +112,28 @@ color: %s;
 
     app.setEffectEnabled(QtCore.Qt.UIEffect.UI_AnimateMenu)
 
+    # Fritz overlay — apply Fritz widget styles adapted to the active theme's palette.
+    # Only Fritz modes carry a "ribbon" key; all other modes skip this entirely.
+    if _active_mode().get("ribbon"):
+        _apply_fritz_overlay(app, Code.dic_colors)
+
+
+def _apply_fritz_overlay(app, dic_colors):
+    """Append Fritz widget QSS adapted to the active theme's colour palette.
+
+    Reads Resources/Styles/fritz-widgets.qss, substitutes {KEY} placeholders
+    with values from dic_colors, and appends the result to the application
+    stylesheet so Fritz widgets respond to any user-selected theme.
+    """
+    path = Code.path_resource("Styles", "fritz-widgets.qss")
+    if not os.path.isfile(path):
+        return
+    with open(path) as f:
+        overlay = f.read()
+    for key, value in dic_colors.items():
+        overlay = overlay.replace(f"{{{key}}}", value)
+    app.setStyleSheet(app.styleSheet() + "\n" + overlay)
+
 
 def apply_live_style(configuration):
     """Re-apply the current theme to the running app without restarting.

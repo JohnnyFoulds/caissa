@@ -181,32 +181,6 @@ def _build_notation_widget(mw) -> QtWidgets.QWidget:
         tab_bar.addTab(label)
     vbox.addWidget(tab_bar)
 
-    # ── NAG palette (Notation tab only) ──────────────────────────────────────
-    nag_bar = QtWidgets.QWidget(container)
-    nag_bar.setObjectName("WFritzNagBar")
-    nag_vbox = QtWidgets.QVBoxLayout(nag_bar)
-    nag_vbox.setContentsMargins(2, 2, 2, 2)
-    nag_vbox.setSpacing(1)
-
-    for row_idx, nag_row_def in enumerate((_NAG_ROW_1, _NAG_ROW_2), start=1):
-        row_widget = QtWidgets.QWidget(nag_bar)
-        row_widget.setObjectName(f"WFritzNagRow{row_idx}")
-        row_hbox = QtWidgets.QHBoxLayout(row_widget)
-        row_hbox.setContentsMargins(0, 0, 0, 0)
-        row_hbox.setSpacing(2)
-        for label, nag_num in nag_row_def:
-            btn = QtWidgets.QToolButton(row_widget)
-            btn.setText(label)
-            btn.setObjectName(f"WFritzNagBtn_{nag_num}")
-            btn.setFixedHeight(18)
-            btn.setToolTip(f"NAG {nag_num}")
-            btn.clicked.connect(lambda _checked=False, n=nag_num, _mw=mw: _apply_nag(_mw, n))
-            row_hbox.addWidget(btn)
-        row_hbox.addStretch()
-        nag_vbox.addWidget(row_widget)
-
-    vbox.addWidget(nag_bar)
-
     # ── flowing notation (Notation tab) ──────────────────────────────────────
     flowing = _FlowingNotation(mw, container)
     vbox.addWidget(flowing)
@@ -220,11 +194,10 @@ def _build_notation_widget(mw) -> QtWidgets.QWidget:
 
     # ── tab switching ────────────────────────────────────────────────────────
     # Score sheet tab shows the N./White/Black grid; all other tabs show the
-    # flowing notation text.  NAG palette is shown on the Notation tab only.
-    def _on_tab_change(idx, _flow=flowing, _pgn=mw.base.pgn, _nag=nag_bar):
+    # flowing notation text.
+    def _on_tab_change(idx, _flow=flowing, _pgn=mw.base.pgn):
         is_score = idx == _SCORE_SHEET_TAB
         _flow.setVisible(not is_score)
-        _nag.setVisible(idx == 0)
         _pgn.setVisible(is_score)
 
     tab_bar.currentChanged.connect(_on_tab_change)
@@ -394,6 +367,10 @@ def on_mode_enter(procesador):
     #     Re-assert the sizes immediately, then again after the event loop drains.
     _reapply_fritz_right_col_sizes(mw)
     QtCore.QTimer.singleShot(150, lambda: _reapply_fritz_right_col_sizes(mw))
+    # 5b2. Snap WBase width to actual board width (eliminates the dead-space gap).
+    #      The board gets its final size during Qt paint events, so we need a delay.
+    QtCore.QTimer.singleShot(400, lambda: _snap_wbase_to_board(mw))
+    QtCore.QTimer.singleShot(700, lambda: _snap_wbase_to_board(mw))
 
     # 5c. ManagerSolo.active_game(True) calls pgn.setVisible(True), re-showing the
     #     pgn table.  Re-apply the current notation tab's visibility state to undo it.
@@ -408,6 +385,7 @@ def on_mode_enter(procesador):
     _reapply_notation_visibility()
     QtCore.QTimer.singleShot(0,   _reapply_notation_visibility)
     QtCore.QTimer.singleShot(200, _reapply_notation_visibility)
+    QtCore.QTimer.singleShot(600, _reapply_notation_visibility)
 
     # 6. Register ribbon dropdowns for has_dropdown buttons.
     _register_ribbon_dropdowns(mw, procesador)
@@ -417,14 +395,34 @@ def on_mode_enter(procesador):
 
 # ── right column builder ───────────────────────────────────────────────────────
 
-def _reapply_fritz_right_col_sizes(mw) -> None:
-    """Re-assert right_col width if Qt collapsed it during ManagerSolo.start().
+def _snap_wbase_to_board(mw) -> None:
+    """Eliminate the dead-space gap between the board and the right panel.
 
-    Qt may redistribute splitter sizes when child widget visibility or minimum
-    sizes change (ManagerSolo calls active_information_pgn, pon_toolbar, etc.).
-    This guard re-applies the 380 px right-column target whenever it has been
-    pushed below its minimum.
+    WBase contains [board (fixed size) | collapsed widgets | relleno() stretch].
+    The stretch eats all WBase space to the right of the board.  Snapping the
+    splitter so that WBase width == board width + margins removes that gap and
+    gives the freed pixels to the right column.
     """
+    rc = getattr(mw, "_fritz_right_col", None)
+    if rc is None:
+        return
+    board = getattr(mw.base, "board", None)
+    if board is None:
+        return
+    bw = board.width()
+    if bw < 100:
+        return
+    total = mw.splitter.width()
+    if total < 400:
+        return
+    wbase_w = bw + 6          # board + 2 px margin each side + 2 px slack
+    rc_w = max(total - wbase_w, 360)
+    wbase_w = total - rc_w    # recalculate in case rc_w hit the floor
+    mw.splitter.setSizes([wbase_w, rc_w])
+
+
+def _reapply_fritz_right_col_sizes(mw) -> None:
+    """Re-assert right_col width if Qt collapsed it during ManagerSolo.start()."""
     rc = getattr(mw, "_fritz_right_col", None)
     if rc is None:
         return

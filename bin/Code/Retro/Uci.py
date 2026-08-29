@@ -256,7 +256,7 @@ def _identify(path_str: str) -> None:
             print(f"manifest: MATCH — {match.get('label', '(no label)')}")
             print(f"          supported={match.get('supported')}")
         else:
-            print(f"manifest: NOT IN MANIFEST — unknown binary")
+            print("manifest: NOT IN MANIFEST — unknown binary")
     except Exception as exc:  # noqa: BLE001
         print(f"manifest: (lookup failed: {exc})")
 

@@ -30,7 +30,8 @@ import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from Code.Retro.Bridge import A4 as _A4_VALUE, AI_BEST_MOVE_ADDR, AI_OUTER_DRIVER_ADDR, Bridge
+from Code.Retro.Bridge import A4 as _A4_VALUE
+from Code.Retro.Bridge import AI_BEST_MOVE_ADDR, AI_OUTER_DRIVER_ADDR, Bridge
 from Code.Retro.Cpu import HOOK_CODE, Cpu
 from Code.Retro.Errors import EmulatorUnavailableError, RomNotFoundError, ThinkError
 from Code.Retro.Types import Level, ThinkResult

@@ -974,10 +974,16 @@ background-color: #ffffff;
 border-bottom: 1px solid #cccedb;
 font-family: "Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", Arial, sans-serif;
 font-size: 10pt;
-qproperty-tabRowHeight: 24;
-qproperty-contentHeight: 88;
+qproperty-qatRowHeight: 29;
+qproperty-tabRowHeight: 21;
+qproperty-contentHeight: 91;
 qproperty-largeBtnHeight: 64;
 qproperty-largeIconSize: 28;
+}
+
+#WRibbonQATRow
+{
+background-color: #d4d5d9;
 }
 
 #WRibbonQAT

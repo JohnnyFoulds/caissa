@@ -28,6 +28,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode Behaviour — Phase 2 (Dropdown + Toggle Infrastructure)**:
+  `WDropdownPanel` — blue-header floating selection panel (Qt.Popup semantics,
+  checkmark support, `popup(button)` positions below anchor); QSS rules added to
+  `fritz-widgets.qss`; `WRibbon` toggle support: `"toggle": true` in ribbon JSON
+  → `setCheckable(True)` (applied after `setDefaultAction` to survive Qt action sync),
+  tracked in `_toggle_btns`, synced via `set_toggle_api` + `sync()`; `▼` on large
+  buttons only when `"has_dropdown": true` (was always appended); `RibbonModel._validate()`
+  now enforces key format (`TB_*` / `caissa:*`), duplicate slot keys within a tab, valid
+  `size` / `kind` values, and `default_tab` resolution; `WDropdownPanel.py` added to
+  `_PYSIDE6_ALLOWED_RELATIVE` purity allowlist; 11 new tests (T-RIB-01..05 UI,
+  T-RIB-06..11 unit).
 - **Fritz Mode Behaviour — Phase 1 (Boot State)**: Fritz mode now boots directly
   into Infinite Analysis — engine analyses but never replies, no landing screen.
   `WFritzHome.py` deleted; `_build_fritz_right_col()` replaces `_swap_home_to_analysis`;

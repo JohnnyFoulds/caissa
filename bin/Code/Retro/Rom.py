@@ -202,10 +202,16 @@ def parse_amiga_hunk(data: bytes) -> list[MemRegion]:
                 pos += (size_longs & _MEMF_MASK) * 4
 
             else:
-                raise RomError(
-                    f"unexpected hunk type 0x{hunk_type:X} at file offset {pos - 4} "
-                    f"(hunk index {hunk_idx})"
+                # Tolerate unknown trailing hunk blocks (e.g. Dragon crack non-standard
+                # layout where game-loop code follows the AI code without HUNK_END markers).
+                # The AI code is fully within the preceding HUNK_CODE block; stop here.
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "unknown hunk type 0x%X at file offset %d (hunk index %d) — "
+                    "treating as end of hunk; %d bytes skipped",
+                    hunk_type, pos - 4, hunk_idx, len(data) - (pos - 4),
                 )
+                hunk_done = True
 
     if not regions:
         raise RomError("no loadable CODE, DATA, or BSS hunks found in the binary")

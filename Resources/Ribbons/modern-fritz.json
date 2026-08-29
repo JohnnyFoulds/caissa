@@ -3,9 +3,10 @@
   "default_tab": "home",
   "missing_key_policy": "disable",
   "quick_access": [
-    "TB_CLOSE", "TB_CANCEL", "TB_STOP", "TB_TUTOR_STOP", "TB_END_REPLAY", "TB_QUIT"
+    "TB_CLOSE", "TB_CANCEL", "TB_END_REPLAY",
+    "TB_STOP", "TB_TUTOR_STOP",
+    "TB_PREVIOUS", "TB_NEXT"
   ],
-  "overflow": { "tab": "home", "group": "more", "label": "More" },
   "tabs": [
     {
       "id": "file",
@@ -22,7 +23,8 @@
         { "key": "TB_OPTIONS",         "label": "Options..." },
         { "key": "TB_ENGINES",         "label": "Engines..." },
         { "separator": true },
-        { "key": "caissa:switch_mode", "label": "Switch Mode..." },
+        { "key": "caissa:switch_mode",  "label": "Switch Mode..." },
+        { "key": "caissa:switch_theme", "label": "Switch Theme..." },
         { "separator": true },
         { "key": "TB_QUIT",            "label": "Quit" }
       ]
@@ -35,8 +37,8 @@
           "id": "home.play",
           "label": "Play",
           "slots": [
-            { "key": "caissa:fritz_level", "size": "large", "label": "New Game", "icon": "Images/Fritz/new_game.png" },
-            { "key": "TB_LEVEL",           "size": "large", "label": "Levels",   "icon": "Images/Fritz/levels.png" }
+            { "key": "caissa:fritz_level", "size": "large", "label": "New Game" },
+            { "key": "TB_LEVEL",           "size": "large", "label": "Levels" }
           ]
         },
         {
@@ -45,7 +47,7 @@
           "slots": [
             { "key": "TB_RESIGN",   "size": "small" },
             { "key": "TB_DRAW",     "size": "small", "label": "Offer Draw" },
-            { "key": "TB_REINIT",   "size": "small", "label": "Abort" },
+            { "key": "TB_REINIT",   "size": "small", "label": "Restart" },
             { "key": "TB_TAKEBACK", "size": "small" }
           ]
         },
@@ -76,17 +78,23 @@
       "label": "Board",
       "groups": [
         {
-          "id": "board.appearance",
-          "label": "Appearance",
+          "id": "board.board",
+          "label": "Board",
           "slots": [
-            { "key": "caissa:flip_board",  "size": "large", "label": "Flip Board" },
+            { "key": "caissa:flip_board", "size": "large", "label": "Flip Board" }
+          ]
+        },
+        {
+          "id": "board.pieces",
+          "label": "Pieces",
+          "slots": [
             { "key": "caissa:piece_style", "size": "large", "label": "Piece Style" },
             { "key": "caissa:sq_color",    "size": "large", "label": "Square Color" }
           ]
         },
         {
-          "id": "board.view",
-          "label": "View",
+          "id": "board.display",
+          "label": "Display",
           "kind": "checkboxes",
           "items": [
             { "label": "Coordinates", "default": true  },
@@ -101,18 +109,13 @@
       "label": "Analysis",
       "groups": [
         {
-          "id": "analysis.play",
-          "label": "Play",
+          "id": "analysis.engine",
+          "label": "Engine",
           "slots": [
-            { "key": "caissa:play_now", "size": "large", "label": "Play Now" }
-          ]
-        },
-        {
-          "id": "analysis.tutor",
-          "label": "Tutor",
-          "slots": [
-            { "key": "TB_PAUSE",    "size": "small", "label": "Pause Tutor" },
-            { "key": "TB_CONTINUE", "size": "small", "label": "Continue Tutor" }
+            { "key": "TB_STOP",       "size": "large", "label": "Play Now" },
+            { "key": "TB_PAUSE",      "size": "small", "label": "Pause" },
+            { "key": "TB_CONTINUE",   "size": "small", "label": "Continue" },
+            { "key": "TB_TUTOR_STOP", "size": "small", "label": "Stop Tutor" }
           ]
         },
         {
@@ -151,7 +154,13 @@
           "label": "Settings",
           "slots": [
             { "key": "TB_ENGINES",      "size": "small", "label": "Engine Properties" },
-            { "key": "TB_SETTINGS",     "size": "small", "label": "UCI Options" },
+            { "key": "TB_SETTINGS",     "size": "small", "label": "UCI Options" }
+          ]
+        },
+        {
+          "id": "engine.kibitzer",
+          "label": "Kibitzer",
+          "slots": [
             { "key": "caissa:kibitzer", "size": "small", "label": "Kibitzer" }
           ]
         }

@@ -180,8 +180,7 @@ off in the raster mockup, the PySide6 harness is updated to match the agreed des
 **Decision:** The Caissa "Coaching" ribbon group contains two small flat buttons — Hint and
 Suggestion — each using a `?` icon. They are not radio buttons, not toggles, and not grouped as a
 selection control.  
-**Rationale:** Confirmed from Fritz 18 manual p.63: "functions Hint and Suggestion in the Help menu"
-are plain one-shot actions. An earlier mockup used a circle outline icon that visually resembled a
+**Rationale:** Confirmed from Fritz 18 manual (`https://help.chessbase.com/Fritz/18/Eng/000018.htm`, `https://help.chessbase.com/Fritz/18/Eng/000070.htm`): Hint and Suggestion are plain one-shot actions. An earlier mockup used a circle outline icon that visually resembled a
 radio button; this was incorrect and has been replaced with the `?` icon.  
 **Alternative considered:** Radio buttons / toggle buttons — rejected because the Fritz manual
 confirms these are one-time actions, not mode selections.
@@ -242,3 +241,51 @@ layout.
 layout has `setSpacing(4)`, the visual gap between groups is the sum of both — `4 + 6 + 1 + 6 + 4
 = 21px` — which looks fat even though the line itself is 1px. Setting horizontal margin to 0 on the
 separator and letting layout spacing control horizontal gaps keeps the total gap predictable.
+
+---
+
+## D18 — `_swap_home_to_analysis` is deleted, not patched
+
+**Resolved:** 2026-08-29  
+**Decision:** `_swap_home_to_analysis` (`modern_fritz_ui.py:354-495`) is deleted in Phase 1.
+Its replacement is `_build_fritz_right_col(mw)`, which both the boot path and the game-start
+path call.  
+**Rationale:** `_swap_home_to_analysis` has two defects that cannot be fixed in isolation:
+it early-returns `False` when `_fritz_home is None` (`:368-371`), which is the permanent
+state after the landing screen is deleted; and it mutates `right_col` positionally, assuming
+the first child is always `WFritzHome` (`:405`, `:410-411`, `:414`). A patch that removes
+the early-return and fixes the positional mutation is larger than a clean rewrite, and
+leaves dead code paths. `_build_fritz_right_col` is the single function that builds the
+right column from the `_PANE_SPECS` order; it is idempotent and safe to call twice.  
+**Alternative considered:** Patch `_swap_home_to_analysis` — rejected because the function
+is premised on a widget (`WFritzHome`) that no longer exists.
+
+---
+
+## D19 — `WFritzHome.py` is deleted, not archived or emptied
+
+**Resolved:** 2026-08-29  
+**Decision:** `bin/Code/UIModes/WFritzHome.py` is deleted (`git rm`) in Phase 1.
+Its 33 associated `#WFritzHome*` QSS rules across three stylesheets are also deleted.  
+**Rationale:** The file has zero callers after the boot-state change. Keeping an empty or
+stub file wastes the purity-tier AST walk's attention and leaves dead QSS rules. Deleted
+files are still reachable in git history for any future reference.  
+**Alternative considered:** Leave an empty module or a deprecation notice — rejected as
+dead code.
+
+---
+
+## D20 — The `voyager2` route in `_dispatch_non_game_action` is removed, not fixed
+
+**Resolved:** 2026-08-29  
+**Decision:** `modern_fritz_ui.py:513` (`sh.play_menu().run_exec("voyager2")`) is deleted.
+The correct call for "Set up position" is `Voyager.voyager_position(mw, position)` called
+directly from the New Game ▼ panel's "Set up position" item.  
+**Rationale:** `play_menu().run_exec("voyager2")` routes through `BaseMenu.run_exec` →
+`PlayMenu.run_select`, which has no `voyager2` attribute, causing an `AttributeError` that
+is silently swallowed (`:515-516`). The only place `"voyager2"` is a real key is
+`Openings/WindowOpeningLine.py:744`, an unrelated opening-study dialog. `Voyager.voyager_position()`
+(`Voyager/Voyager.py:1038`) is the correct entry point for position setup.  
+**Alternative considered:** Add `voyager2` to `PlayMenu` — rejected; that would add a
+Lucas Chess internal routing key for a Fritz-specific use case, violating the architectural
+boundary.

@@ -391,8 +391,7 @@ color: {FOREGROUND};
 
 #WRibbonRule
 {
-color: {CHROME_SURFACE_2};
-background-color: {CHROME_SURFACE_2};
+background-color: {CHROME_BORDER};
 max-height: 1px;
 }
 
@@ -420,8 +419,8 @@ padding: 0px 2px;
 
 #WRibbonGroupSep
 {
-background-color: {CHROME_BORDER};
-margin: 8px 3px;
+background-color: {CHROME_SEP};
+margin: 8px 0px;
 }
 
 #WRibbonQAT QToolButton

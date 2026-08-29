@@ -114,6 +114,7 @@ SELECTION_BOARD_FILLING=Filling
 CHROME_SURFACE=Surface
 CHROME_SURFACE_2=Surface (alt / hover)
 CHROME_BORDER=Border
+CHROME_SEP=Ribbon group separator
 CHROME_TEXT_DIM=Dim text
 CHROME_ACCENT=Accent
 CHROME_ACCENT_HOVER=Accent (hover)

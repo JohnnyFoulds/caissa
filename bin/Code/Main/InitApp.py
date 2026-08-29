@@ -14,11 +14,20 @@ def init_app_style(app, configuration):
         style = "fusion"
     app.setStyle(QtWidgets.QStyleFactory.create(style))
 
-    # - Style Mode (active mode may pin a specific theme via its "style" field)
+    # - Style Mode
+    # Mode JSON may declare a preferred default theme via "style".
+    # It wins only when the user has not explicitly chosen a theme
+    # (i.e. their global preference is still the factory "By default").
+    # An explicit user choice (set via Options or the ribbon theme switcher)
+    # always takes priority.
     from Code.UIModes.UIModes import active_mode as _active_mode
     _mode_style = _active_mode().get("style")
+    _user_theme = configuration.x_style_mode
 
-    style_mode = _mode_style or configuration.x_style_mode
+    if _mode_style and _user_theme in ("By default", "", None):
+        style_mode = _mode_style
+    else:
+        style_mode = _user_theme
     path_qss = Code.path_resource("Styles", f"{style_mode}.qss")
     if not os.path.isfile(path_qss):
         # Mode-pinned style not found — fall back to user preference

@@ -318,6 +318,9 @@ def on_mode_enter(procesador):
     from Code.Z.ManagerSolo import ManagerSolo as _ManagerSolo
     _ManagerSolo(procesador).start({"PLAY_AGAINST_ENGINE": False, "ANALYSIS_BAR": True})
 
+    # 6. Register ribbon dropdowns for has_dropdown buttons.
+    _register_ribbon_dropdowns(mw, procesador)
+
     _log.debug("Modern Fritz layout activated (Infinite Analysis)")
 
 
@@ -456,6 +459,82 @@ def _build_fritz_right_col(mw) -> None:
     mw._fritz_pgn_restore    = pgn_layout_info
 
     _log.debug("Fritz right col built")
+
+
+def _register_ribbon_dropdowns(mw, procesador) -> None:
+    """Register WDropdownPanel instances for every has_dropdown ribbon button.
+
+    Called at the end of on_mode_enter so the ribbon exists and procesador
+    is fully set up.  Silently skips if no ribbon is installed.
+    """
+    ribbon = getattr(getattr(mw, "base", None), "ribbon", None)
+    if ribbon is None:
+        return
+
+    # ── New Game ▼ (caissa:fritz_level) ─────────────────────────────────────
+    def _new_game():
+        _fritz_new_game(procesador)
+
+    ribbon.set_dropdown(
+        "caissa:fritz_level",
+        _("New Game"),
+        [(_("New Game…"), _new_game)],
+    )
+
+    # ── Levels ▼ (TB_LEVEL) — opens level picker in-game ────────────────────
+    ribbon.set_dropdown(
+        "TB_LEVEL",
+        _("Levels"),
+        [(_("Choose Level…"), _new_game)],
+    )
+
+    # ── Piece Style ▼ (caissa:piece_style) ───────────────────────────────────
+    from Code.UIModes.actions.board_actions import apply_piece_style as _apply_piece
+
+    _PIECES = [
+        "Alpha", "Berlin", "Cburnett", "Leipzig", "Merida", "Regular", "Staunton 3D",
+    ]
+
+    def _make_piece_cb(name: str):
+        def _cb():
+            _apply_piece(name)
+        return _cb
+
+    def _config_board():
+        import Code
+        if hasattr(Code, "procesador") and Code.procesador is not None:
+            Code.procesador.config_board()
+
+    piece_items = [(n, _make_piece_cb(n)) for n in _PIECES]
+    piece_items.append((_("More…"), _config_board))
+
+    ribbon.set_dropdown("caissa:piece_style", _("Piece Style"), piece_items)
+
+    # ── Square Color ▼ (caissa:sq_color) ─────────────────────────────────────
+    ribbon.set_dropdown(
+        "caissa:sq_color",
+        _("Square Color"),
+        [(_("Configure…"), _config_board)],
+    )
+
+    # ── Standard Layouts ▼ (caissa:std_layout) ───────────────────────────────
+    ribbon.set_dropdown(
+        "caissa:std_layout",
+        _("Standard Layouts"),
+        [(_("Configure…"), _config_board)],
+    )
+
+    # ── Select Engine ▼ (caissa:select_engine) ───────────────────────────────
+    def _select_engine():
+        import Code
+        if hasattr(Code, "procesador") and Code.procesador is not None:
+            Code.procesador.motores()
+
+    ribbon.set_dropdown(
+        "caissa:select_engine",
+        _("Select Engine"),
+        [(_("Choose Engine…"), _select_engine)],
+    )
 
 
 def _fritz_new_game(procesador):

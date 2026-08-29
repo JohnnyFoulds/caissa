@@ -32,6 +32,7 @@ from Code.Base.Constantes import (
     TB_CONFIG,
     TB_CONTINUE,
     TB_DRAW,
+    TB_LEVEL,
     TB_PAUSE,
     TB_QUIT,
     TB_REINIT,
@@ -689,6 +690,10 @@ class ManagerPlayAgainstEngine(Manager.Manager):
 
         elif key == TB_STOP:
             self.stop_engine()
+
+        elif key == TB_LEVEL:
+            from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
+            _fritz_new_game(self.procesador)
 
         else:
             self.routine_default(key)

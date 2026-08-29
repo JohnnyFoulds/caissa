@@ -303,7 +303,7 @@ def on_mode_enter(procesador):
 
     # 4. Restore last saved layout (manual §000078).
     try:
-        from Code.Fritz.GeometryStore import GeometryStore
+        from Code.Fritz import GeometryStore
         saved = GeometryStore.load_splitters("fritz")
         if saved:
             rc = getattr(mw, "_fritz_right_col", None)
@@ -518,11 +518,23 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
     )
 
     # ── Standard Layouts ▼ (caissa:std_layout) ───────────────────────────────
-    ribbon.set_dropdown(
-        "caissa:std_layout",
-        _("Standard Layouts"),
-        [(_("Configure…"), _config_board)],
-    )
+    from Code.Fritz.Layouts import apply_preset as _apply_layout, preset_names as _preset_names
+
+    def _make_layout_cb(preset_name: str):
+        def _cb():
+            rc = getattr(mw, "_fritz_right_col", None)
+            if rc is not None:
+                _apply_layout(preset_name, mw.splitter, rc)
+        return _cb
+
+    def _factory_reset():
+        from Code.Fritz.Layouts import factory_name
+        _make_layout_cb(factory_name())()
+
+    layout_items = [(n, _make_layout_cb(n)) for n in _preset_names()]
+    layout_items.append((_("Factory Settings"), _factory_reset))
+
+    ribbon.set_dropdown("caissa:std_layout", _("Standard Layouts"), layout_items)
 
     # ── Select Engine ▼ (caissa:select_engine) ───────────────────────────────
     def _select_engine():
@@ -660,6 +672,21 @@ def _restore_main_splitter_pre_fritz(mw):
 def on_mode_exit(procesador):
     """Restore the standard layout before Procesador.reset() wipes state."""
     mw = procesador.main_window
+
+    # ── Persist current splitter layout (manual §000078) ─────────────────────
+    try:
+        from Code.Fritz import GeometryStore
+        rc = getattr(mw, "_fritz_right_col", None)
+        splitter_sizes: dict[str, list[int]] = {}
+        if rc is not None:
+            splitter_sizes["right_col"] = rc.sizes()
+        main_sizes = mw.splitter.sizes()
+        if main_sizes:
+            splitter_sizes["main"] = main_sizes
+        if splitter_sizes:
+            GeometryStore.save_splitters("fritz", splitter_sizes)
+    except Exception:
+        _log.debug("Fritz: GeometryStore save failed", exc_info=True)
 
     # Restore FritzEtiquetaPGN → original EtiquetaPGN delegates.
     saved = getattr(mw, "_fritz_saved_delegates", None)

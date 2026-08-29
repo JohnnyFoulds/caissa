@@ -28,6 +28,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode Behaviour — Phase 5 (View Tab — Layouts + Splitter Persistence)**:
+  `bin/Code/Fritz/Layouts.py` — six named presets (Standard / Big Board / Big Notation /
+  Big Engine / Board Only / All Windows); `apply_preset(name, main_sp, rc_sp)` scales
+  proportional weights to pixels via `QSplitter.setSizes`; `factory_name()` returns
+  `"Standard"`. `GeometryStore.save_splitters` now called in `on_mode_exit` — last
+  layout persists across sessions (manual §000078). Fixed silent import bug in
+  `on_mode_enter` (`from Code.Fritz.GeometryStore import GeometryStore` → module-level
+  import; `GeometryStore` has no class). Standard Layouts ▼ dropdown wired with all
+  six presets + Factory Settings. 10 unit tests in `tests/unit/fritz/test_layouts.py`.
 - **Fritz Mode Behaviour — Phase 4 (Analysis + Engine Tab Wiring)**:
   `ManagerSolo.run_action` dispatches `caissa:infinite_analysis` — toggles
   `play_against_engine`: game→analysis terminates rival engine and calls

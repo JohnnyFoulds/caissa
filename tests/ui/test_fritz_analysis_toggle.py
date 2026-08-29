@@ -154,12 +154,12 @@ def test_infinite_analysis_toggle_flips_play_against_engine():
 
 
 @pytest.mark.xfail(strict=True, reason=_PHASE4_DISPATCH)
-def test_tb_stop_in_manager_solo_opens_new_game():
-    """T-P4-04: TB_STOP in ManagerSolo dispatches to _fritz_new_game."""
+def test_tb_stop_in_manager_solo_opens_level_picker():
+    """T-P4-04: TB_STOP in ManagerSolo dispatches to _fritz_pick_level."""
     pytest.fail("not yet testable without live app")
 
 
 @pytest.mark.xfail(strict=True, reason=_PHASE4_DISPATCH)
-def test_tb_level_in_manager_solo_opens_new_game():
-    """T-P4-05: TB_LEVEL in ManagerSolo dispatches to _fritz_new_game."""
+def test_tb_level_in_manager_solo_opens_level_picker():
+    """T-P4-05: TB_LEVEL in ManagerSolo dispatches to _fritz_pick_level."""
     pytest.fail("not yet testable without live app")

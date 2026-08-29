@@ -537,10 +537,9 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
     ribbon.set_dropdown("caissa:std_layout", _("Standard Layouts"), layout_items)
 
     # ── Select Engine ▼ (caissa:select_engine) ───────────────────────────────
-    # Opens the Fritz New Game dialog — the engine is chosen as part of level setup.
-    # Code.procesador.motores() does not exist; WFritzNewGame is the Fritz-mode path.
+    # Engine selection is part of the level/game setup dialog for now.
     def _select_engine():
-        _fritz_new_game(procesador)
+        _fritz_pick_level(procesador)
 
     ribbon.set_dropdown(
         "caissa:select_engine",
@@ -582,8 +581,33 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
     ribbon.set_toggle_api(_get_toggle)
 
 
+_FRITZ_GAME_DIC_KEY = "FRITZ_LAST_GAME_DIC"
+
+
 def _fritz_new_game(procesador):
-    """Show the Fritz level picker and start a game against the engine."""
+    """New Game — restart immediately with last-used settings (no dialog).
+
+    Fritz behaviour: clicking New Game never shows a dialog.  It restarts
+    with the most recently configured level/time settings.  If no settings
+    have been stored yet (first ever run) the level picker is opened instead
+    so the user can configure a level before play begins.
+    """
+    import Code
+    stored = Code.configuration.read_variables(_FRITZ_GAME_DIC_KEY)
+    if stored and "RIVAL" in stored:
+        _start_fritz_engine_game(procesador, stored)
+    else:
+        # First run — no level configured yet; fall back to the picker.
+        _fritz_pick_level(procesador)
+
+
+def _fritz_pick_level(procesador):
+    """Levels — open the Fritz level/time-control picker dialog.
+
+    After the user confirms, the selected settings are saved and the game
+    starts immediately.  This is the only place the WFritzNewGame dialog
+    is shown.
+    """
     mw = procesador.main_window
     from Code.Fritz.WFritzNewGame import WFritzNewGame
     dlg = WFritzNewGame(mw)
@@ -594,6 +618,14 @@ def _fritz_new_game(procesador):
     if dic is None:
         return
 
+    import Code
+    Code.configuration.write_variables(_FRITZ_GAME_DIC_KEY, dic)
+    _start_fritz_engine_game(procesador, dic)
+
+
+def _start_fritz_engine_game(procesador, dic):
+    """Start a Fritz engine game from a fully-formed game-setup dic."""
+    mw = procesador.main_window
     eval_graph = getattr(mw, "_fritz_eval_graph", None)
     if eval_graph is not None:
         eval_graph.reset()

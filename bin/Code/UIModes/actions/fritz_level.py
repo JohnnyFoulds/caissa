@@ -16,3 +16,10 @@ def _handler():
     import Code
     from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
     _fritz_new_game(Code.procesador)
+
+
+def pick_level_handler():
+    """Used by TB_LEVEL and Analysis tab 'Play Now' — always shows the picker."""
+    import Code
+    from Code.UIModes.actions.modern_fritz_ui import _fritz_pick_level
+    _fritz_pick_level(Code.procesador)

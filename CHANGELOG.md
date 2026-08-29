@@ -12,6 +12,13 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **DOS corpus collection — reliable multi-move pipeline**: `WaitCpuReply` rewritten to use
+  color-based `board_state()` comparison (pink/blue piece classification) instead of pixel-diff
+  heuristics.  Two-phase detection: wait for first movement sign → 0.8s animation settle → read
+  final board state.  Handles captures correctly (pink square becomes blue).  `MovePiece` gains
+  a precondition that verifies a white piece is actually at the source square, catching stale game
+  state from previous runs.  Fresh DOSBox-X kill-and-relaunch guarantees startpos.  Pipeline now
+  records 5+ consecutive moves including captures without error.
 - **DOS automation — first ground-truth corpus entry**: `Resources/Retro/Corpus/dosbox-manual.jsonl`
   records Battle Chess (DOS) responding `c7c5` (Sicilian Defence) to `1.e4`, verified deterministic
   across two independent fresh-launch runs.  Full pipeline: DOSBox-X launch → 2D board mode →

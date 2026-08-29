@@ -28,8 +28,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from Code.Dos.Driver import DosBoxDriver
     from PIL.Image import Image
+
+    from Code.Dos.Driver import DosBoxDriver
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +96,8 @@ def square_center(square: str) -> tuple[int, int]:
 # ==================================================================
 
 def inner_square_changed(
-    before: "Image",
-    after: "Image",
+    before: Image,
+    after: Image,
     square: str,
     *,
     threshold: float = 10.0,
@@ -120,7 +121,7 @@ def inner_square_changed(
     hw = max(1, _SQ_HALF_W // 2)
     hh = max(1, _SQ_HALF_H // 2)
 
-    def _crop(img: "Image") -> "np.ndarray":
+    def _crop(img: Image) -> np.ndarray:
         return np.array(
             img.crop((cx - hw, cy - hh, cx + hw, cy + hh)).convert("RGB"),
             dtype=np.int32,
@@ -131,7 +132,7 @@ def inner_square_changed(
     return diff >= threshold
 
 
-def board_crop(img: "Image") -> "Image":
+def board_crop(img: Image) -> Image:
     """Crop *img* to the board region only.
 
     :param img: Full-window PIL Image.
@@ -141,7 +142,7 @@ def board_crop(img: "Image") -> "Image":
     return img.crop((x, y, x + w, y + h))
 
 
-def square_crop(img: "Image", square: str) -> "Image":
+def square_crop(img: Image, square: str) -> Image:
     """Crop *img* to the bounding box of *square*.
 
     :param img: Full-window PIL Image.
@@ -155,7 +156,7 @@ def square_crop(img: "Image", square: str) -> "Image":
     ))
 
 
-def is_selected(img: "Image", square: str) -> bool:
+def is_selected(img: Image, square: str) -> bool:
     """Return True if *square* shows the Battle Chess selection highlight.
 
     The highlight flickers between bright green and bright blue; both are
@@ -179,7 +180,7 @@ def is_selected(img: "Image", square: str) -> bool:
     return int((green | blue).sum()) >= _SELECTION_MIN_PX
 
 
-def is_white_piece_at(img: "Image", square: str) -> bool:
+def is_white_piece_at(img: Image, square: str) -> bool:
     """Return True if *square* likely contains a white (pink/cream) piece.
 
     White pieces in 2D Battle Chess are rendered in pinkish tones.
@@ -201,7 +202,7 @@ def is_white_piece_at(img: "Image", square: str) -> bool:
     return int(pink.sum()) >= 8
 
 
-def is_black_piece_at(img: "Image", square: str) -> bool:
+def is_black_piece_at(img: Image, square: str) -> bool:
     """Return True if *square* likely contains a black (blue/dark) piece.
 
     Black pieces in 2D Battle Chess are rendered in blue-ish dark tones.
@@ -222,7 +223,7 @@ def is_black_piece_at(img: "Image", square: str) -> bool:
     return int(blue_dark.sum()) >= 8
 
 
-def has_piece_at(img: "Image", square: str) -> bool:
+def has_piece_at(img: Image, square: str) -> bool:
     """Return True if *square* contains either a white or black piece.
 
     :param img: Full-window PIL Image.
@@ -233,8 +234,8 @@ def has_piece_at(img: "Image", square: str) -> bool:
 
 
 def detect_changed_squares(
-    before: "Image",
-    after: "Image",
+    before: Image,
+    after: Image,
     *,
     threshold: float = _CHANGE_THRESHOLD,
 ) -> list[tuple[float, str]]:
@@ -270,9 +271,53 @@ def detect_changed_squares(
     return results
 
 
+def board_state(img: Image) -> dict[str, str]:
+    """Classify all 64 squares as empty, white piece, or black piece.
+
+    Uses color detection on each square's inner core crop.  A high pixel-count
+    threshold (50) ensures that sprite overflow from an adjacent rank — where
+    only the top of a tall piece enters the crop — does not trigger a false
+    piece detection.  A full piece body contributes 100–300 qualifying pixels;
+    overflow contributes fewer than 50.
+
+    :param img: Full-window PIL Image.
+    :returns: Dict mapping each square name to ``'w'`` (white/pink piece),
+              ``'b'`` (black/blue piece), or ``''`` (empty).
+    """
+    import numpy as np
+
+    arr = np.array(img.convert("RGB"), dtype=np.int32)
+    ih, iw = arr.shape[:2]
+    hw = max(1, _SQ_HALF_W // 2)
+    hh = max(1, _SQ_HALF_H // 2)
+    # Minimum colored pixels in the inner core to count as a piece presence.
+    # After animation settles (0.8s), a piece body contributes 50-300 px and
+    # overflow from an adjacent rank contributes ~5-15 px.  Threshold 20 gives
+    # clear separation while reliably detecting all piece types.
+    _MIN_PIECE_PX = 20
+
+    state: dict[str, str] = {}
+    for sq, (cx, cy) in _SQUARE_COORDS.items():
+        x0 = max(0, cx - hw)
+        y0 = max(0, cy - hh)
+        x1 = min(iw, cx + hw)
+        y1 = min(ih, cy + hh)
+        crop = arr[y0:y1, x0:x1]
+        r, g, b = crop[:, :, 0], crop[:, :, 1], crop[:, :, 2]
+        pink = int(((r > 150) & (r > g + 30) & (r > b + 10)).sum())
+        blue = int(((b > 80) & (b > r + 20) & (b > g + 10) & (r + g + b < 300)).sum())
+        if pink >= _MIN_PIECE_PX:
+            state[sq] = "w"
+        elif blue >= _MIN_PIECE_PX:
+            state[sq] = "b"
+        else:
+            state[sq] = ""
+    return state
+
+
 def _infer_from_candidates(
-    before: "Image",
-    after: "Image",
+    before: Image,
+    after: Image,
     candidates: list[tuple[float, str]],
 ) -> tuple[str, str] | None:
     """Infer from/to from a pre-filtered candidate list using brightness DELTA.
@@ -303,7 +348,7 @@ def _infer_from_candidates(
     sq_a = candidates[0][1]
     sq_b = candidates[1][1]
 
-    def _mean_brightness(img: "Image", sq: str) -> float:
+    def _mean_brightness(img: Image, sq: str) -> float:
         arr = np.array(square_crop(img, sq).convert("L"), dtype=np.float32)
         return float(arr.mean())
 
@@ -319,7 +364,7 @@ def _infer_from_candidates(
     return (sq_a, sq_b) if delta_a >= delta_b else (sq_b, sq_a)
 
 
-def infer_move(before: "Image", after: "Image") -> tuple[str, str] | None:
+def infer_move(before: Image, after: Image) -> tuple[str, str] | None:
     """Infer the from/to squares of a move from two screenshots.
 
     Finds the two most-changed squares, then uses brightness of the *before*
@@ -339,7 +384,7 @@ def infer_move(before: "Image", after: "Image") -> tuple[str, str] | None:
     sq_a = changed[0][1]
     sq_b = changed[1][1]
 
-    def _mean_brightness(img: "Image", sq: str) -> float:
+    def _mean_brightness(img: Image, sq: str) -> float:
         arr = np.array(square_crop(img, sq).convert("L"), dtype=np.float32)
         return float(arr.mean())
 
@@ -376,7 +421,7 @@ class BattleChessSession:
         self._save_dir = Path(save_dir)
         self._save_dir.mkdir(parents=True, exist_ok=True)
         self._process = None
-        self._driver: "DosBoxDriver | None" = None
+        self._driver: DosBoxDriver | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -387,7 +432,7 @@ class BattleChessSession:
         cls,
         level: int = 1,
         save_dir: str | Path = "/tmp/bc_session",
-    ) -> "BattleChessSession":
+    ) -> BattleChessSession:
         """Launch DOSBox-X with Battle Chess if not running, then attach.
 
         Uses :class:`~Code.Dos.Activities.EnsureDosBoxRunning` as the first
@@ -400,8 +445,12 @@ class BattleChessSession:
         :raises RuntimeError: If DOSBox-X cannot be launched within the timeout.
         """
         from Code.Dos.Activities import (
-            DosRunner, EnsureDosBoxRunning, FocusDosBox,
-            DismissTitleScreen, EnsureBoard2D, WaitForBoardReady,
+            DismissTitleScreen,
+            DosRunner,
+            EnsureBoard2D,
+            EnsureDosBoxRunning,
+            FocusDosBox,
+            WaitForBoardReady,
         )
         from Code.Dos.Driver import DosBoxDriver
         from Code.Dos.Process import DosBoxProcess
@@ -435,7 +484,7 @@ class BattleChessSession:
         cls,
         level: int = 1,
         save_dir: str | Path = "/tmp/bc_session",
-    ) -> "BattleChessSession":
+    ) -> BattleChessSession:
         """Attach to an already-running DOSBox-X Battle Chess window.
 
         Useful for interactive testing without a full launch/quit cycle.
@@ -457,7 +506,7 @@ class BattleChessSession:
         logger.info("BattleChessSession attached to running DOSBox-X")
         return session
 
-    def start(self) -> "BattleChessSession":
+    def start(self) -> BattleChessSession:
         """Launch DOSBox-X with Battle Chess and wait for the title screen.
 
         :returns: *self* for chaining.
@@ -483,7 +532,7 @@ class BattleChessSession:
             self._process = None
             self._driver = None
 
-    def __enter__(self) -> "BattleChessSession":
+    def __enter__(self) -> BattleChessSession:
         return self.start()
 
     def __exit__(self, *_) -> None:
@@ -493,7 +542,7 @@ class BattleChessSession:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _shot(self, name: str = "") -> "Image":
+    def _shot(self, name: str = "") -> Image:
         """Take a screenshot, optionally saving it for debugging."""
         img = self._driver.screenshot()
         if name:
@@ -598,7 +647,7 @@ class BattleChessSession:
     # CHECK — piece state queries
     # ------------------------------------------------------------------
 
-    def has_piece(self, img: "Image", square: str) -> bool:
+    def has_piece(self, img: Image, square: str) -> bool:
         """Return True if either a white or black piece is visible at *square*.
 
         :param img: Screenshot already taken.
@@ -672,8 +721,13 @@ class BattleChessSession:
         :returns: CPU move as UCI string, e.g. ``"e7e5"``, or ``None``.
         """
         from Code.Dos.Activities import (
-            DosRunner, FocusDosBox, WaitForBoardReady,
-            SourceDragDown, DragToDest, DragRelease, WaitCpuReply,
+            DosRunner,
+            DragRelease,
+            DragToDest,
+            FocusDosBox,
+            SourceDragDown,
+            WaitCpuReply,
+            WaitForBoardReady,
         )
 
         logger.info("make_move: %s → %s", from_sq, to_sq)

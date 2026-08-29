@@ -23,9 +23,10 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from PIL.Image import Image
+
     from Code.Dos.Driver import DosBoxDriver
     from Code.Dos.Process import DosBoxProcess
-    from PIL.Image import Image
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class DosActivity:
     check_pre_screenshot: bool = True
     verify_screenshot: bool = True
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         """Return True if the app is in the right state to execute.
 
         :param img: Current screenshot, or None if check_pre_screenshot=False.
@@ -61,7 +62,7 @@ class DosActivity:
         """
         raise NotImplementedError(f"{type(self).__name__}.precondition not implemented")
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """Issue the driver actuation.
 
         :param driver: DosBoxDriver instance.
@@ -69,7 +70,7 @@ class DosActivity:
         """
         raise NotImplementedError(f"{type(self).__name__}.execute not implemented")
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
         """Return True if the action was performed successfully.
 
         Called repeatedly during VERIFY until True or timeout.
@@ -94,7 +95,7 @@ class DosRunner:
     def __init__(self, save_dir: str | None = None) -> None:
         self._save_dir = save_dir
 
-    def run(self, driver: "DosBoxDriver", activities: list[DosActivity]) -> dict:
+    def run(self, driver: DosBoxDriver, activities: list[DosActivity]) -> dict:
         """Execute *activities* in order.
 
         :param driver: DosBoxDriver to pass to each activity.
@@ -144,7 +145,7 @@ class DosRunner:
 
         return ctx
 
-    def _on_failure(self, driver: "DosBoxDriver", act: DosActivity, reason: str, ctx: dict) -> None:
+    def _on_failure(self, driver: DosBoxDriver, act: DosActivity, reason: str, ctx: dict) -> None:
         logger.error("DosRunner: %s — %s; ctx=%s", act.name, reason, ctx)
         if self._save_dir:
             try:
@@ -172,14 +173,14 @@ class EnsureDosBoxRunning(DosActivity):
     settle_ms = 500
     verify_ms = 20000
 
-    def __init__(self, process: "DosBoxProcess") -> None:
+    def __init__(self, process: DosBoxProcess) -> None:
         self._process = process
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         """Always True — we always check / ensure running state."""
         return True
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """Launch DOSBox-X if it is not already running."""
         if not self._process.is_running:
             logger.info("EnsureDosBoxRunning: launching DOSBox-X")
@@ -187,7 +188,7 @@ class EnsureDosBoxRunning(DosActivity):
         else:
             logger.debug("EnsureDosBoxRunning: already running")
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
         """True when the DOSBox-X window is visible."""
         return self._process.is_running
 
@@ -205,13 +206,13 @@ class FocusDosBox(DosActivity):
     verify_screenshot = False
     settle_ms = 400
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         return True
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         driver.focus()
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
         return True
 
 
@@ -233,14 +234,14 @@ class DismissTitleScreen(DosActivity):
     settle_ms = 500
     verify_ms = 20000   # board may take up to 15s to appear after ENTER
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         return True
 
     # Minimum board-region colour fraction that indicates some game content
     # is on screen (title screen partially loaded; above a black loading screen).
     _TITLE_MIN_FRACTION = 0.03
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """Focus DOSBox, wait for title to load, then press ENTER to advance.
 
         ``driver.focus()`` is called BEFORE the key presses so ENTER goes to
@@ -256,8 +257,9 @@ class DismissTitleScreen(DosActivity):
             img = driver.screenshot()
             if EnsureBoard2D._board_visible(img):
                 return  # already at the board — no key needed
-            from Code.Dos.BattleChess import _BOARD_REGION
             import numpy as np
+
+            from Code.Dos.BattleChess import _BOARD_REGION
             bx, by, bw, bh = _BOARD_REGION
             arr = np.array(img.crop((bx, by, bx + bw, by + bh)).convert("RGB"))
             r, g, b_ch = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
@@ -282,7 +284,7 @@ class DismissTitleScreen(DosActivity):
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
             time.sleep(0.35)
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
         return EnsureBoard2D._board_visible(img)
 
 
@@ -308,13 +310,13 @@ class WaitForBoardReady(DosActivity):
     settle_ms = 0
     verify_ms = 30000
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         return True
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         pass
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
         return EnsureBoard2D._board_visible(img)
 
 
@@ -355,11 +357,11 @@ class EnsureBoard2D(DosActivity):
     _CANCEL_X  = 600
     _CANCEL_Y  = 33
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         """True when the board is visible in any mode (game has loaded)."""
         return self._board_visible(img)
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """Switch to 2D mode if not already there.
 
         CHECK: pixel heuristic detects current mode.
@@ -419,12 +421,12 @@ class EnsureBoard2D(DosActivity):
         _rup(self._ITEM_2D_X, self._ITEM_2D_Y)
         logger.info("EnsureBoard2D: released on '2D Board' — switch in progress")
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
         """True when the 2D flat board is confirmed visible."""
         return self._is_2d_mode(img)
 
     @staticmethod
-    def _is_2d_mode(img: "Image | None") -> bool:
+    def _is_2d_mode(img: Image | None) -> bool:
         """Return True if the board is in 2D flat top-down view.
 
         In 2D mode the flat grid fills ~40 % of the board crop.
@@ -434,6 +436,7 @@ class EnsureBoard2D(DosActivity):
         if img is None:
             return False
         import numpy as np
+
         from Code.Dos.BattleChess import _BOARD_REGION
         bx, by, bw, bh = _BOARD_REGION
         arr = np.array(img.crop((bx, by, bx + bw, by + bh)).convert("RGB"))
@@ -444,7 +447,7 @@ class EnsureBoard2D(DosActivity):
         return fraction >= EnsureBoard2D._2D_MODE_FRACTION
 
     @staticmethod
-    def _board_visible(img: "Image | None") -> bool:
+    def _board_visible(img: Image | None) -> bool:
         """Return True when ANY board (2D or 3D) is visible.
 
         Used by precondition to confirm the game has loaded and is showing
@@ -454,6 +457,7 @@ class EnsureBoard2D(DosActivity):
         if img is None:
             return False
         import numpy as np
+
         from Code.Dos.BattleChess import _BOARD_REGION
         bx, by, bw, bh = _BOARD_REGION
         arr = np.array(img.crop((bx, by, bx + bw, by + bh)).convert("RGB"))
@@ -467,18 +471,136 @@ class EnsureBoard2D(DosActivity):
 # ---------------------------------------------------------------------------
 # Move activities — two-click: SourceClick → DestClick
 #
-# Battle Chess 2D uses two-click move mechanics:
-#   1. MOUSEMOVED to source → CLICK source   (piece selected, highlight appears)
-#   2. MOUSEMOVED to dest   → CLICK dest     (piece moves to dest)
+# Battle Chess 2D — two-click move mechanics
+# ============================================
+# One complete move requires exactly two clicks:
+#   1. MOUSEMOVED → source, click  (piece selected, highlight appears)
+#   2. MOUSEMOVED → dest,   click  (piece moves, highlight clears)
 #
-# The MOUSEMOVED before each click is REQUIRED — SDL ignores a click that
-# arrives without a preceding cursor-enter event at that location.
+# MOUSEMOVED before EACH click is REQUIRED — SDL ignores clicks without a
+# preceding cursor-enter event.  Timing: ≥600 ms between clicks (empirically
+# confirmed — 200 ms is not enough for the game to register the selection
+# before the dest click fires).
 #
-# Timing contract:
-#   SourceClick.settle_ms=400   wait for selection highlight to appear
-#   DestClick.settle_ms=300     wait for move animation to start
-#   DestClick.verify_ms=5000    poll for both squares to change vs baseline
+# Verification rule (empirically confirmed for both pawns and knights):
+#   When a piece leaves its square that square ALWAYS gets brighter — piece
+#   sprites are darker than the board surface on both light and dark squares.
+#     brightness(after, from_sq) > brightness(baseline, from_sq) + 5
+#   Range: +5.9 (pawn on dark e2) to +44 (knight on light g1).
+#   Threshold 5.0 clears the worst case while rejecting deselection (delta ≈ 0).
+#
+# USE MovePiece for new code — it encapsulates the full tested mechanic.
+# SourceClick / DestClick remain as backward-compatible shims only.
 # ---------------------------------------------------------------------------
+
+class MovePiece(DosActivity):
+    """Canonical reusable activity: move one white piece from *from_sq* to *to_sq*.
+
+    Encapsulates the full two-click mechanic with empirically validated timing
+    and a reliable postcondition.  Tested for pawn moves (e2e4) and knight
+    moves (g1f3).
+
+    :param from_sq: Algebraic source square, e.g. ``"g1"``.
+    :param to_sq: Algebraic destination square, e.g. ``"f3"``.
+    """
+
+    name = "MovePiece"
+    check_pre_screenshot = True
+    verify_screenshot = True
+    settle_ms = 1500   # wait for piece animation + selection highlight to fully clear
+    verify_ms = 8000
+
+    #: Brightness increase on source square that confirms the piece left.
+    #: Deselection returns source to piece-on brightness (~0 delta); a real
+    #: move raises it to empty-square brightness (empirically: +5.9 for pawn
+    #: on dark square e2, +44 for knight on light square g1).  Threshold 5.0
+    #: clears both cases while rejecting deselection (delta ≈ 0).
+    _SOURCE_VACATED_DELTA = 5.0
+
+    def __init__(self, from_sq: str, to_sq: str) -> None:
+        self.from_sq = from_sq
+        self.to_sq   = to_sq
+
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
+        if img is None:
+            return False
+        from Code.Dos.BattleChess import is_black_piece_at, is_white_piece_at
+        if not is_white_piece_at(img, self.from_sq):
+            logger.warning(
+                "MovePiece.precondition: no white piece at %s (got black=%s) — board not in expected state",
+                self.from_sq, is_black_piece_at(img, self.from_sq),
+            )
+            return False
+        ctx["baseline"] = img
+        ctx["from_sq"]  = self.from_sq
+        ctx["to_sq"]    = self.to_sq
+        return True
+
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
+        import time as _t
+
+        import Quartz
+
+        from Code.Dos.BattleChess import square_center
+
+        def _click(sq: str) -> None:
+            cx, cy = square_center(sq)
+            ax, ay = driver._abs(cx, cy)
+            pt = Quartz.CGPoint(ax, ay)
+            mv = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, mv)
+            _t.sleep(0.2)
+            dn = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseDown, pt, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, dn)
+            _t.sleep(0.08)
+            up = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, pt, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
+
+        _click(self.from_sq)
+        _t.sleep(0.6)   # selection settle — dest click is ignored if <600 ms
+        _click(self.to_sq)
+
+        # Move cursor to a neutral area (left edge, off all squares) so it does
+        # not hover over any square in the after_our_move reference snapshot.
+        # Without this, the game's CPU move animation moves the cursor away from
+        # to_sq, causing to_sq to appear as a "changed" square in WaitCpuReply.
+        nx, ny = driver._abs(15, 200)
+        neutral = Quartz.CGPoint(nx, ny)
+        mv_neutral = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, neutral, Quartz.kCGMouseButtonLeft)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, mv_neutral)
+        _t.sleep(0.1)
+
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
+        """True when from_sq brightness delta ≥ threshold vs baseline.
+
+        settle_ms=1500 ensures all animations and selection highlights at both
+        source and dest have cleared before the first poll fires, so this single
+        brightness check is sufficient for a stable after_our_move snapshot.
+        """
+        import numpy as np
+
+        from Code.Dos.BattleChess import square_crop
+        baseline = ctx.get("baseline")
+        if baseline is None or img is None:
+            return False
+        from_sq = ctx.get("from_sq", self.from_sq)
+        to_sq   = ctx.get("to_sq",   self.to_sq)
+
+        def _mean(image, sq):
+            return float(np.array(square_crop(image, sq).convert("L"), dtype=np.float32).mean())
+
+        delta = _mean(img, from_sq) - _mean(baseline, from_sq)
+        logger.info(
+            "MovePiece.postcondition: %s→%s  Δbright=%.1f (need ≥%.1f)",
+            from_sq, to_sq, delta, self._SOURCE_VACATED_DELTA,
+        )
+        if delta >= self._SOURCE_VACATED_DELTA:
+            ctx["after_our_move"] = img
+            from Code.Dos.BattleChess import board_state
+            ctx["before_cpu_state"] = board_state(img)
+            return True
+        return False
+
 
 class SourceClick(DosActivity):
     """Move cursor to source square and click to select the piece.
@@ -491,24 +613,27 @@ class SourceClick(DosActivity):
 
     name = "SourceClick"
     check_pre_screenshot = True
-    verify_screenshot = False
-    settle_ms = 400   # wait for selection highlight to appear
+    verify_screenshot = True
+    settle_ms = 600    # wait for selection highlight; 200ms was too short
+    verify_ms = 4000   # fail if selection highlight doesn't appear within 4s
 
     def __init__(self, from_sq: str) -> None:
         self.from_sq = from_sq
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
-        """Capture baseline; always True (piece presence checked by has_piece_at)."""
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
+        """Capture baseline before clicking; always True once screenshot available."""
         if img is None:
             return False
         ctx["baseline"] = img
         ctx["from_sq"] = self.from_sq
         return True
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """MOUSEMOVED to source, then full click (DOWN + UP)."""
-        import Quartz
         import time as _t
+
+        import Quartz
+
         from Code.Dos.BattleChess import square_center
         cx, cy = square_center(self.from_sq)
         ax, ay = driver._abs(cx, cy)
@@ -524,8 +649,29 @@ class SourceClick(DosActivity):
         up = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, pt, Quartz.kCGMouseButtonLeft)
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
-        return True
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
+        """True when source square shows a selection highlight vs the baseline.
+
+        A selection highlight means the game accepted the click and the piece
+        is now selected.  If the highlight doesn't appear (e.g. because the
+        game is still processing the CPU's previous move and it is not yet
+        white's turn), this returns False and the runner keeps polling.
+
+        When selection is confirmed, saves the current screenshot as
+        ``ctx["after_source_click"]`` so DestClick.postcondition can compare
+        from/to against the HIGHLIGHTED state (not the original clean board).
+        This avoids false negatives where the cleaned-up g1 square looks the
+        same as the highlighted g1 in the original baseline.
+        """
+        from Code.Dos.BattleChess import inner_square_changed
+        baseline = ctx.get("baseline")
+        if baseline is None or img is None:
+            return False
+        selected = inner_square_changed(baseline, img, self.from_sq)
+        logger.info("SourceClick.postcondition: %s selected=%s", self.from_sq, selected)
+        if selected:
+            ctx["after_source_click"] = img
+        return selected
 
 
 class DestClick(DosActivity):
@@ -548,13 +694,15 @@ class DestClick(DosActivity):
         self.to_sq   = to_sq
         self.from_sq = from_sq
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         return True
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """MOUSEMOVED to dest, then full click (DOWN + UP)."""
-        import Quartz
         import time as _t
+
+        import Quartz
+
         from Code.Dos.BattleChess import square_center
         tx, ty = square_center(self.to_sq)
         ax, ay = driver._abs(tx, ty)
@@ -570,22 +718,29 @@ class DestClick(DosActivity):
         up = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, pt, Quartz.kCGMouseButtonLeft)
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
-        """True when BOTH source and destination changed vs the pre-click baseline.
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
+        """True when BOTH source vacated AND destination occupied vs the selected state.
 
-        inner_square_changed(baseline, img, sq) compares the inner 13×11 px core
-        of sq.  A pawn leaving its square and arriving at the destination both
-        produce diffs well above the default threshold of 10.
+        Uses ``ctx["after_source_click"]`` (the board with the piece highlighted/
+        selected) as the comparison reference for the source square, so "source
+        vacated" means the highlight is GONE and the piece left.  Falls back to
+        the original ``ctx["baseline"]`` if source-click snapshot is absent.
+
+        For the destination, always compares against the original baseline (the
+        piece was not on dest before the move started).
         """
         from Code.Dos.BattleChess import inner_square_changed
-        baseline = ctx.get("baseline")
+        # Source reference: highlighted state (piece selected) → empty after move
+        src_ref  = ctx.get("after_source_click") or ctx.get("baseline")
+        # Dest reference: original board state before any clicks → occupied after move
+        dest_ref = ctx.get("baseline")
         from_sq  = ctx.get("from_sq", self.from_sq)
         to_sq    = ctx.get("to_sq", self.to_sq)
-        if baseline is None or img is None:
+        if src_ref is None or dest_ref is None or img is None:
             return False
-        source_vacated = inner_square_changed(baseline, img, from_sq)
-        dest_occupied  = inner_square_changed(baseline, img, to_sq)
-        logger.debug(
+        source_vacated = inner_square_changed(src_ref, img, from_sq)
+        dest_occupied  = inner_square_changed(dest_ref, img, to_sq)
+        logger.info(
             "DestClick.postcondition: source %s vacated=%s  dest %s occupied=%s",
             from_sq, source_vacated, to_sq, dest_occupied,
         )
@@ -625,61 +780,78 @@ class WaitCpuReply(DosActivity):
         self.from_sq = from_sq
         self.to_sq = to_sq
 
-    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+    def precondition(self, img: Image | None, ctx: dict) -> bool:
         return True
 
-    def execute(self, driver: "DosBoxDriver", ctx: dict) -> None:
+    def execute(self, driver: DosBoxDriver, ctx: dict) -> None:
         """No actuation — we are waiting for an external event (CPU move)."""
 
-    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
-        """True when CPU has moved; stores inferred move in ctx['cpu_move']."""
-        from Code.Dos.BattleChess import detect_changed_squares, _infer_from_candidates
+    # After the first sign of movement, wait this long for the piece animation
+    # to finish before reading the final board state.
+    _ANIMATION_SETTLE_S = 0.8
 
-        # Prefer after_our_move as the comparison baseline — it is a stable
-        # screenshot captured AFTER our move settled, so click artefacts at
-        # squares adjacent to our dest (e.g. e3 beside e4) are already "baked
-        # in" and won't fire as false CPU-move candidates.
-        # Fall back to pre-move baseline + exclusion list when after_our_move
-        # is not yet available (first poll before DestClick verified).
-        ref = ctx.get("after_our_move") or ctx.get("baseline")
-        if ref is None or img is None:
+    def postcondition(self, img: Image | None, ctx: dict) -> bool:
+        """True when the CPU's move is confirmed after animation settles.
+
+        Phase 1 — wait: poll until the board state first differs from before_cpu_state
+          (any black piece position changed). This is the "CPU started moving" signal.
+        Phase 2 — settle: sleep _ANIMATION_SETTLE_S so the piece lands fully in
+          its destination square before we read the board state.
+        Phase 3 — read: do one clean board_state comparison and extract from/to.
+        """
+        import time as _t
+
+        from Code.Dos.BattleChess import board_state
+
+        if img is None:
             return False
 
-        changed = detect_changed_squares(ref, img)
-        if ctx.get("after_our_move") is not None:
-            # after_our_move already has our pieces in their new positions;
-            # any changed square must be the CPU's.
-            cpu_candidates = list(changed)
-        else:
-            cpu_candidates = [
-                (s, n) for s, n in changed
-                if n not in (self.from_sq, self.to_sq)
-            ]
-        if len(cpu_candidates) < 2:
-            return False
+        # Build before-state once from the stable after_our_move snapshot.
+        if "before_cpu_state" not in ctx:
+            ref = ctx.get("after_our_move")
+            if ref is None:
+                return False
+            ctx["before_cpu_state"] = board_state(ref)
+            ref.save("/tmp/wait_cpu_ref.png")
 
-        result = _infer_from_candidates(ref, img, cpu_candidates)
-        if result is None:
-            return False
+        ctx.setdefault("_move_started", False)
+        before = ctx["before_cpu_state"]
 
-        cpu_from, cpu_to = result
-
-        # Double-check: both inferred squares must show a real inner-core change
-        # vs the reference.  This mirrors the same verification used in
-        # DestClick.postcondition for our own moves — it rejects false positives
-        # where _infer_from_candidates picks noisy candidates that happen to
-        # pass the brightness test but are not actually vacated/occupied.
-        from Code.Dos.BattleChess import inner_square_changed
-        if not (inner_square_changed(ref, img, cpu_from) and inner_square_changed(ref, img, cpu_to)):
-            logger.debug(
-                "WaitCpuReply: double-check failed for %s→%s (not both squares changed)",
-                cpu_from, cpu_to,
+        # Phase 1: wait for any change in black piece positions.
+        if not ctx["_move_started"]:
+            after = board_state(img)
+            exclude = {self.from_sq, self.to_sq}
+            any_change = any(
+                before.get(sq) != after[sq]
+                for sq in after
+                if sq not in exclude and (before.get(sq) == "b" or after[sq] == "b")
             )
-            return False
+            if not any_change:
+                return False
+            logger.info("WaitCpuReply: CPU started moving — settling %.1fs", self._ANIMATION_SETTLE_S)
+            ctx["_move_started"] = True
+            _t.sleep(self._ANIMATION_SETTLE_S)
+            return False   # re-poll after sleep with fresh screenshot
 
-        ctx["cpu_move"] = cpu_from + cpu_to
-        logger.info("WaitCpuReply: CPU played %s", ctx["cpu_move"])
-        return True
+        # Phase 3: animation settled — read final position.
+        # No exclusion here: before_cpu_state already reflects our move, so our
+        # from/to squares don't produce spurious changes.  Excluding to_sq would
+        # hide captures where the CPU takes our piece on our destination square.
+        after    = board_state(img)
+        cpu_from = [sq for sq in after if before.get(sq) == "b" and after[sq] != "b"]
+        cpu_to   = [sq for sq in after if before.get(sq) != "b" and after[sq] == "b"]
+
+        logger.info("WaitCpuReply: post-settle from=%s to=%s", cpu_from, cpu_to)
+
+        if len(cpu_from) == 1 and len(cpu_to) == 1:
+            ctx["cpu_move"] = cpu_from[0] + cpu_to[0]
+            logger.info("WaitCpuReply: CPU played %s", ctx["cpu_move"])
+            return True
+
+        # Ambiguous after settle — reset and keep waiting.
+        logger.warning("WaitCpuReply: ambiguous after settle — from=%s to=%s, resetting", cpu_from, cpu_to)
+        ctx["_move_started"] = False
+        return False
 
 
 # ---------------------------------------------------------------------------

@@ -1,1 +1,20 @@
-{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", "level": 1, "expected_uci": "c7c5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "g8f6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "e7e5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "d7d5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "c7c5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "c7c5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "c7c5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "e7e6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "e7e5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "g8f6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "e7e6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppp1ppp/4p3/8/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "level": 1, "expected_uci": "g8f6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "e7e6", "g1f3"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "c7c5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "level": 1, "expected_uci": "e7e6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "c7c5", "g1f3"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "e7e5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "level": 1, "expected_uci": "b8c6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "e7e5", "g1f3"]}
+{"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "level": 1, "expected_uci": "e7e5", "source": "dosbox-manual", "moves_from_startpos": ["e2e4"]}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "level": 1, "expected_uci": "b8c6", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "e7e5", "g1f3"]}
+{"fen": "r1bqkbnr/pppp1ppp/2n5/4p3/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3", "level": 1, "expected_uci": "e5d4", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "e7e5", "g1f3", "b8c6", "d2d4"]}
+{"fen": "r1bqkbnr/pppp1ppp/2n5/8/3pP3/2N2N2/PPP2PPP/R1BQKB1R b KQkq - 1 4", "level": 1, "expected_uci": "d4c3", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "e7e5", "g1f3", "b8c6", "d2d4", "e5d4", "b1c3"]}
+{"fen": "r1bqkbnr/pppp1ppp/2n5/8/2B1P3/2p2N2/PPP2PPP/R1BQK2R b KQkq - 1 5", "level": 1, "expected_uci": "c3b2", "source": "dosbox-manual", "moves_from_startpos": ["e2e4", "e7e5", "g1f3", "b8c6", "d2d4", "e5d4", "b1c3", "d4c3", "f1c4"]}

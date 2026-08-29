@@ -13,24 +13,47 @@ raises :exc:`~Code.Retro.Errors.EmulatorUnavailableError` at think-time.
     →  write_position  →  clear_best_move  →  set_computer_color
     →  emu_start  →  read_best_move  →  ThinkResult
 
+**Memory map** (virtual addresses)::
+
+    0x000000 – 0x015000   HUNK_CODE (page-aligned)
+    0x0E0000 – 0x0F0000   stack (64 KB)
+    0x200000 – 0x300000   AllocMem pool
+    0x7C0000 – 0x840000   Amiga exec library stubs (mapped by AmigaTraps)
+
 :spec: feature_spec.md §7, decisions.md D2, D4, N-RETRO-8
 """
 
 from __future__ import annotations
 
 import logging
+import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from Code.Retro.Bridge import AI_INIT_ADDR, Bridge
-from Code.Retro.Cpu import Cpu
+from Code.Retro.Bridge import A4 as _A4_VALUE, AI_BEST_MOVE_ADDR, AI_OUTER_DRIVER_ADDR, Bridge
+from Code.Retro.Cpu import HOOK_CODE, Cpu
 from Code.Retro.Errors import EmulatorUnavailableError, RomNotFoundError, ThinkError
 from Code.Retro.Types import Level, ThinkResult
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TIMEOUT = 30.0
 _MANIFEST_PATH = Path(__file__).parents[3] / "Resources" / "Retro" / "manifest.json"
+
+# Chip RAM: 2 MB flat block covering code, BSS, stack, globals.
+# The original Amiga ran with chip RAM from 0x000000..0x1FFFFF; we map it
+# as one region so the AI can write to any address without an unmapped fault.
+_CHIP_RAM_BASE: int = 0x000000
+_CHIP_RAM_SIZE: int = 0x200000  # 2 MB
+
+# Stack top sits near the end of chip RAM.
+_STACK_TOP: int = 0x1F0000
+
+# Sentinel return address — emulation stops when PC reaches this value.
+# Must not collide with any mapped region.
+_SENTINEL: int = 0xFFFF0000
+
+# Safety cap: ~50 M instructions is far more than a 1-ply 1988 AI needs.
+_MAX_INSTRUCTIONS: int = 50_000_000
 
 
 @dataclass
@@ -84,24 +107,40 @@ class ThinkSession:
         require()
 
         from Code.Retro.Cpus.Unicorn68k import Unicorn68k
-        from Code.Retro.Manifest import load as load_manifest
+        from Code.Retro.Manifest import verify as verify_rom
         from Code.Retro.Rom import parse_amiga_hunk
-        from Code.Retro.Traps import AmigaTraps
+        from Code.Retro.Traps import ALLOC_POOL, ALLOC_POOL_SIZE, AmigaTraps
 
         logger.info("loading ROM from %s", self._rom_path)
-        manifest = load_manifest(_MANIFEST_PATH)
-        manifest.verify(self._rom_path)
+
+        # Verify ROM integrity before loading.
+        verify_rom(str(self._rom_path), _MANIFEST_PATH)
 
         rom_data = self._rom_path.read_bytes()
         regions = parse_amiga_hunk(rom_data)
 
         cpu: Cpu = Unicorn68k()
-        for region in regions:
-            cpu.map_region(region.base, region.size)
-            cpu.mem_write(region.base, region.data)
 
+        # Map chip RAM as one 2 MB flat region — covers code, BSS, stack,
+        # and all A4-relative globals.  This mirrors how the original Amiga
+        # loaded the binary into chip RAM without gaps.
+        cpu.map_region(_CHIP_RAM_BASE, _CHIP_RAM_SIZE)
+
+        # Write each hunk segment's code data into chip RAM.
+        for region in regions:
+            if region.size > 0:
+                cpu.mem_write(
+                    region.load_address,
+                    rom_data[region.offset : region.offset + region.size],
+                )
+
+        # AllocMem pool (Amiga exec allocator) sits above chip RAM.
+        cpu.map_region(ALLOC_POOL, ALLOC_POOL_SIZE)
+
+        # Amiga OS stubs + AbsExecBase mem hook.
         traps = AmigaTraps(cpu)
         traps.install()
+        traps.install_mem_hook()
 
         self._cpu = cpu
         logger.info("ROM loaded; %d memory region(s) mapped", len(regions))
@@ -126,8 +165,31 @@ class ThinkSession:
         bridge.write_position(request.fen)
         bridge.set_computer_color(request.computer_color)
 
-        logger.debug("starting emulation from 0x%X", AI_INIT_ADDR)
-        cpu.emu_start(AI_INIT_ADDR, until=0xFFFFFFFF, count=0)
+        # Restore A4 (global data pointer) and reset the stack for each call.
+        # The AI may leave these in an arbitrary state after one run.
+        cpu.reg_write("A4", _A4_VALUE)
+        sp = _STACK_TOP - 4
+        # Push sentinel so a clean RTS stops emulation.
+        cpu.mem_write(sp, struct.pack(">I", _SENTINEL))
+        cpu.reg_write("A7", sp)
+
+        # Stop emulation at the game-loop exit point (0x01EA) once the best move
+        # has been written.  This address is the natural fall-through point where
+        # all AI phases converge before the game updates the display.
+        _GAME_LOOP_EXIT = 0x01EA
+
+        def _stop_at_exit(_emu, address: int, _size: int, _user: object = None) -> None:
+            if address == _GAME_LOOP_EXIT:
+                raw = cpu.mem_read(AI_BEST_MOVE_ADDR, 8)
+                if any(raw):
+                    cpu.emu_stop()
+
+        hook = cpu.hook_add(HOOK_CODE, _stop_at_exit)
+        logger.debug("starting emulation from 0x%X", AI_OUTER_DRIVER_ADDR)
+        try:
+            cpu.emu_start(AI_OUTER_DRIVER_ADDR, until=_SENTINEL, count=_MAX_INSTRUCTIONS)
+        finally:
+            cpu.hook_del(hook)
 
         move = bridge.read_best_move()
         if move is None:

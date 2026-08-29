@@ -6,15 +6,17 @@ Options exposed by `tools/caissa-retro` via the UCI `option` command.
 
 ## `EmuLevel` (spin)
 
-**Default:** 3  
-**Range:** 1–N (exact range determined by Phase 1 recon; maps to original difficulty levels)
+**Default:** 1  
+**Range:** 1–9 (maps directly to the original's "Level 1" through "Level 9" labels)
 
-The difficulty level as in the original game. Each level maps to the original engine's
-internal level parameter, which controls search depth or time budget.
+The difficulty level as in the original game. The binary contains nine levels labelled
+"Level 1"–"Level 9" in its string table; each maps to the same integer passed to the
+timed AI state machine. Higher numbers allow more virtual clock time per move, resulting
+in stronger play.
 
-Level 1 is the easiest (shallowest search, responds fastest). The highest level
-corresponds to the original game's hardest difficulty — which on a 1988 Amiga 500 took
-minutes; under emulation it takes milliseconds.
+Level 1 is the easiest (least search time, responds fastest). Level 9 corresponds to the
+original's hardest difficulty — which on a 1988 Amiga 500 took minutes; under emulation
+it takes milliseconds regardless of level.
 
 ---
 
@@ -69,7 +71,7 @@ environment where the environment variable is not set.
 uci
 id name Battle Chess (Retro) 1988
 id author Interplay (emulated)
-option name EmuLevel type spin default 3 min 1 max 8
+option name EmuLevel type spin default 1 min 1 max 9
 option name EmuClockRate type spin default 100 min 1 max 10000
 option name EmuStrictOriginal type check default false
 option name EmuRomPath type string default <empty>

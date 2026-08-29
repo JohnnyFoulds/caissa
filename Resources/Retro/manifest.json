@@ -50,7 +50,31 @@
           {"offset": 6, "size": 1, "field": "piece",    "encoding": "piece type nibble (0=empty..6=king)"},
           {"offset": 7, "size": 1, "field": "legal",    "encoding": "non-zero = legal"}
         ]
-      }
+      },
+      "companion_data": "ChessStuff"
+    },
+    {
+      "sha256": "c32d4f6bc732b67efa65d55bc5813bc74dcfb52b8616894b57ed7aeeeed2a1cd",
+      "platform": "dos_x86",
+      "label": "Battle Chess (DOS, 1.2 MB 5.25\" floppy, 1988-12-10)",
+      "file_size": 83415,
+      "supported": false,
+      "container": "dos_mz",
+      "load_address": null,
+      "repo_path": "Resources/Retro/BattleChess.dos",
+      "notes": "Clean MZ binary, zero relocation entries. Entry CS:IP = 0x1413:0x0012 (self-relocating stub at end of file, file offset 82754). DOS x86 recon pending before wiring emulation.",
+      "offsets": {}
+    },
+    {
+      "sha256": "3917b1583176cc6198e7804514ae060a736a089b724f219987ba4832e45e2981",
+      "platform": "amiga_68k",
+      "label": "Battle Chess ChessStuff (WHDLoad v1.1, 1988) — game data file",
+      "file_size": 722790,
+      "supported": false,
+      "container": "raw_data",
+      "repo_path": "Resources/Retro/ChessStuff",
+      "notes": "Companion data file for the Amiga executable. Contains animation data for all piece-capture sequences and the opening book. Loaded via AmigaDOS Open('ChessStuff',...) during game init. Not an executable — use with the amiga_68k binary entry. Opening book is embedded within this file (exact offset TBD — requires recon). The Dragon Inc crack (BattleChess.amiga) strips this file; this copy is from the WHDLoad v1.1 install (2006-09-24 timestamp).",
+      "offsets": {}
     }
   ]
 }

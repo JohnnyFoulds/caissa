@@ -12,6 +12,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **DOS automation — first ground-truth corpus entry**: `Resources/Retro/Corpus/dosbox-manual.jsonl`
+  records Battle Chess (DOS) responding `c7c5` (Sicilian Defence) to `1.e4`, verified deterministic
+  across two independent fresh-launch runs.  Full pipeline: DOSBox-X launch → 2D board mode →
+  two-click `e2e4` → CPU reply detected and verified.
+- **DOS automation — two-click move and CPU detection improvements**:
+  `DismissTitleScreen` now calls `driver.focus()` + 0.3s delay before ENTER to prevent keypresses
+  reaching the user's focused window; `WaitCpuReply` gains `settle_ms=3000` (artefact decay) and
+  a double-check (`inner_square_changed` on both CPU squares before accepting); brightness-delta
+  direction rule (`Δbright after−before`) replaces the broken "brighter-in-before = FROM" heuristic
+  that inverted from/to for black pieces.
+
 - **Retro Engine — Phase A ground-truth attempt (A5 documented negative result)**:
   `docs/retro/reverse-engineering.md` now records two failed boot attempts: `vamos` crashes
   at PC=0xFFFF807C (exec library stubs not mapped); FS-UAE + AROS quits on

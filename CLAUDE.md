@@ -266,3 +266,121 @@ nohup tools/caissa > /tmp/caissa.log 2>&1 &   # background
   ```
 - Stockfish engines use NNUE files — ensure they are not LFS stubs (see NNUE bug fix in memory)
 - When adding a new mode JSON, include `TB_OPTIONS` in the `toolbar` allowlist so users can always reach Configuration
+
+---
+
+## DOS/Battle Chess Automation Layer (`bin/Code/Dos/`)
+
+### Python interpreter
+All DOS-layer code and automation scripts **must run under `/opt/homebrew/bin/python3.14`**.
+That is the only Python on this machine that has `Quartz`, `AppKit`, `Pillow`, and `numpy`.
+The conda Python 3.13 at `/opt/homebrew/Caskroom/miniconda/base/bin/python3` lacks Quartz
+and will silently fail (window detection returns None, all activities timeout).
+
+### Game directory
+Battle Chess DOS files live at `/Users/johannes/Documents/dosbox/oldgames/bc/`.
+The `DosBoxProcess` constructor takes `(_GAME_DIR, _LAUNCH_CMD)` from `BattleChess.py`.
+
+### 2D mode detection (calibrated, do not change without re-measuring)
+Board-coloured pixel fraction over `_BOARD_REGION=(100,38,443,379)`:
+- **2D flat board**: fraction ≈ 0.40 → `_is_2d_mode` returns True if fraction ≥ 0.25
+- **3D perspective board**: fraction ≈ 0.14 → _is_2d_mode returns False
+- **Title screen / loading**: fraction can be 0.05–0.14 (decorative chess elements)
+- `_board_visible` uses threshold 0.10 to confirm ANY game content is on screen
+
+The bot/top ratio heuristic (ratio < 1.15 → 2D) was an incorrect approach; use absolute
+fraction threshold 0.25 instead.
+
+### Menu navigation to '2D Board' (calibrated)
+Only works when DOSBox is on a **secondary display** (x < 0 or x > 2559 on this machine).
+On the primary display the menu bar appears but the Settings dropdown does not open.
+
+```
+# All coordinates are window-relative
+MENU_TRIGGER = (320, 33)     # right-click-hold here opens Settings menu
+ITEM_2D_BOARD = (410, 180)   # drag to here while holding right button, then release
+```
+
+Sequence: `MOUSEMOVED → (320,33)` → wait 0.35s → `RDOWN (320,33)` → wait 0.6s →
+`RDRAG (410,180)` → wait 0.3s → `RUP (410,180)`.
+
+The cursor MUST be moved to the trigger position with MOUSEMOVED before RDOWN,
+otherwise SDL does not register a cursor-enter event.
+
+### Two-click move (confirmed working)
+Battle Chess 2D uses **two-click** move mechanics, NOT drag-to-move.
+
+```python
+_COL_X = {"a":127,"b":183,"c":238,"d":293,"e":349,"f":404,"g":459,"h":515}
+_RANK_Y = {"1":393,"2":345,"3":298,"4":251,"5":203,"6":156,"7":109,"8":61}
+```
+
+Required event sequence for each click:
+1. `MOUSEMOVED → square` (SDL needs cursor-enter before click; without this, click is ignored)
+2. wait 0.2s
+3. `MOUSEDOWN → square`
+4. wait 0.08s
+5. `MOUSEUP → square`
+
+Full move = SourceClick (click source) + settle 400ms + DestClick (click dest) + settle 300ms.
+Activities: `SourceClick("e2")` then `DestClick("e4", "e2")`.
+`DragToDest`, `DragRelease`, `SourceDragDown` are legacy aliases — do not use for new code.
+
+### Move postcondition (compare BOTH squares vs baseline)
+`has_piece_at` gives false positives on light board squares and cursor artefacts.
+Use `inner_square_changed(baseline, img, sq)` with the pre-drag baseline instead:
+- `inner_square_changed(baseline, img, from_sq)` → source changed = piece left
+- `inner_square_changed(baseline, img, to_sq)` → dest changed = piece arrived
+
+Both must be True. Baseline is captured in SourceDragDown.precondition before any cursor movement.
+This is implemented in `DragRelease.postcondition`.
+
+### WaitCpuReply timing and baseline
+Battle Chess CPU think time varies by difficulty level. On hard settings it can
+exceed 60 seconds. `verify_ms=90000` (90s) is the current setting.
+`settle_ms=3000` — mandatory, to let selection-highlight artefacts from our own
+click decay before polling starts. Without this, adjacent-square artefacts fire
+within 1-2 seconds as false CPU replies.
+
+Use `ctx["after_our_move"]` as the comparison baseline when available (set by
+`DestClick.postcondition`). This is a stable post-move screenshot where click
+artefacts at adjacent squares (e.g. e3 adjacent to clicked e4) are already
+"baked in" — they won't fire as false CPU-move detections.
+Fall back to pre-move baseline + exclusion of our from_sq/to_sq only if
+`after_our_move` is not yet set.
+
+After `_infer_from_candidates` infers `cpu_from`/`cpu_to`, add a double-check:
+`inner_square_changed(ref, img, cpu_from) and inner_square_changed(ref, img, cpu_to)`
+must both be True. This mirrors the DestClick postcondition and rejects noisy candidates.
+
+### CPU move direction rule — brightness DELTA
+**NEVER use `brightness(before)` alone to infer from/to.** The old "brighter before = FROM"
+heuristic fails for black pieces: dark pieces are darker than empty squares, so the
+direction is inverted (c7c5 is reported as c5c7).
+
+Correct rule in `_infer_from_candidates` and `infer_move`:
+```python
+delta = brightness(after, sq) - brightness(before, sq)
+# more-positive delta = square got brighter = piece LEFT = FROM
+# more-negative delta = square got darker = piece ARRIVED = TO
+```
+Empirically verified: 1.e4 → c7c5 (Sicilian), consistent across two runs.
+
+### Quartz keyboard events — focus BEFORE keypress
+`CGEventPost(kCGHIDEventTap, key_event)` fires at whatever has OS focus. If the user is
+typing elsewhere, ENTER goes to their window, not DOSBox. Always:
+1. Call `driver.focus()` first
+2. `time.sleep(0.3)` — let the OS commit focus
+3. Then send the key event
+
+### Quartz mouse events
+`CGEventPost(kCGHIDEventTap, ev)` routes events globally to whatever window is
+frontmost. Call `driver.focus()` before any input sequence. The user moving the
+mouse or typing during automation will disrupt the sequence — there is no reliable
+way to prevent this with HID-level events on macOS without Accessibility permission
+to inject directly into a process.
+
+### Screenshot capture
+`screencapture -x -o -l <wid>` captures by Quartz window number. `-o` removes
+the macOS drop shadow so the image is exactly 640×428 with coordinate (0,0) at
+window top-left. Using `-R x,y,w,h` is unreliable when the window moves displays.

@@ -22,7 +22,8 @@
         { "key": "TB_OPTIONS",         "label": "Options..." },
         { "key": "TB_ENGINES",         "label": "Engines..." },
         { "separator": true },
-        { "key": "caissa:switch_mode", "label": "Switch Mode..." },
+        { "key": "caissa:switch_mode",  "label": "Switch Mode..." },
+        { "key": "caissa:switch_theme", "label": "Switch Theme..." },
         { "separator": true },
         { "key": "TB_QUIT",            "label": "Quit" }
       ]

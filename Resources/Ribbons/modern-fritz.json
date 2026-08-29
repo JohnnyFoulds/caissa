@@ -38,7 +38,7 @@
           "label": "Play",
           "slots": [
             { "key": "caissa:fritz_level", "size": "large", "label": "New Game", "has_dropdown": true },
-            { "key": "TB_LEVEL",           "size": "large", "label": "Levels",   "has_dropdown": true }
+            { "key": "TB_LEVEL",           "size": "large", "label": "Levels" }
           ]
         },
         {

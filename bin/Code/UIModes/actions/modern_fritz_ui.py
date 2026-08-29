@@ -163,6 +163,16 @@ def _build_notation_widget(mw) -> QtWidgets.QWidget:
     # ── pgn grid ─────────────────────────────────────────────────────────────
     vbox.addWidget(mw.base.pgn)
 
+    # ── tab switching ────────────────────────────────────────────────────────
+    # Notation (0) and Score sheet (2) show the pgn grid.
+    # NAG palette is shown only on the Notation tab.
+    # All other tabs hide both.
+    def _on_tab_change(idx, _pgn=mw.base.pgn, _nag=nag_bar):
+        _pgn.setVisible(idx in (0, 2))
+        _nag.setVisible(idx == 0)
+
+    tab_bar.currentChanged.connect(_on_tab_change)
+
     return container
 
 
@@ -419,6 +429,13 @@ def _build_fritz_right_col(mw) -> None:
                           fritz_col_width])
     mw.splitter.setChildrenCollapsible(False)
     right_col.setMinimumWidth(360)
+
+    # Push right-col content below the ribbon so panes align with the board.
+    # The ribbon lives inside WBase.tb (a QToolBar with setFixedHeight set by
+    # Ribbon.install), so mw.base.tb.height() gives the exact ribbon height.
+    _tb_h = mw.base.tb.height()
+    right_col.setContentsMargins(0, _tb_h if _tb_h > 0 else 142, 0, 0)
+
     right_col.setSizes([_PANE_SPECS[0].default_px, _PANE_SPECS[1].default_px,
                         _PANE_SPECS[2].default_px, _PANE_SPECS[3].default_px])
     right_col.show()
@@ -504,13 +521,6 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
         "caissa:fritz_level",
         _("New Game"),
         [(_("New Game…"), _new_game)],
-    )
-
-    # ── Levels ▼ (TB_LEVEL) — opens level picker in-game ────────────────────
-    ribbon.set_dropdown(
-        "TB_LEVEL",
-        _("Levels"),
-        [(_("Choose Level…"), _new_game)],
     )
 
     # ── Piece Style ▼ (caissa:piece_style) ───────────────────────────────────

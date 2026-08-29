@@ -34,7 +34,7 @@ Specific authoring rules:
 1. **Category names for group captions** — "Play", "Game", not "New Game", "Controls"
 2. **No 1:1 Fritz copy** — include only what is relevant to playing chess in Caissa
 3. **Plain action buttons for one-shot commands** — never radio buttons (D13)
-4. **Dropdowns (▼) for selection panels** — blue-header floating panel pattern (manual p.34)
+4. **Dropdowns (▼) for selection panels** — blue-header floating panel pattern (`https://help.chessbase.com/Fritz/18/Eng/000058.htm`)
 5. **Checkboxes for pane visibility** — column layout, checked = pane visible
 6. **Large buttons (56×56) for primary actions** — icon + text + optional ▼ chevron
 7. **Small buttons (auto×20) for secondary actions** — icon left, text right, flat
@@ -299,13 +299,13 @@ Window layout and pane management.
 - Board Only — board alone
 - All Windows — all panes open
 
-Matches Fritz standard layouts (manual p.35–36) but strips the ChessBase-specific ones.
+Matches Fritz standard layouts (`https://help.chessbase.com/Fritz/18/Eng/000078.htm`) but strips the ChessBase-specific ones.
 
 **Full Screen** large button — Ctrl+Alt+F equivalent. Active state: filled blue.
 
 **Top 2 Vertical / Horizontal / Maximize All** — window arrangement shortcuts.
 
-**Panes** group checkboxes — same semantics as Fritz View → Panes (manual p.73):
+**Panes** group checkboxes — same semantics as Fritz View → Panes (`https://help.chessbase.com/Fritz/18/Eng/000104.htm`):
 - Notation: game notation + variations + commentary
 - Clocks: chess clock window
 - Engine analysis: main engine output window

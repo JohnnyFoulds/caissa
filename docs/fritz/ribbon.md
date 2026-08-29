@@ -198,8 +198,9 @@ Labels: left-aligned vertical column, `#1e1e1e` text, disabled variant `#a2a4a5`
 
 ## Fritz Home tab — group inventory (from manual)
 
-Source: Fritz 18 manual pages 31, 34–35, 63, 73.  The Board tab (p.31) is the most photographed
-ribbon; the Home tab content was inferred from manual text and the reference screenshot.
+Source: Fritz 18 online manual (live at `https://help.chessbase.com/Fritz/18/Eng/`).
+Key pages: `000031` (clocks/board), `000058` (levels/dropdown), `000018` (Hint), `000070` (Suggestion), `000104` (Panes).
+The Board tab image is the most photographed ribbon; the Home tab content was inferred from manual text and the reference screenshot.
 
 ### Fritz Home tab groups
 
@@ -207,12 +208,12 @@ ribbon; the Home tab content was inferred from manual text and the reference scr
 |---|---|---|
 | **New Game** | New Game ▼ (dropdown) | Opens a level/opponent selection panel (see Dropdown pattern below) |
 | **Level** | Levels ▼ (dropdown) | Opens a time-control selection panel (Blitz, Rapid, Classical, Custom…) |
-| **Game** | Resign, Offer Draw, Abort | Flat icon buttons. **NOT radio buttons** — confirmed manual p.63 |
+| **Game** | Resign, Offer Draw, Abort | Flat icon buttons. **NOT radio buttons** — confirmed `https://help.chessbase.com/Fritz/18/Eng/000018.htm` |
 | **Game** | Takeback | Small flat button |
-| **Coaching** | Hint, Suggestion | Plain action buttons in the Help tab (manual p.63). **NOT radio buttons, NOT toggles** |
+| **Coaching** | Hint, Suggestion | Plain action buttons (`https://help.chessbase.com/Fritz/18/Eng/000018.htm`, `https://help.chessbase.com/Fritz/18/Eng/000070.htm`). **NOT radio buttons, NOT toggles** |
 | **Panes** | Players, Engine analysis, Eval profile, Notation, Eval bar | QCheckBox column; checked = pane visible |
 
-### Dropdown panel visual pattern (manual p.34–35)
+### Dropdown panel visual pattern (`https://help.chessbase.com/Fritz/18/Eng/000058.htm`)
 
 When a button with a ▼ chevron is clicked, a floating panel opens **directly below the button**:
 
@@ -239,7 +240,7 @@ have context. See also `docs/fritz/decisions.md` D12 and D13.
 |---|---|---|
 | **Play** | New Game ▼ (large), Levels ▼ (large) | Category name "Play" covers both launch actions; matches Fritz naming pattern of grouping by category not action |
 | **Game** | Resign, Offer Draw, Abort, Takeback (2×2 small grid) | Four mid-game controls logically belong together |
-| **Coaching** | Hint (small), Suggestion (small) | Plain action buttons — confirmed NOT radio buttons (manual p.63); `?` / lightbulb icon |
+| **Coaching** | Hint (small), Suggestion (small) | Plain action buttons — confirmed NOT radio buttons (`https://help.chessbase.com/Fritz/18/Eng/000018.htm`); `?` / lightbulb icon |
 | **Panes** | Players ✓, Engine analysis ✓, Eval profile ✓, Notation ✓, Eval bar ☐ | Matches Fritz Panes group; last pane defaults unchecked |
 
 ### Caption styling

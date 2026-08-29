@@ -419,7 +419,7 @@ padding: 0px 2px;
 
 #WRibbonGroupSep
 {
-background-color: {CHROME_TEXT_DIM};
+background-color: {CHROME_SEP};
 margin: 8px 0px;
 }
 

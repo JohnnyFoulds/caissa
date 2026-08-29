@@ -108,8 +108,10 @@ as offsets from A4 = 0x7FFE.
 ```
 Virtual address space (2 MB chip RAM)
 ──────────────────────────────────────
-0x000000 – 0x014B88   HUNK_CODE (84 872 bytes of 68000 machine code)
-0x014B89 – 0x0DFFFF   zero-filled (BSS / uninitialised globals)
+0x000000 – 0x011D1B   HUNK_CODE block (72 988 bytes; confirmed by hunktool)
+0x011D1C – 0x014B87   Dragon-crack code (non-standard; not in hunk format,
+                       not currently loaded; includes opening-book loader at 0x1302A)
+0x014B88 – 0x0DFFFF   zero-filled (Unicorn initialises mapped memory to zero)
 0x0E0000 – 0x0EFFFF   stack (64 KB; grows downward from 0x0F0000)
 0x0F0000 – 0x1FFFFF   remaining chip RAM
 ──────────────────────────────────────
@@ -122,6 +124,45 @@ Virtual address space (2 MB chip RAM)
 A4 = 0x7FFE is the global data pointer. All game globals are accessed as
 `A4 - constant`, so writing a value to, say, the piece table means writing
 to `0x7FFE - 0x4CDC = 0x3322`.
+
+### Layout Paradox (OPEN QUESTION — resolve via A4b)
+
+The startup routine at `0x110CC–0x110E2` does this:
+
+```
+lea.l -$572a(a4), a1    ; a1 = 0x7FFE - 0x572A = 0x28D4
+lea.l -$572a(a4), a2    ; a2 = 0x28D4
+cmpa.l a1, a2           ; compare identical registers
+bne.b $110e6            ; always NOT taken (a1 == a2 always)
+move.w #$214b, d1       ; 8523 — clear 8524 longs = 34096 bytes
+move.l d2, (a1)+
+dbra d1, $110e0         ; fill 0x28D4 .. 0xAE04 with d2
+```
+
+If this loop executed with `D2 = 0`, it would zero-fill `0x28D4–0xAE04`, which
+**contains known AI code**: `0x79B4`, `0x81DC`, `0x94D8`, `0xADD0`.
+
+The branch `bne.b $110e6` compares `A1` against itself — it can never be taken,
+so the loop always runs. This makes no sense on real hardware.
+
+Three possible explanations (exactly one must be true):
+
+1. **The hunk does not load at 0x000000.** If the real load address is higher (say
+   `0x20000`), all documented offsets would be shifted. The Dragon crack's pre-
+   relocation would have embedded the correct addresses for that load base.
+
+2. **The clear loop is an unpatched linker template** that ran on the original
+   Amiga in a state where `D2` was non-zero, or the BSS region was located elsewhere
+   and the compiler intended to clear something other than AI code.
+
+3. **Our reading of the memory layout is wrong in some other way** (e.g. the
+   addresses come from a different binary version).
+
+**This means no absolute virtual address in this document (or `manifest.json`) is
+fully trusted until A4b resolves it from a real FS-UAE memory dump.** The AI entry
+points (0x81DC etc.) are within HUNK_CODE, so they are correct relative to the
+hunk base — but whether the hunk base is 0x000000 on real hardware is the open
+question.
 
 ---
 

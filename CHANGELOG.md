@@ -12,6 +12,11 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Retro Engine — Phase A ground-truth attempt (A5 documented negative result)**:
+  `docs/retro/reverse-engineering.md` now records two failed boot attempts: `vamos` crashes
+  at PC=0xFFFF807C (exec library stubs not mapped); FS-UAE + AROS quits on
+  `my_resolvesoftlink` stub before the startup-sequence runs.  Path forward documented:
+  licensed Kickstart 1.3 (Amiga Forever), AROS+Workbench HDF, or DOSBox-X+DOS CHESS.EXE.
 - **Retro Engine — real-execution reset (Phase A prep)**: `docs/retro/architecture.md`
   (494-line technical deep-dive; §Layout Paradox flags unresolved BSS-clear contradiction);
   `manifest.json` corrected hunk_code_size 72988 (was 84872, confirmed by hunktool); Level

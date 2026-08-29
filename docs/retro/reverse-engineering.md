@@ -260,3 +260,80 @@ Same as the Amiga phase:
 
 Cross-platform comparison: after both targets are working, run the same positions
 through both and compare. Any divergence is documented in `docs/retro/divergences.md`.
+
+---
+
+## Phase A ground-truth attempt — documented negative result (A5)
+
+**Date:** 2026-08-29  
+**Status:** BLOCKED — A5 criterion met; stop and report.
+
+The plan's global stop rule: *"If Phase A does not yield ≥1 recorded move and a memory dump
+within one working session, stop and report rather than starting another patch-and-rerun loop."*
+
+### Attempt 1 — `vamos` (amitools 0.9.x)
+
+`vamos` is an AmigaOS API stub runner that implements exec/dos library calls in Python on a
+Musashi 68000 core. It handles HUNK loading, relocation, and standard library calls.
+
+Problem: the game accesses Amiga custom chip registers early in startup.
+
+```
+vamos BattleChess.clean
+InvalidMemoryAccessError: Invalid Memory Access R(2): ff807a
+PC=ffff807c  A4=00000000
+```
+
+`PC=0xFFFF807C` is in the Kickstart ROM area — the startup code jumps into exec library vectors
+that vamos routes to ROM-space addresses it never maps.  `A4=0x00000000` confirms startup
+hadn't reached `lea.l $7ffe.l, a4` at `0x1113C` yet.
+
+**With `-H ignore`** (silently ignore hardware chip-register I/O): same crash.
+The `-H` flag handles custom chip I/O at `0xDFF000`-range; it does not map the ROM exec-vector
+area at `0xFFFF.xxxx`.  Code *execution* from unmapped ROM space is not an I/O issue.
+
+**Root cause:** vamos stubs only a subset of exec/dos functions and doesn't provide a
+Kickstart ROM image. The 1988 hardware-banging startup calls into exec vectors routed through
+ROM space before the chess AI is ever reached.
+
+### Attempt 2 — `fs-uae` 3.2.35 with AROS replacement ROM
+
+FS-UAE (full Amiga system emulator) bundles the free AROS Kickstart replacement ROMs in its
+data archive:
+- `aros-amiga-m68k-rom.bin` (524288 bytes, SHA `3ad2601f`)
+- `aros-amiga-m68k-ext.bin` (524288 bytes, SHA `a63586e4`)
+
+Config: A500, 512K chip RAM, `hard_drive_0 = /tmp/amiga_bc/` (contains `BattleChess` +
+`ChessStuff`), startup-sequence `DH0:BattleChess`.
+
+**Result:** AROS loaded (memory map printed, filesystem autoconfig ran), then:
+
+```
+-- stub -- my_resolvesoftlink
+res_initcode context = 0x0
+UAE: Calling uae_quit
+```
+
+AROS quit before executing the startup-sequence.  `my_resolvesoftlink` is a filesystem
+operation AROS calls during boot that FS-UAE's AROS support layer returns as an unimplemented
+stub, triggering a clean exit.  AROS cannot run AmigaDOS programs without a full Workbench
+environment it never received.
+
+**Root cause:** Running an AmigaDOS binary from a bare directory hard drive under AROS
+requires a complete Workbench disk or a pre-configured AROS installation volume. The minimal
+directory-only hard drive does not provide the Workbench shell (`NewShell`, `Execute`,
+`Assign`) that AmigaDOS needs to process a startup-sequence.
+
+### Path forward — three options
+
+| Option | Effort | Probability |
+|---|---|---|
+| **Amiga Forever** (licensed Kickstart 1.3) | Low (~$15 purchase) | High — this is the correct ROM |
+| **AROS + full Workbench setup** | Medium (download AROS One 68k HDF image) | Unknown — 1988 game compatibility |
+| **DOSBox-X + DOS CHESS.EXE** | Medium (x86 recon needed) | Moderate — different binary, same AI logic |
+
+For the Kickstart route: FS-UAE is already installed and configured; swapping in Kickstart 1.3
+(from Amiga Forever or any licensed copy) is one config line change.
+
+**This plan cannot close until Phase A yields ≥1 recorded corpus entry and a memory dump.**
+Phase C (Unicorn reproducing a move) is explicitly blocked until then.

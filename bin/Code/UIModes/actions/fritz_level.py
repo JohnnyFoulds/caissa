@@ -9,7 +9,7 @@ so it appears as "Level" in the Fritz mode in-game toolbar.
 
 def register(reg):
     from Code.QT import Iconos
-    reg("caissa:fritz_level", _("Level"), Iconos.Configurar(), _handler)
+    reg("caissa:fritz_level", _("Level"), Iconos.NuevaPartida(), _handler)
 
 
 def _handler():

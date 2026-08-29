@@ -160,14 +160,19 @@ class ManagerSolo(Manager.Manager):
                     self.manager_rival = None
                 self.play_next_move()
             else:
-                # Switch to game mode: open level picker.
+                # Switch to game mode: use last-used settings (no dialog).
                 from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
                 _fritz_new_game(self.procesador)
 
-        elif key in (TB_STOP, TB_LEVEL):
-            # "Play Now" / "Levels": open the Fritz level picker to start a game.
-            from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
-            _fritz_new_game(self.procesador)
+        elif key == TB_LEVEL:
+            # "Levels" button — always open the level/time picker.
+            from Code.UIModes.actions.modern_fritz_ui import _fritz_pick_level
+            _fritz_pick_level(self.procesador)
+
+        elif key == TB_STOP:
+            # "Play Now" in Analysis tab — same as Levels (start engine game).
+            from Code.UIModes.actions.modern_fritz_ui import _fritz_pick_level
+            _fritz_pick_level(self.procesador)
 
         else:
             self.routine_default(key)

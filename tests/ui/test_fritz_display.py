@@ -97,7 +97,7 @@ def test_display_api_routes_toggle_to_callback(qt_app):
 def test_select_engine_action_does_not_crash(qt_app, monkeypatch):
     """T-DSP-03: caissa:select_engine no longer calls non-existent procesador.motores().
 
-    The action is routed to _fritz_new_game; we monkeypatch that to a no-op
+    The action is routed to _fritz_pick_level; we monkeypatch that to a no-op
     so the test stays unit-level.
     """
     import Code.UIModes.actions.view_actions as va
@@ -105,7 +105,7 @@ def test_select_engine_action_does_not_crash(qt_app, monkeypatch):
     called: list[bool] = []
 
     import Code.UIModes.actions.modern_fritz_ui as mfu
-    monkeypatch.setattr(mfu, "_fritz_new_game", lambda proc: called.append(True))
+    monkeypatch.setattr(mfu, "_fritz_pick_level", lambda proc: called.append(True))
 
     import Code
     original_proc = getattr(Code, "procesador", None)
@@ -116,7 +116,7 @@ def test_select_engine_action_does_not_crash(qt_app, monkeypatch):
         va._select_engine()
 
         assert called, (
-            "T-DSP-03: _fritz_new_game must be called when caissa:select_engine fires"
+            "T-DSP-03: _fritz_pick_level must be called when caissa:select_engine fires"
         )
     finally:
         Code.procesador = original_proc

@@ -28,6 +28,12 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode Behaviour — Phase 6 (Polish — WFritz* widget relocation)**:
+  `WFritzAnalysisTable.py`, `WFritzEvalGraph.py`, `WFritzPlayerHeader.py`, and
+  `WFritzNewGame.py` moved from `bin/Code/UIModes/` to `bin/Code/Fritz/` so the
+  purity AST walk in `test_completeness.py` covers them. All four added to
+  `_PYSIDE6_ALLOWED_RELATIVE`. Import sites in `modern_fritz_ui.py` and
+  `tests/ui/test_fritz_clocks.py` updated accordingly.
 - **Fritz Mode Behaviour — Phase 5 (View Tab — Layouts + Splitter Persistence)**:
   `bin/Code/Fritz/Layouts.py` — six named presets (Standard / Big Board / Big Notation /
   Big Engine / Board Only / All Windows); `apply_preset(name, main_sp, rc_sp)` scales

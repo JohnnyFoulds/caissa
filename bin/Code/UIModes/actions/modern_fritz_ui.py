@@ -358,9 +358,9 @@ def _build_fritz_right_col(mw) -> None:
     pgn_layout_info = _find_widget_in_layout(mw.base.layout(), mw.base.pgn)
 
     # ── 2. Build content widgets ──────────────────────────────────────────────
-    from Code.UIModes.WFritzPlayerHeader import WFritzPlayerHeader
-    from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
-    from Code.UIModes.WFritzEvalGraph import WFritzEvalGraph
+    from Code.Fritz.WFritzPlayerHeader import WFritzPlayerHeader
+    from Code.Fritz.WFritzAnalysisTable import WFritzAnalysisTable
+    from Code.Fritz.WFritzEvalGraph import WFritzEvalGraph
     from Code.Fritz.PaneRegistry import PaneRegistry
     from Code.Fritz.WFritzPane import WFritzPane
 
@@ -565,7 +565,7 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
 def _fritz_new_game(procesador):
     """Show the Fritz level picker and start a game against the engine."""
     mw = procesador.main_window
-    from Code.UIModes.WFritzNewGame import WFritzNewGame
+    from Code.Fritz.WFritzNewGame import WFritzNewGame
     dlg = WFritzNewGame(mw)
     if not dlg.exec():
         return

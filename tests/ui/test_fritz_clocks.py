@@ -97,7 +97,7 @@ def test_classical_shows_qlabel_not_lcd(qt_app):
     :spec: FR-30, T-LCD-04
     """
     from Code.Fritz.WFritzLCD import WFritzLCD
-    from Code.UIModes.WFritzPlayerHeader import _PlayerRow
+    from Code.Fritz.WFritzPlayerHeader import _PlayerRow
 
     row = _PlayerRow(None, "♙", "#ffffff")
 

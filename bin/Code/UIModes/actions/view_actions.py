@@ -33,4 +33,5 @@ def _play_now():
 def _select_engine():
     import Code
     if hasattr(Code, "procesador") and Code.procesador is not None:
-        Code.procesador.motores()
+        from Code.UIModes.actions.modern_fritz_ui import _fritz_new_game
+        _fritz_new_game(Code.procesador)

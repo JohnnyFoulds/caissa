@@ -537,16 +537,36 @@ def _register_ribbon_dropdowns(mw, procesador) -> None:
     ribbon.set_dropdown("caissa:std_layout", _("Standard Layouts"), layout_items)
 
     # ── Select Engine ▼ (caissa:select_engine) ───────────────────────────────
+    # Opens the Fritz New Game dialog — the engine is chosen as part of level setup.
+    # Code.procesador.motores() does not exist; WFritzNewGame is the Fritz-mode path.
     def _select_engine():
-        import Code
-        if hasattr(Code, "procesador") and Code.procesador is not None:
-            Code.procesador.motores()
+        _fritz_new_game(procesador)
 
     ribbon.set_dropdown(
         "caissa:select_engine",
         _("Select Engine"),
         [(_("Choose Engine…"), _select_engine)],
     )
+
+    # ── Board Display API (caissa:board_coordinates, caissa:board_arrows) ─────
+    def _get_board():
+        rc = getattr(mw, "base", None)
+        return rc.board if rc is not None and hasattr(rc, "board") else None
+
+    def _set_coordinates(visible: bool) -> None:
+        board = _get_board()
+        if board is not None:
+            board.show_coordinates(visible)
+
+    def _set_arrows(visible: bool) -> None:
+        import Code
+        Code.configuration.x_show_bestmove = visible
+
+    ribbon.set_display_api({
+        "caissa:board_coordinates": _set_coordinates,
+        "caissa:board_arrows":      _set_arrows,
+        "caissa:board_hints":       lambda _: None,
+    })
 
     # ── Toggle API: TB_STOP checked state reflects play_against_engine ────────
     # TB_STOP is "Play Now" — checked means the engine is playing (not analysis).

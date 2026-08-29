@@ -335,6 +335,7 @@ class WRibbon(QtWidgets.QWidget):
         self._toggle_btns: dict[str, Any] = {}   # key → QToolButton for toggle slots
         self._toggle_get_fn: Any | None = None   # callable(key) → bool | None
         self._dropdowns: dict[str, Any] = {}     # key → WDropdownPanel
+        self._display_api: dict[str, Any] = {}   # key → set_fn(bool)
 
         self._build_ui()
         self._apply_metrics()
@@ -499,6 +500,15 @@ class WRibbon(QtWidgets.QWidget):
         return False
 
     # ── dropdown / toggle public API ──────────────────────────────────────────
+
+    def set_display_api(self, api: dict[str, Any]) -> None:
+        """Register set-callbacks for Board ▸ Display checkboxes.
+
+        :param api: ``{key: callable(bool)}`` mapping — called when the user
+            toggles the checkbox.  Unknown keys are ignored.
+        :spec: FR-?? (defect #11 fix)
+        """
+        self._display_api = dict(api)
 
     def set_toggle_api(self, get_fn: Any) -> None:
         """Register a callable that returns the checked state of a toggle slot.
@@ -869,8 +879,15 @@ class WRibbon(QtWidgets.QWidget):
         vbox.setSpacing(1)
         for item in group.get("items", []):
             label = item.get("label", "")
+            key = item.get("key", "")
             cb = _FritzPaneCheckBox(label, container)
             cb.setChecked(bool(item.get("default", False)))
+            if key:
+                _key = key
+                _self = self
+                cb.toggled.connect(
+                    lambda checked, k=_key, s=_self: s._display_api.get(k, lambda _: None)(checked)
+                )
             vbox.addWidget(cb)
         vbox.addStretch(1)
         return container

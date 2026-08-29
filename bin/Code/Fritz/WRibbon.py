@@ -587,9 +587,12 @@ class WRibbon(QtWidgets.QWidget):
         root.addWidget(self._tab_row)
 
         # ── Horizontal rule ───────────────────────────────────────────────────
+        # QFrame.HLine paints natively and ignores QSS background-color; use
+        # NoFrame + WA_StyledBackground so the QSS color is the only renderer.
         rule = QtWidgets.QFrame(self)
         rule.setObjectName("WRibbonRule")
-        rule.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        rule.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        rule.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         rule.setFixedHeight(_RULE_H)
         root.addWidget(rule)
 

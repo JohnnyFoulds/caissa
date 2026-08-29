@@ -508,25 +508,10 @@ class WBase(QtWidgets.QWidget):
     def pon_toolbar(self, li_acciones, separator=False, with_shortcuts=False, with_eboard=False):
         self.with_shortcuts = with_shortcuts
 
-        # Hoist li_acciones so closeEvent/set_hints can read it even via the ribbon path.
-        self.tb.li_acciones = list(li_acciones) if not isinstance(li_acciones, list) else li_acciones
+        li_acciones = list(li_acciones)
 
-        if self.ribbon:
-            self.ribbon.sync(self.tb.li_acciones)
-            return self.tb
-
-        self.tb.clear()
-        if with_eboard:
-            li_acciones = list(li_acciones)
-            if TB_CONFIG in li_acciones:
-                pos = li_acciones.index(TB_CONFIG)
-                li_acciones.insert(pos, TB_EBOARD)
-            else:
-                li_acciones.append(TB_EBOARD)
-            title = _("Disable") if Code.eboard.driver else _("Enable")
-            self.dic_toolbar[TB_EBOARD].setIconText(title)
-
-        # ── mode filter (never removes NEVER_FILTER_TOOLBAR keys) ──────────
+        # Apply mode filter and inject Fritz-specific keys before the ribbon path
+        # so that tb.li_acciones (and ribbon.sync) always see the enriched list.
         try:
             from Code.UIModes import UIModes
             if not UIModes.allows_all_toolbar():
@@ -536,6 +521,23 @@ class WBase(QtWidgets.QWidget):
                     li_acciones = [inj] + list(li_acciones)
         except Exception:
             pass
+
+        # Hoist so closeEvent/set_hints/toolbar_info can read it via the ribbon path too.
+        self.tb.li_acciones = li_acciones
+
+        if self.ribbon:
+            self.ribbon.sync(self.tb.li_acciones)
+            return self.tb
+
+        self.tb.clear()
+        if with_eboard:
+            if TB_CONFIG in li_acciones:
+                pos = li_acciones.index(TB_CONFIG)
+                li_acciones.insert(pos, TB_EBOARD)
+            else:
+                li_acciones.append(TB_EBOARD)
+            title = _("Disable") if Code.eboard.driver else _("Enable")
+            self.dic_toolbar[TB_EBOARD].setIconText(title)
 
         last = len(li_acciones) - 1
         for n, k in enumerate(li_acciones):

@@ -309,6 +309,25 @@ class QtDriver(Driver):
                     "x": gpos.x() - mw_origin.x(),
                     "y": gpos.y() - mw_origin.y(),
                 })
+        # Ribbon fallback: when a ribbon is installed, expose its slot actions
+        base = getattr(mw, "base", None)
+        ribbon = getattr(base, "ribbon", None) if base else None
+        if ribbon is not None:
+            dic_tb = getattr(base, "dic_toolbar", {})
+            li_acc = set(getattr(getattr(base, "tb", None), "li_acciones", []) or [])
+            for action in dic_tb.values():
+                if getattr(action, "key", None) not in li_acc:
+                    continue
+                txt = action.text() or ""
+                if txt:
+                    buttons.append({
+                        "text": txt,
+                        "enabled": action.isEnabled(),
+                        "width": 0,
+                        "height": 0,
+                        "x": 0,
+                        "y": 0,
+                    })
         dpr = mw.devicePixelRatio()
         return {
             "count": len(buttons),
@@ -347,11 +366,11 @@ class QtDriver(Driver):
         from PySide6 import QtWidgets
         g = w.geometry()
         info = {
-            "class": type(w).__name__,
-            "objectName": w.objectName() or None,
+            "cls": type(w).__name__,
+            "object_name": w.objectName() or None,
             "visible": w.isVisible(),
             "enabled": w.isEnabled(),
-            "geometry": {"x": g.x(), "y": g.y(), "w": g.width(), "h": g.height()},
+            "rect": {"x": g.x(), "y": g.y(), "w": g.width(), "h": g.height()},
         }
         for attr in ("text", "title", "windowTitle", "currentText", "toolTip"):
             try:
@@ -397,23 +416,104 @@ class QtDriver(Driver):
     def match_widget(self, query: str):
         """Find first visible widget whose text/objectName/class contains ``query``.
 
+        When the only match is a QLabel (e.g. a form row label), the adjacent
+        field widget from the parent QFormLayout is returned instead, so callers
+        like ``set_field("Player", ...)`` can locate QLineEdits by their label text.
+
+        When an active window is focused (e.g. a dialog), that window's widgets
+        are searched first so that background Fritz widgets cannot shadow dialog
+        fields whose label text matches a background widget's objectName substring.
+
         :param query: Case-insensitive substring to match.
         :returns:     Matching QWidget or ``None``.
         """
+        from PySide6 import QtWidgets
         q = query.lower()
-        for w in self.all_visible_widgets():
-            if q in (w.objectName() or "").lower():
-                return w
-            if q in type(w).__name__.lower():
-                return w
-            for attr in ("text", "windowTitle", "title", "currentText"):
-                try:
-                    val = getattr(w, attr)()
-                    if val and q in val.lower():
-                        return w
-                except Exception:
-                    pass
+        all_widgets = self.all_visible_widgets()
+
+        active_win = QtWidgets.QApplication.activeWindow()
+        if active_win is not None:
+            scoped = [w for w in all_widgets if self._is_descendant(active_win, w)]
+        else:
+            scoped = all_widgets
+
+        def _scan(widgets):
+            # Pass 1: exact objectName or class-name match.
+            for w in widgets:
+                if (w.objectName() or "").lower() == q:
+                    return w, None
+                if type(w).__name__.lower() == q:
+                    return w, None
+            # Pass 2: substring objectName / class-name, or text match (QLabel deferred).
+            label_candidate = None
+            for w in widgets:
+                if q in (w.objectName() or "").lower():
+                    return w, None
+                if q in type(w).__name__.lower():
+                    return w, None
+                for attr in ("text", "windowTitle", "title", "currentText"):
+                    try:
+                        val = getattr(w, attr)()
+                        if val and q in val.lower():
+                            if isinstance(w, QtWidgets.QLabel):
+                                if label_candidate is None:
+                                    label_candidate = w
+                            else:
+                                return w, None
+                            break
+                    except Exception:
+                        pass
+            return None, label_candidate
+
+        result, label = _scan(scoped)
+        if result is None and label is None and scoped is not all_widgets:
+            result, label = _scan(all_widgets)
+
+        if result is not None:
+            return result
+        if label is not None:
+            field = self._form_field_for_label(label)
+            return field if field is not None else label
         return None
+
+    @staticmethod
+    def _form_field_for_label(label_widget):
+        """Return the QFormLayout field widget paired with *label_widget*, or None.
+
+        :param label_widget: A QLabel that is a row label in a QFormLayout.
+        :returns:            The adjacent field QWidget, or ``None``.
+        """
+        from PySide6 import QtWidgets
+        parent = label_widget.parentWidget()
+        if parent is None:
+            return None
+        layout = parent.layout()
+        if not isinstance(layout, QtWidgets.QFormLayout):
+            return None
+        LabelRole = QtWidgets.QFormLayout.ItemRole.LabelRole
+        FieldRole = QtWidgets.QFormLayout.ItemRole.FieldRole
+        for row in range(layout.rowCount()):
+            label_item = layout.itemAt(row, LabelRole)
+            if label_item and label_item.widget() is label_widget:
+                field_item = layout.itemAt(row, FieldRole)
+                if field_item:
+                    return field_item.widget()
+        return None
+
+    @staticmethod
+    def _is_descendant(ancestor, widget) -> bool:
+        """Return True if *widget* is *ancestor* or a descendant of it.
+
+        :param ancestor: The candidate ancestor widget.
+        :param widget:   The widget to test.
+        :returns:        True when *widget* is within *ancestor*'s subtree.
+        """
+        w = widget
+        while w is not None:
+            if w is ancestor:
+                return True
+            w = w.parentWidget()
+        return False
 
     def inspect_widget(self, query: str) -> dict:
         """Return info dict for the first visible widget matching ``query``.
@@ -682,6 +782,18 @@ class QtDriver(Driver):
                     return {"error": f"toolbar action {text!r} is disabled"}
                 QtCore.QTimer.singleShot(0, action.trigger)
                 return {"ok": True, "text": action.text()}
+        # Ribbon fallback: search dic_toolbar for matching action text
+        base = getattr(mw, "base", None)
+        dic_tb = getattr(base, "dic_toolbar", {}) if base else {}
+        li_acc = set(getattr(getattr(base, "tb", None), "li_acciones", []) or [])
+        for action in dic_tb.values():
+            if getattr(action, "key", None) not in li_acc:
+                continue
+            if t_lower in (action.text() or "").lower():
+                if not action.isEnabled():
+                    return {"error": f"toolbar action {text!r} is disabled"}
+                QtCore.QTimer.singleShot(0, action.trigger)
+                return {"ok": True, "text": action.text()}
         return {"error": f"no toolbar action matching {text!r}"}
 
     def click_tab(self, text: str) -> dict:
@@ -817,7 +929,10 @@ class QtDriver(Driver):
             return {"error": "no visible modal dialog"}
         keywords = (["accept", "ok", "yes", "aceptar", "confirm"] if accept
                     else ["cancel", "close", "no", "cancelar", "reject"])
-        for btn in dlg.findChildren(QtWidgets.QPushButton):
+        btn_types = (QtWidgets.QPushButton, QtWidgets.QToolButton)
+        for btn in dlg.findChildren(QtWidgets.QAbstractButton):
+            if not isinstance(btn, btn_types):
+                continue
             if not btn.isVisible():
                 continue
             btn_text = btn.text().lower().replace("&", "")
@@ -825,9 +940,15 @@ class QtDriver(Driver):
                 btn.click()
                 return {"ok": True, "clicked": btn.text(), "title": dlg.windowTitle()}
         if accept:
-            dlg.accept()
+            if hasattr(dlg, "aceptar"):
+                dlg.aceptar()
+            else:
+                dlg.accept()
         else:
-            dlg.reject()
+            if hasattr(dlg, "cancelar"):
+                dlg.cancelar()
+            else:
+                dlg.reject()
         return {"ok": True, "method": "accept" if accept else "reject", "title": dlg.windowTitle()}
 
     # ------------------------------------------------------------------

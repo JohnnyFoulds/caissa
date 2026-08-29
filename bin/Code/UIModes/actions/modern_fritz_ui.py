@@ -266,7 +266,34 @@ def on_mode_enter(procesador):
     """Activate Fritz layout: home panel on the right, engine bar running."""
     mw = procesador.main_window
 
+    # If re-entered (e.g. after force_cancel → proc.start()), remove the old
+    # Fritz right_col before building a new one.  Without this, splitter ends up
+    # with 3 children but setSizes only passes 2 values, leaving the third at 0px.
+    old_rc = getattr(mw, "_fritz_right_col", None)
+    _log.debug(
+        "on_mode_enter: splitter.count()=%d  sizes=%s  old_rc=%s",
+        mw.splitter.count(),
+        mw.splitter.sizes(),
+        old_rc,
+    )
+    if old_rc is not None:
+        try:
+            _restore_main_splitter_pre_fritz(mw)
+        except Exception:
+            _log.debug("Fritz on_mode_enter pre-cleanup failed", exc_info=True)
+        _log.debug(
+            "on_mode_enter: after cleanup splitter.count()=%d  sizes=%s",
+            mw.splitter.count(),
+            mw.splitter.sizes(),
+        )
+
     from Code.UIModes.WFritzHome import WFritzHome
+
+    # Read splitter sizes BEFORE addWidget so we see the 2-pane classical split.
+    main_sizes = mw.splitter.sizes()
+    _log.debug("on_mode_enter: main_sizes before addWidget = %s", main_sizes)
+    wbase_width = main_sizes[0] if main_sizes else 800
+    pgn_width = main_sizes[1] if len(main_sizes) > 1 else 300
 
     right_col = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, mw)
     right_col.setChildrenCollapsible(False)
@@ -277,14 +304,20 @@ def on_mode_enter(procesador):
     right_col.addWidget(mw.pgn_information)
     right_col.setSizes([320, 400])
 
-    main_sizes = mw.splitter.sizes()
-    wbase_width = main_sizes[0] if main_sizes else 800
-    pgn_width = main_sizes[1] if len(main_sizes) > 1 else 300
-
     mw.splitter.addWidget(right_col)
     fritz_col_width = max(pgn_width, 380)
+    _log.debug(
+        "on_mode_enter: before setSizes splitter.count()=%d  computing sizes=[%d, %d]",
+        mw.splitter.count(),
+        max(wbase_width - (fritz_col_width - pgn_width), 600),
+        fritz_col_width,
+    )
     mw.splitter.setSizes([max(wbase_width - (fritz_col_width - pgn_width), 600),
                           fritz_col_width])
+    _log.debug(
+        "on_mode_enter: after setSizes splitter.sizes()=%s",
+        mw.splitter.sizes(),
+    )
     right_col.show()
     home.show()
 
@@ -378,8 +411,10 @@ def _swap_home_to_analysis(procesador):
     right_col.insertWidget(2, eg_pane)
 
     old_pgi = right_col.replaceWidget(3, pgn_pane)
+    # replaceWidget() already detaches and hides old_pgi.  Do NOT add it back to
+    # mw.splitter here — doing so creates a 3-item splitter, and the setSizes call
+    # below only passes 2 values, leaving right_col at ~4px wide.
     if old_pgi is not None:
-        mw.splitter.addWidget(old_pgi)
         old_pgi.hide()
 
     right_col.setSizes([60, 280, 80, 220])
@@ -558,6 +593,33 @@ def pane_api(mw) -> dict:
 
 
 # ── mode exit ──────────────────────────────────────────────────────────────────
+
+def _restore_main_splitter_pre_fritz(mw):
+    """Remove the Fritz right_col from mw.splitter and restore pgn_information.
+
+    Called by on_mode_enter when Fritz mode is re-entered (e.g. after
+    force_cancel → proc.start()).  Without this, mw.splitter accumulates extra
+    panes and setSizes([a, b]) leaves the third pane at 0px.
+    """
+    right_col = getattr(mw, "_fritz_right_col", None)
+    if right_col is None:
+        return
+    try:
+        # pgn_information may already be in mw.splitter (added by _swap_home_to_analysis
+        # line 393) or still inside right_col; either way addWidget restores it.
+        mw.splitter.addWidget(mw.pgn_information)
+        right_col.hide()
+        right_col.setParent(None)
+    except Exception:
+        _log.debug("_restore_main_splitter_pre_fritz error", exc_info=True)
+    # Clear all Fritz state attrs so on_mode_enter starts fresh.
+    for attr in ("_fritz_right_col", "_fritz_home", "_fritz_analysis_table",
+                 "_fritz_eval_graph", "_fritz_player_header", "_fritz_pgn_restore"):
+        try:
+            delattr(mw, attr)
+        except AttributeError:
+            pass
+
 
 def on_mode_exit(procesador):
     """Restore the standard layout before Procesador.reset() wipes state."""

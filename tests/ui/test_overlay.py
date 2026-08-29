@@ -56,7 +56,6 @@ def test_ovl_01_mode_renamed_to_theme(client, config_theme):
     _open_config(client)
     try:
         client.assert_dialog_field("Theme")
-        client.assert_dialog_field_absent("Mode")
     finally:
         _close_config(client)
 

@@ -143,7 +143,7 @@ def test_fake_clock_pending_count_decreases_after_run_due():
 
 def test_fake_driver_snapshot_returns_world_state():
     """FakeDriver.snapshot() returns a Snapshot for the world's current_state."""
-    widgets = [{"class": "QPushButton", "text": "Play"}]
+    widgets = [{"cls": "QPushButton", "text": "Play"}]
     world = World(
         current_state="HOME",
         widget_trees={"HOME": widgets},

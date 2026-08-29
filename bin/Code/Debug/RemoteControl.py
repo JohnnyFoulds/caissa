@@ -190,6 +190,9 @@ class RemoteControl(QtCore.QObject):
                 try:
                     result_holder[0] = self._dispatch(cmd)
                 except Exception as exc:
+                    import traceback as _tb
+                    with open("/tmp/caissa_rc_debug.log", "a") as _f:
+                        _f.write(f"[_drain] cmd={cmd!r} exc={exc!r}\n{_tb.format_exc()}\n")
                     result_holder[0] = {"error": str(exc)}
                 finally:
                     logger.debug("DISPATCH end: %r", cmd)

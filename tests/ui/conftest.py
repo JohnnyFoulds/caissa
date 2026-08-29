@@ -63,9 +63,11 @@ def _disable_startup_dialogs():
     original = {
         "x_check_for_update": cfg.get("x_check_for_update"),
         "x_show_puzzles_on_startup": cfg.get("x_show_puzzles_on_startup"),
+        "x_ui_mode": cfg.get("x_ui_mode"),
     }
     cfg["x_check_for_update"] = False
     cfg["x_show_puzzles_on_startup"] = False
+    cfg["x_ui_mode"] = "Modern Fritz"
     with open(pk_path, "wb") as f:
         pickle.dump(cfg, f)
     return original

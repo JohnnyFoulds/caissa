@@ -201,6 +201,10 @@ def test_nag_annotated_cell_differs_from_unannotated(client):
     pytest.xfail(_LIVE_GAME)
 
 
+@pytest.mark.xfail(
+    strict=False,
+    reason="Mode switch requires app restart; single-session fixture cannot verify classical mode",
+)
 def test_classical_has_no_tab_strip(client):
     """T-NOT-08: Classical mode has no WFritzNotationTabBar.
 

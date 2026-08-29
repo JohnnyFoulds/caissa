@@ -28,6 +28,14 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode defects #6 and #11 (select-engine crash + display checkboxes)**:
+  `caissa:select_engine` action now routes to `_fritz_new_game` instead of calling
+  the non-existent `Code.procesador.motores()` (crash on every click). Board ▸ Display
+  checkboxes (`modern-fritz.json`) now have `key` fields (`caissa:board_coordinates`,
+  `caissa:board_arrows`, `caissa:board_hints`). `WRibbon.set_display_api(api)` wires
+  per-key callbacks so toggling "Coordinates" calls `board.show_coordinates(bool)` and
+  "Show arrows" toggles `configuration.x_show_bestmove`. 4 tests in
+  `tests/ui/test_fritz_display.py` (T-DSP-01..04).
 - **Fritz Mode Behaviour — Phase 6 (Polish — WFritz* widget relocation)**:
   `WFritzAnalysisTable.py`, `WFritzEvalGraph.py`, `WFritzPlayerHeader.py`, and
   `WFritzNewGame.py` moved from `bin/Code/UIModes/` to `bin/Code/Fritz/` so the

@@ -97,9 +97,9 @@
           "label": "Display",
           "kind": "checkboxes",
           "items": [
-            { "label": "Coordinates", "default": true  },
-            { "label": "Show arrows", "default": true  },
-            { "label": "Show hints",  "default": false }
+            { "key": "caissa:board_coordinates", "label": "Coordinates", "default": true  },
+            { "key": "caissa:board_arrows",      "label": "Show arrows", "default": true  },
+            { "key": "caissa:board_hints",       "label": "Show hints",  "default": false }
           ]
         }
       ]

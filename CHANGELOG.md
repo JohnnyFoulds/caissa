@@ -28,6 +28,16 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode Behaviour — Phase 4 (Analysis + Engine Tab Wiring)**:
+  `ManagerSolo.run_action` dispatches `caissa:infinite_analysis` — toggles
+  `play_against_engine`: game→analysis terminates rival engine and calls
+  `play_next_move()`; analysis→game opens `WFritzNewGame`; `TB_STOP` and `TB_LEVEL`
+  also dispatch to `WFritzNewGame` in `ManagerSolo`. Ribbon toggle API wired in
+  `_register_ribbon_dropdowns`: `ribbon.set_toggle_api(_get_toggle)` proxies
+  `manager.play_against_engine` so `TB_STOP` button checked state tracks live mode.
+  Tests: T-P4-01 (toggle getter mirrors `play_against_engine`), T-P4-02 (`WRibbon.sync()`
+  reflects toggled state); T-P4-03..05 are `xfail(strict=True)` stubs pending
+  circular-import resolution in `ManagerSolo`.
 - **Fritz Mode Behaviour — Phase 3 (Home + Board Tab Wiring)**:
   `caissa:flip_board` now calls `Board.rotate_board()` (fixes coordinate labels,
   arrow repositioning, and captures-panel flip — was direct `is_white_bottom` mutation);

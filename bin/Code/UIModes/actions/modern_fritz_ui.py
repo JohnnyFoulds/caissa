@@ -96,7 +96,6 @@ _NOTATION_TAB_LABELS = [
     "Notation",
     "Training",
     "Score sheet",
-    "LiveBook",
     "Openings Book",
     "My Moves",
 ]
@@ -556,9 +555,12 @@ def _build_fritz_right_col(mw) -> None:
     mw._fritz_pane_registry = reg
     mw._fritz_pane_sizes    = {}
 
+    # Track visibility in Python (not Qt widget state) so checkboxes are correct
+    # immediately — isVisible() is unreliable during layout construction.
+    mw._fritz_pane_shown = {key: True for key in pane_dict}
     _api = {
         "names": [s.key for s in _PANE_SPECS],
-        "get":   lambda key: bool(pane_dict.get(key) and pane_dict[key].isVisible()),
+        "get":   lambda key: getattr(mw, "_fritz_pane_shown", {}).get(key, False),
         "set":   lambda key, vis: _set_pane_visible(mw, key, vis),
     }
     for _pane in pane_dict.values():
@@ -599,6 +601,12 @@ def _build_fritz_right_col(mw) -> None:
     flowing = getattr(mw, "_fritz_notation_flowing", None)
     if flowing is not None:
         flowing.start()
+
+    # Register pane API with ribbon NOW (after panes are shown) so that
+    # isVisible() returns True and checkboxes reflect actual state.
+    _ribbon = getattr(getattr(mw, "base", None), "ribbon", None)
+    if _ribbon is not None:
+        _ribbon.set_pane_api(_api)
 
     # ── 10. Store state attrs ─────────────────────────────────────────────────
     mw._fritz_right_col      = right_col
@@ -798,10 +806,12 @@ def _set_pane_visible(mw, key: str, visible: bool) -> None:
             idx = i
             break
 
+    pane_shown = getattr(mw, "_fritz_pane_shown", {})
     if visible:
         stored = pane_sizes.get(key, 0)
         restored_h = reg.restore_px(key, stored) if reg else pane.spec.default_px
         pane.show()
+        pane_shown[key] = True
         if idx is not None:
             sizes = right_col.sizes()
             new_sizes = list(sizes)
@@ -814,6 +824,7 @@ def _set_pane_visible(mw, key: str, visible: bool) -> None:
                 pane_sizes[key] = sizes[idx]
                 mw._fritz_pane_sizes = pane_sizes
         pane.hide()
+        pane_shown[key] = False
 
 
 def pane_api(mw) -> dict:
@@ -822,10 +833,9 @@ def pane_api(mw) -> dict:
     :returns: ``{"names": [...], "get": callable, "set": callable}``
     :spec: §5.3
     """
-    pane_dict = getattr(mw, "_fritz_panes", {})
     return {
         "names": [s.key for s in _PANE_SPECS],
-        "get":   lambda key: bool(pane_dict.get(key) and pane_dict[key].isVisible()),
+        "get":   lambda key: getattr(mw, "_fritz_pane_shown", {}).get(key, False),
         "set":   lambda key, vis: _set_pane_visible(mw, key, vis),
     }
 
@@ -930,6 +940,12 @@ def on_mode_exit(procesador):
     player_header = getattr(mw, "_fritz_player_header", None)
     right_col = getattr(mw, "_fritz_right_col", None)
     flowing = getattr(mw, "_fritz_notation_flowing", None)
+
+    # Clear pane API on ribbon before destroying panes to prevent _sync_panes
+    # from calling isVisible() on deleted C++ objects during/after teardown.
+    _ribbon = getattr(getattr(mw, "base", None), "ribbon", None)
+    if _ribbon is not None:
+        _ribbon.set_pane_api({})
 
     # Stop live widgets
     for widget in (table, eval_graph, player_header, home, flowing):

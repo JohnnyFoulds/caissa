@@ -28,6 +28,16 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
+- **Fritz Mode Behaviour — Phase 1 (Boot State)**: Fritz mode now boots directly
+  into Infinite Analysis — engine analyses but never replies, no landing screen.
+  `WFritzHome.py` deleted; `_build_fritz_right_col()` replaces `_swap_home_to_analysis`;
+  `on_mode_enter` terminates `ManagerChallenge101` then boots `ManagerSolo` headlessly
+  (`PLAY_AGAINST_ENGINE: False`); `GeometryStore.load_splitters` wired for layout
+  persistence; `Ribbon.py` pane-API timing fixed (deferred `main_window` lookup);
+  `Ribbon.py` `hook` override respected for Dark variant; `eval_bar` added to
+  `_PANE_SPECS`; 75 dead `#WFritzHome*` QSS rules removed from three stylesheets;
+  mode descriptions updated in `modern-fritz.json` and `modern-fritz-dark.json`.
+
 ### Fixed
 - **Retro — Traps.py buffer overflow**: `AmigaTraps.install()` was writing
   `b"\x4e\x75" * size` (2×size bytes) into a size-byte region; corrected to `*(size//2)`.

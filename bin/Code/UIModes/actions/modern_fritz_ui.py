@@ -3,23 +3,18 @@ modern_fritz_ui.py — mode lifecycle hook for the Modern Fritz skin.
 
 Called by Procesador when the active mode is "Modern Fritz".
 
-Target layout (after home panel is dismissed, game in progress)
-───────────────────────────────────────────────────────────────
+On mode entry the board boots directly into Infinite Analysis (manual §000128):
+engine analyses but never replies.  No landing screen.
+
+Layout:
     MainWindow.splitter (horizontal)
-    ├─ [0]  WBase                    — board + toolbar + eval bar
+    ├─ [0]  WBase                    — board + toolbar
     │          (internal right panel COLLAPSED — pgn reparented out)
     └─ [1]  _fritz_right_col  (QSplitter, Vertical)
-               ├─ [0]  WFritzPlayerHeader (60 px fixed)  — player names/clocks
-               ├─ [1]  WFritzAnalysisTable (flexible)    — multi-PV engine lines
-               ├─ [2]  WFritzEvalGraph (80 px fixed)     — eval profile graph
-               └─ [3]  WBase.pgn (flexible)              — game move list
-
-Home-screen layout (on mode entry, before a game starts):
-    MainWindow.splitter (horizontal)
-    ├─ [0]  WBase                    — board
-    └─ [1]  _fritz_right_col
-               ├─ [0]  WFritzHome                       — home/landing panel
-               └─ [1]  pgn_information                   — hidden
+               ├─ [0]  WFritzPlayerHeader (60 px)   — player names/clocks
+               ├─ [1]  WFritzAnalysisTable (flexible) — multi-PV engine lines
+               ├─ [2]  WFritzEvalGraph (80 px)       — eval profile graph
+               └─ [3]  WBase.pgn (flexible)          — game move list
 
 On mode exit, every widget is restored to its original parent and constraints
 so Classical mode renders identically to upstream Lucas Chess R6.
@@ -39,6 +34,7 @@ _PANE_SPECS = [
     PaneSpec("analysis_table", "Engine analysis", 280, 60),
     PaneSpec("eval_graph",     "Eval profile",     80, 40),
     PaneSpec("pgn",            "Notation",        220, 60),
+    PaneSpec("eval_bar",       "Eval bar",         30, 30),
 ]
 
 # NAG colours come from dic_colors via ThemeGateway — no hardcoded hex here.
@@ -263,12 +259,14 @@ def _collapse_widget(widget):
 # ── mode entry ─────────────────────────────────────────────────────────────────
 
 def on_mode_enter(procesador):
-    """Activate Fritz layout: home panel on the right, engine bar running."""
+    """Boot Fritz mode directly into Infinite Analysis (manual §000128).
+
+    Engine analyses but never replies.  No landing screen.
+    """
     mw = procesador.main_window
 
-    # If re-entered (e.g. after force_cancel → proc.start()), remove the old
-    # Fritz right_col before building a new one.  Without this, splitter ends up
-    # with 3 children but setSizes only passes 2 values, leaving the third at 0px.
+    # Re-entry guard: remove stale Fritz right_col if mode is re-entered
+    # (e.g. after force_cancel → proc.start()).
     old_rc = getattr(mw, "_fritz_right_col", None)
     _log.debug(
         "on_mode_enter: splitter.count()=%d  sizes=%s  old_rc=%s",
@@ -281,17 +279,65 @@ def on_mode_enter(procesador):
             _restore_main_splitter_pre_fritz(mw)
         except Exception:
             _log.debug("Fritz on_mode_enter pre-cleanup failed", exc_info=True)
-        _log.debug(
-            "on_mode_enter: after cleanup splitter.count()=%d  sizes=%s",
-            mw.splitter.count(),
-            mw.splitter.sizes(),
-        )
 
-    from Code.UIModes.WFritzHome import WFritzHome
+    # 1. Terminate presentacion manager (ManagerChallenge101) if it was started
+    #    by Procesador.reset() before the mode hook ran.
+    mgr = getattr(procesador, "manager", None)
+    if mgr is not None and type(mgr).__name__ == "ManagerChallenge101":
+        try:
+            mgr.terminate()
+        except Exception:
+            _log.debug("Fritz: failed to terminate presentacion manager", exc_info=True)
 
-    # Read splitter sizes BEFORE addWidget so we see the 2-pane classical split.
+    # 2. Activate analysis bar BEFORE building pane widgets.
+    #    force_hidden prevents macOS QGraphicsDropShadowEffect crash on Qt6/Metal.
+    mw.activate_analysis_bar(True)
+    mw.base.analysis_bar.force_hidden = True
+    mw.base.analysis_bar.setVisible(False)
+    # Collapse layout space — setVisible alone still reserves ≈70 px in HBoxLayout.
+    mw.base.analysis_bar.setMaximumWidth(0)
+    mw.active_information_pgn(True)
+
+    # 3. Build the right column with all panes (no landing screen).
+    _build_fritz_right_col(mw)
+
+    # 4. Restore last saved layout (manual §000078).
+    try:
+        from Code.Fritz.GeometryStore import GeometryStore
+        saved = GeometryStore.load_splitters("fritz")
+        if saved:
+            rc = getattr(mw, "_fritz_right_col", None)
+            if rc is not None and "right_col" in saved:
+                rc.setSizes(saved["right_col"])
+            if "main" in saved:
+                mw.splitter.setSizes(saved["main"])
+    except Exception:
+        _log.debug("Fritz: GeometryStore load failed", exc_info=True)
+
+    # 5. Boot ManagerSolo in Infinite Analysis — engine analyses, never replies.
+    from Code.Z.ManagerSolo import ManagerSolo as _ManagerSolo
+    _ManagerSolo(procesador).start({"PLAY_AGAINST_ENGINE": False, "ANALYSIS_BAR": True})
+
+    _log.debug("Modern Fritz layout activated (Infinite Analysis)")
+
+
+# ── right column builder ───────────────────────────────────────────────────────
+
+def _build_fritz_right_col(mw) -> None:
+    """Build the Fritz right column and wire pane API.
+
+    Builds::
+
+        _fritz_right_col (QSplitter, Vertical)
+        ├─ [0]  WFritzPlayerHeader
+        ├─ [1]  WFritzAnalysisTable
+        ├─ [2]  WFritzEvalGraph
+        └─ [3]  notation widget (tab strip + NAG bar + mw.base.pgn)
+
+    Parks ``mw.pgn_information`` inside right_col so it is removed from the main
+    splitter (keeps the main splitter at 2 items), then hides it.
+    """
     main_sizes = mw.splitter.sizes()
-    _log.debug("on_mode_enter: main_sizes before addWidget = %s", main_sizes)
     wbase_width = main_sizes[0] if main_sizes else 800
     pgn_width = main_sizes[1] if len(main_sizes) > 1 else 300
 
@@ -299,96 +345,27 @@ def on_mode_enter(procesador):
     right_col.setChildrenCollapsible(False)
     right_col.setObjectName("WFritzRightCol")
 
-    home = WFritzHome(mw)
-    right_col.addWidget(home)
+    # Park pgn_information so it leaves the main splitter (→ 2-item main splitter).
     right_col.addWidget(mw.pgn_information)
-    right_col.setSizes([320, 400])
-
-    mw.splitter.addWidget(right_col)
-    fritz_col_width = max(pgn_width, 380)
-    _log.debug(
-        "on_mode_enter: before setSizes splitter.count()=%d  computing sizes=[%d, %d]",
-        mw.splitter.count(),
-        max(wbase_width - (fritz_col_width - pgn_width), 600),
-        fritz_col_width,
-    )
-    mw.splitter.setSizes([max(wbase_width - (fritz_col_width - pgn_width), 600),
-                          fritz_col_width])
-    _log.debug(
-        "on_mode_enter: after setSizes splitter.sizes()=%s",
-        mw.splitter.sizes(),
-    )
-    right_col.show()
-    home.show()
-
-    mw.activate_analysis_bar(True)
-    # Keep the engine running but hide the widget — Fritz uses WFritzAnalysisTable.
-    # force_hidden prevents activate() from calling setVisible(True) again when
-    # Manager.show_info_extra() re-activates the bar during game start; a visible
-    # AnalysisBar forces a board resize that triggers a QGraphicsDropShadowEffect
-    # crash on macOS with Qt6/Metal.
-    mw.base.analysis_bar.force_hidden = True
-    mw.base.analysis_bar.setVisible(False)
-    # Collapse the layout space — setVisible alone still reserves the widget's
-    # preferred width (≈70 px) in the HBoxLayout, pushing the board rightward.
-    mw.base.analysis_bar.setMaximumWidth(0)
-    mw.active_information_pgn(True)
-    # active_information_pgn(True) calls show() internally — hide it on home screen
     mw.pgn_information.hide()
-
-    mw._fritz_home = home
-    mw._fritz_analysis_table = None
-    mw._fritz_eval_graph = None
-    mw._fritz_player_header = None
-    mw._fritz_right_col = right_col
-    mw._fritz_pgn_restore = None
-    mw._fritz_wbase_constraints = []
-
-    home.action_chosen.connect(lambda action: _on_home_action(procesador, action))
-
-    _log.debug("Modern Fritz layout activated (home screen)")
-
-
-# ── home → analysis swap ───────────────────────────────────────────────────────
-
-def _swap_home_to_analysis(procesador):
-    """Replace WFritzHome with the full Fritz analysis panel.
-
-    Builds the Fritz right column:
-      [0] WFritzPlayerHeader (player names + clocks)
-      [1] WFritzAnalysisTable (multi-PV engine lines)
-      [2] WFritzEvalGraph (eval profile)
-      [3] mw.base.pgn (game move list, reparented from WBase)
-
-    Collapses WBase's internal right-panel widgets so the board fills WBase.
-    Idempotent — safe to call even if already swapped.
-    Returns True if the swap was performed, False if already in analysis view.
-    """
-    mw = procesador.main_window
-    home = getattr(mw, "_fritz_home", None)
-    right_col = getattr(mw, "_fritz_right_col", None)
-    if home is None or right_col is None:
-        return False
 
     bar = mw.base.analysis_bar
 
-    # ── 1. Find pgn's position in WBase's layout tree BEFORE moving it ─────
+    # ── 1. Find pgn's position in WBase's layout tree BEFORE reparenting it ──
     pgn_layout_info = _find_widget_in_layout(mw.base.layout(), mw.base.pgn)
 
-    # ── 2. Build new right_col widgets ──────────────────────────────────────
+    # ── 2. Build content widgets ──────────────────────────────────────────────
     from Code.UIModes.WFritzPlayerHeader import WFritzPlayerHeader
-    player_header = WFritzPlayerHeader(mw, mw.base)
-
     from Code.UIModes.WFritzAnalysisTable import WFritzAnalysisTable
-    table = WFritzAnalysisTable(mw, bar)
-
     from Code.UIModes.WFritzEvalGraph import WFritzEvalGraph
-    eval_graph = WFritzEvalGraph(mw, bar)
-
-    # ── 3. Wrap content widgets in WFritzPane ────────────────────────────────
     from Code.Fritz.PaneRegistry import PaneRegistry
     from Code.Fritz.WFritzPane import WFritzPane
 
+    player_header = WFritzPlayerHeader(mw, mw.base)
+    table = WFritzAnalysisTable(mw, bar)
+    eval_graph = WFritzEvalGraph(mw, bar)
+
+    # ── 3. Wrap in WFritzPane ─────────────────────────────────────────────────
     reg = PaneRegistry()
     for s in _PANE_SPECS:
         reg.register(s)
@@ -396,66 +373,52 @@ def _swap_home_to_analysis(procesador):
     ph_pane  = WFritzPane(_PANE_SPECS[0], player_header)
     tbl_pane = WFritzPane(_PANE_SPECS[1], table)
     eg_pane  = WFritzPane(_PANE_SPECS[2], eval_graph)
-
-    # Build the notation container (tab strip + NAG palette + pgn grid).
     notation_widget = _build_notation_widget(mw)
     pgn_pane = WFritzPane(_PANE_SPECS[3], notation_widget)
 
-    # ── 4. Restructure right_col ─────────────────────────────────────────────
-    # Current right_col: [home(0), pgn_information(1)]
-    # Target:            [ph_pane(0), tbl_pane(1), eg_pane(2), pgn_pane(3)]
-
-    old_home = right_col.replaceWidget(0, ph_pane)
-    if old_home is not None:
-        old_home.hide()
-        old_home.setParent(None)
-
-    right_col.insertWidget(1, tbl_pane)
-    right_col.insertWidget(2, eg_pane)
-
-    old_pgi = right_col.replaceWidget(3, pgn_pane)
-    # replaceWidget() already detaches and hides old_pgi.  Do NOT add it back to
-    # mw.splitter here — doing so creates a 3-item splitter, and the setSizes call
-    # below only passes 2 values, leaving right_col at ~4px wide.
+    # ── 4. Populate right_col ─────────────────────────────────────────────────
+    # pgn_information is at index 0 (parked above).  Replace it with ph_pane,
+    # then append the remaining panes.
+    old_pgi = right_col.replaceWidget(0, ph_pane)
     if old_pgi is not None:
         old_pgi.hide()
+    right_col.addWidget(tbl_pane)
+    right_col.addWidget(eg_pane)
+    right_col.addWidget(pgn_pane)
 
-    right_col.setSizes([60, 280, 80, 220])
+    # ── 5. Attach right_col to main splitter ──────────────────────────────────
+    mw.splitter.addWidget(right_col)
+    fritz_col_width = max(pgn_width, 380)
+    mw.splitter.setSizes([max(wbase_width - (fritz_col_width - pgn_width), 600),
+                          fritz_col_width])
+    right_col.setSizes([_PANE_SPECS[0].default_px, _PANE_SPECS[1].default_px,
+                        _PANE_SPECS[2].default_px, _PANE_SPECS[3].default_px])
+    right_col.show()
 
-    # ── 5. Wire pane API ─────────────────────────────────────────────────────
-    _pane_dict = {
+    # ── 6. Wire pane API ──────────────────────────────────────────────────────
+    pane_dict = {
         "player_header":  ph_pane,
         "analysis_table": tbl_pane,
         "eval_graph":     eg_pane,
         "pgn":            pgn_pane,
     }
-    mw._fritz_panes         = _pane_dict
+    mw._fritz_panes         = pane_dict
     mw._fritz_pane_registry = reg
     mw._fritz_pane_sizes    = {}
 
     _api = {
         "names": [s.key for s in _PANE_SPECS],
-        "get":   lambda key: bool(_pane_dict.get(key) and _pane_dict[key].isVisible()),
+        "get":   lambda key: bool(pane_dict.get(key) and pane_dict[key].isVisible()),
         "set":   lambda key, vis: _set_pane_visible(mw, key, vis),
     }
-    for _pane in _pane_dict.values():
+    for _pane in pane_dict.values():
         _pane.wire_pane_api(_api, _PANE_SPECS)
 
-    # ── Attach FritzEtiquetaPGN to notation columns (replaces monkey-patch) ────
+    # ── 7. Attach FritzEtiquetaPGN delegates ──────────────────────────────────
     saved_delegates = _attach_fritz_delegates(mw.base.pgn)
     mw._fritz_saved_delegates = saved_delegates
 
-    # ── 6. Show and start the new widgets ────────────────────────────────────
-    for _p in _pane_dict.values():
-        _p.show()
-    player_header.start()
-    table.start()
-    eval_graph.start()
-
-    # ── 7. Collapse WBase's internal right-panel widgets ─────────────────────
-    # Zero out min/max size so the layout gives back all the space to the board.
-    # We intentionally skip mw.base.pgn (already reparented) and track everything
-    # else so we can restore on mode exit.
+    # ── 8. Collapse WBase internal right-panel widgets ─────────────────────────
     _right_panel_widgets = [
         mw.base.lb_player_white,
         mw.base.lb_player_black,
@@ -477,57 +440,35 @@ def _swap_home_to_analysis(procesador):
         constraints.append((w, orig_min, orig_max))
     mw._fritz_wbase_constraints = constraints
 
-    # ── 6. Resize main splitter ───────────────────────────────────────────────
-    total = sum(mw.splitter.sizes())
-    fritz_width = 400
-    mw.splitter.setSizes([max(total - fritz_width, 400), fritz_width])
+    # ── 9. Show and start live widgets ────────────────────────────────────────
+    for _p in pane_dict.values():
+        _p.show()
+    player_header.start()
+    table.start()
+    eval_graph.start()
 
-    # ── 7. Store restoration info ─────────────────────────────────────────────
-    mw._fritz_pgn_restore = pgn_layout_info
-    mw._fritz_player_header = player_header
-    mw._fritz_home = None
+    # ── 10. Store state attrs ─────────────────────────────────────────────────
+    mw._fritz_right_col      = right_col
+    mw._fritz_home           = None
+    mw._fritz_player_header  = player_header
     mw._fritz_analysis_table = table
-    mw._fritz_eval_graph = eval_graph
+    mw._fritz_eval_graph     = eval_graph
+    mw._fritz_pgn_restore    = pgn_layout_info
 
-    _log.debug("Modern Fritz: home → player_header + analysis table + eval graph + pgn")
-    return True
-
-
-# ── home action routing ────────────────────────────────────────────────────────
-
-def _on_home_action(procesador, action: str):
-    if action == "new_game":
-        _fritz_new_game(procesador, from_home=True)
-    else:
-        _swap_home_to_analysis(procesador)
-        _dispatch_non_game_action(procesador, action)
+    _log.debug("Fritz right col built")
 
 
-def _dispatch_non_game_action(procesador, action: str):
-    from Code.Shortcuts import Shortcuts
-    sh = Shortcuts.Shortcuts(procesador)
-    try:
-        if action == "load_game":
-            sh.tools_menu().run_exec("openPGN")
-        elif action == "analyze":
-            sh.play_menu().run_exec("voyager2")
-    except Exception:
-        _log.debug("Fritz home action dispatch failed: %s", action, exc_info=True)
-
-
-def _fritz_new_game(procesador, from_home: bool = False):
-    """Show the Fritz level picker and start a game without the PAE popup."""
+def _fritz_new_game(procesador):
+    """Show the Fritz level picker and start a game against the engine."""
     mw = procesador.main_window
     from Code.UIModes.WFritzNewGame import WFritzNewGame
     dlg = WFritzNewGame(mw)
     if not dlg.exec():
-        return  # cancelled — home screen stays
+        return
 
     dic = dlg.get_dic()
     if dic is None:
         return
-
-    _swap_home_to_analysis(procesador)  # no-op if already swapped
 
     eval_graph = getattr(mw, "_fritz_eval_graph", None)
     if eval_graph is not None:

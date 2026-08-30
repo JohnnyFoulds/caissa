@@ -26,18 +26,31 @@ pytestmark = pytest.mark.rpa
 # Helpers — run without cv2
 # ===========================================================================
 
+# Vision modules explicitly permitted to import cv2/numpy at the top level.
+# Only Tier-2 modules (cv2/tesseract) and Tier-3 capture belong here.
+# Tier-1 modules (Scene, Region, Measure, Detectors, StyleSource, Report) MUST NOT appear.
+_CV2_ALLOWLIST = frozenset({
+    "Segment.py",
+    "Annotate.py",
+    "Capture.py",
+    "Template.py",
+    "Ocr.py",
+})
+
+
 def _all_rpa_py_files():
-    """Yield absolute paths of all .py files in bin/Code/Rpa/ excluding Vision/."""
+    """Yield absolute paths of all .py files in bin/Code/Rpa/ excluding the cv2 allowlist."""
     rpa_root = os.path.join(
         os.path.dirname(__file__), "..", "..", "..", "bin", "Code", "Rpa"
     )
     rpa_root = os.path.normpath(rpa_root)
     for dirpath, dirnames, filenames in os.walk(rpa_root):
-        # Exclude Vision/ — only Vision/ is allowed to import cv2/numpy
-        dirnames[:] = [d for d in dirnames if d != "Vision"]
         for fn in filenames:
-            if fn.endswith(".py"):
-                yield os.path.join(dirpath, fn)
+            if not fn.endswith(".py"):
+                continue
+            if fn in _CV2_ALLOWLIST:
+                continue
+            yield os.path.join(dirpath, fn)
 
 
 # ===========================================================================
@@ -100,6 +113,62 @@ def test_no_toplevel_numpy_or_cv2_import_outside_vision():
     assert not violations, (
         "These files outside Vision/ have top-level cv2/numpy imports:\n"
         + "\n".join(violations)
+    )
+
+
+def test_cv2_confined_to_designated_vision_modules():
+    """Only the explicit cv2 allowlist modules may import cv2/numpy (direct or one-hop).
+
+    This is the transitive check that architecture.md §3 requires: a non-allowlist
+    module that *imports* an allowlist module at the top level would pull cv2 into
+    sys.modules on any import — violating N-RPA-9.  Walking one hop is sufficient
+    because the allowlist modules themselves have no Rpa sub-imports.
+    """
+    forbidden = {"cv2", "numpy", "np"}
+    rpa_root = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "bin", "Code", "Rpa")
+    )
+
+    def top_level_imports(path: str) -> set[str]:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read(), filename=path)
+        except (SyntaxError, OSError):
+            return set()
+        names: set[str] = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            if node.col_offset != 0:
+                continue
+            if isinstance(node, ast.Import):
+                names.update(alias.name.split(".")[0] for alias in node.names)
+            elif node.module:
+                names.add(node.module.split(".")[0])
+        return names
+
+    violations = []
+    for path in _all_rpa_py_files():
+        direct = top_level_imports(path)
+        if direct & forbidden:
+            rel = os.path.relpath(path)
+            violations.append(f"{rel}: direct cv2/numpy import (caught by previous test too)")
+        # One-hop: any top-level import of a Vision allowlist module is a cv2 transit path
+        allowlist_basenames = {os.path.splitext(n)[0] for n in _CV2_ALLOWLIST}
+        transitive_hits = {
+            n for n in direct
+            if n in allowlist_basenames
+            or any(n.endswith("." + b) for b in allowlist_basenames)
+        }
+        if transitive_hits:
+            rel = os.path.relpath(path)
+            violations.append(
+                f"{rel}: top-level import of cv2-tier module(s) {transitive_hits} "
+                "— cv2 would enter sys.modules on plain import"
+            )
+
+    assert not violations, (
+        "cv2 purity violations (direct or one-hop transitive):\n" + "\n".join(violations)
     )
 
 

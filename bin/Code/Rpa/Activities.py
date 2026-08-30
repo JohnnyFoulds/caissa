@@ -35,17 +35,26 @@ class Context:
     :param extra: Caller-supplied extras (e.g. workflow params).
     """
 
-    def __init__(self, driver, graph, run_id: str, extra: dict | None = None) -> None:
+    def __init__(
+        self,
+        driver,
+        graph,
+        run_id: str,
+        extra: dict | None = None,
+        run_dir: str | None = None,
+    ) -> None:
         """Initialise the context.
 
         :param driver: Driver instance.
         :param graph: StateGraph instance.
         :param run_id: Run identifier string.
         :param extra: Optional dict of caller-supplied workflow parameters.
+        :param run_dir: Journal output directory; ``None`` skips persistence.
         """
         self.driver = driver
         self.graph = graph
         self.run_id: str = run_id
+        self.run_dir: str | None = run_dir
         self.extra: dict = extra or {}
         self.snapshot: "Snapshot | None" = None  # refreshed at CHECK_PRE
 

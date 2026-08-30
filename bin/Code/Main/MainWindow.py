@@ -30,9 +30,11 @@ class MainWindow(LCDialog.LCDialog):
             Code.main_window = self
 
         self.base = WBase.WBase(self, manager)
+        self.base.setObjectName("MainWindowBase")
 
         self.siCapturas = False
         self.pgn_information = WInformation.Information(self)
+        self.pgn_information.setObjectName("MainWindowPgnInformation")
         self.siInformacionPGN = False
         self.pgn_information.hide()
         self.register_splitter(self.pgn_information.splitter, "InformacionPGN")
@@ -58,6 +60,7 @@ class MainWindow(LCDialog.LCDialog):
         self._fit_timer = None
 
         self.splitter = splitter = QtWidgets.QSplitter(self)
+        splitter.setObjectName("MainWindowSplitter")
         splitter.addWidget(self.base)
         splitter.addWidget(self.pgn_information)
 

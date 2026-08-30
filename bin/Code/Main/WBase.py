@@ -151,6 +151,7 @@ class WBase(QtWidgets.QWidget):
 
     def create_toolbar(self):
         self.tb = QtWidgets.QToolBar("BASIC", self)
+        self.tb.setObjectName("WBaseToolBar")
 
         icons_tb = self.configuration.type_icons()
         self.tb.setToolButtonStyle(icons_tb)
@@ -321,6 +322,7 @@ class WBase(QtWidgets.QWidget):
         _theme = CaissaThemes.find_theme(getattr(self.configuration, "x_caissa_theme", ""))
         _hide_visual_menu = bool(_theme and _theme.get("board", {}).get("hide_visual_menu"))
         self.board = Board.Board(self, config_board, allow_eboard=True, with_menu_visual=not _hide_visual_menu)
+        self.board.setObjectName("WBaseBoard")
         self.board.draw_window()
         self.board.setFocus()
 
@@ -387,6 +389,7 @@ class WBase(QtWidgets.QWidget):
             is_column_header_movable=False,
             heigh_row=configuration.x_pgn_rowheight,
         )
+        self.pgn.setObjectName("WBasePgn")
         self.pgn.setMinimumWidth(width_pgn)
         self.pgn.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.pgn.font_type(puntos=configuration.x_pgn_fontpoints)

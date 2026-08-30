@@ -100,6 +100,71 @@ class Rect:
         union = self.w * self.h + other.w * other.h - inter
         return inter / union if union > 0 else 0.0
 
+    def intersects(self, other: Rect) -> bool:
+        """Return True if this rect overlaps *other* (touching edges count).
+
+        :param other: The rect to test against.
+        :return: True when the rects share at least one pixel column and row.
+        """
+        return (
+            self.x < other.right
+            and other.x < self.right
+            and self.y < other.bottom
+            and other.y < self.bottom
+        )
+
+    def intersection(self, other: Rect) -> Rect | None:
+        """Return the overlapping sub-rect, or ``None`` when they do not overlap.
+
+        :param other: The rect to intersect with.
+        :return: Intersection rect, or None.
+        """
+        x = max(self.x, other.x)
+        y = max(self.y, other.y)
+        r = min(self.right, other.right)
+        b = min(self.bottom, other.bottom)
+        if r <= x or b <= y:
+            return None
+        return Rect(x, y, r - x, b - y)
+
+    @property
+    def area(self) -> int:
+        """Area in square logical pixels.
+
+        :return: w * h
+        """
+        return self.w * self.h
+
+    def translate(self, dx: int, dy: int) -> Rect:
+        """Return a copy shifted by (*dx*, *dy*).
+
+        :param dx: Horizontal offset.
+        :param dy: Vertical offset.
+        :return: Translated rect.
+        """
+        return Rect(self.x + dx, self.y + dy, self.w, self.h)
+
+    def inset(self, px: int) -> Rect:
+        """Return a copy shrunk by *px* on every side.
+
+        Clamps to zero size so the result is always valid.
+
+        :param px: Pixels to remove from each edge.
+        :return: Inset rect.
+        """
+        w = max(0, self.w - 2 * px)
+        h = max(0, self.h - 2 * px)
+        return Rect(self.x + px, self.y + px, w, h)
+
+    def contains_point(self, px: int, py: int) -> bool:
+        """Return True if (*px*, *py*) lies inside this rect.
+
+        :param px: X coordinate.
+        :param py: Y coordinate.
+        :return: True when the point is inside (edges are inclusive).
+        """
+        return self.x <= px < self.right and self.y <= py < self.bottom
+
 
 @dataclass(frozen=True)
 class ElementRef:
@@ -144,3 +209,26 @@ class Snapshot:
     widget_tree: list[dict[str, Any]]
     timestamp_ms: float
     screenshot: Any = None
+
+
+@dataclass(frozen=True)
+class SubRect:
+    """A painted sub-element of a composite widget (e.g. a tab inside a QTabBar).
+
+    ``QtDriver.widget_info`` emits these when a widget class has known sub-element
+    geometry (``QTabBar`` → per-tab rects; ``QToolBar``/``QMenuBar`` → per-action rects).
+    Sub-rects are parent-relative logical pixels, exactly like ``w.geometry()``; callers
+    must add the parent's capture-absolute origin before hit-testing.
+
+    :param index: Zero-based position within the composite widget.
+    :param role: Element role: ``"tab"`` | ``"action"`` | ``"item"``.
+    :param rect: Parent-relative bounding rect in logical pixels.
+    :param text: Label text, or empty string when not applicable.
+    :param selected: True when this sub-element is the currently selected/checked one.
+    """
+
+    index: int
+    role: str
+    rect: Rect
+    text: str = ""
+    selected: bool = False

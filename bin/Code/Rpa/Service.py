@@ -325,13 +325,13 @@ class RpaService:
             return {
                 "elements": [
                     {
-                        "object_name": e.object_name,
-                        "cls": e.cls,
-                        "text": e.text,
-                        "rect": list(e.rect) if e.rect else None,
-                        "confidence": e.confidence,
+                        "object_name": c.widget.get("object_name"),
+                        "cls": c.widget.get("cls"),
+                        "text": c.widget.get("text"),
+                        "rect": [c.rect.x, c.rect.y, c.rect.w, c.rect.h] if c.rect else None,
+                        "confidence": c.confidence,
                     }
-                    for e in (c.element for c in candidates)
+                    for c in candidates
                 ],
                 "count": len(candidates),
             }
@@ -563,19 +563,19 @@ def _build_activity(activity_type: str, data: dict):
         raise ValueError(f"Unknown activity type {activity_type!r}. Known: {sorted(_MAP)}")
 
     if cls is TakeScreenshot:
-        return cls(filename=data.get("filename", "screenshot.png"))
+        return cls(path=data.get("path", data.get("filename", "screenshot.png")))
     if cls is SwitchTab:
-        return cls(tab_name=data.get("tab_name", ""))
+        return cls(tab_text=data.get("tab_text", data.get("tab_name", "")))
     if cls is GetText:
         sel = Selector.from_json(data["selector"])
-        return cls(selector=sel, output_key=data.get("output_key", "text"))
+        return cls(selector=sel, key=data.get("key", data.get("output_key", "text")))
     if cls in (Click, TypeInto, SelectItem, ElementExists):
         sel = Selector.from_json(data["selector"])
         if cls is TypeInto:
-            return cls(selector=sel, text=data.get("text", ""), clear_before=data.get("clear_before", True))
+            return cls(selector=sel, value=data.get("value", data.get("text", "")))
         if cls is SelectItem:
             return cls(selector=sel, value=data.get("value", ""))
         if cls is ElementExists:
-            return cls(selector=sel, output_key=data.get("output_key"))
+            return cls(selector=sel, expected=data.get("expected", True))
         return cls(selector=sel, settle_ms=data.get("settle_ms", 200))
     return cls()

@@ -34,6 +34,7 @@ from typing import Any
 from Code.Rpa.Errors import AmbiguousMatchError, TargetNotFoundError, VisionUnavailableError
 from Code.Rpa.Targets import Selector, Target
 from Code.Rpa.Types import ElementRef, Rect, Snapshot
+from Code.Rpa.Vision.Region import flatten
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,7 @@ class TargetResolver:
         :returns: List of :class:`~Code.Rpa.Types.ElementRef` for all visible widgets.
         """
         refs = []
-        for w in snapshot.widget_tree:
+        for w in flatten(snapshot.widget_tree):
             if not w.get("visible", True):
                 continue
             rect = _widget_rect(w)
@@ -299,6 +300,33 @@ class TargetResolver:
             f"No element found matching {target.selector!r}"
         )
 
+    def resolve_all(self, target: Target, snapshot: Snapshot) -> list[ElementRef]:
+        """Resolve *target* against *snapshot*, returning **all** matches above threshold.
+
+        Unlike :meth:`resolve_one`, this never raises :class:`~Code.Rpa.Errors.AmbiguousMatchError`.
+        It returns the full scored list, sorted by confidence descending, so callers can
+        iterate over every instance of a repeated element (e.g. all tabs in a tab bar,
+        all buttons in a toolbar).
+
+        Only the object tier is consulted — image/OCR multi-match is not supported.
+
+        :param target: The target to resolve.
+        :param snapshot: Current app snapshot.
+        :returns: List of :class:`~Code.Rpa.Types.ElementRef`, best match first.
+            Empty list when nothing matches the confidence threshold.
+        """
+        candidates = self._object_candidates(target.selector, snapshot)
+        if not candidates:
+            return []
+        if target.anchor is not None:
+            candidates = self._apply_anchor(candidates, target, snapshot)
+        candidates.sort(key=lambda c: c.confidence, reverse=True)
+        result = []
+        for c in candidates:
+            name = c.widget.get("object_name") or c.widget.get("text") or target.selector.cls or ""
+            result.append(ElementRef(selector=name, rect=c.rect))
+        return result
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -313,7 +341,7 @@ class TargetResolver:
         :returns: List of :class:`_Candidate` objects whose confidence meets the threshold.
         """
         results = []
-        for widget in snapshot.widget_tree:
+        for widget in flatten(snapshot.widget_tree):
             if not widget.get("visible", True):
                 continue
             conf = _object_confidence(selector, widget)

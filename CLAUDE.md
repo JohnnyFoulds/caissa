@@ -326,6 +326,52 @@ See `docs/rpa/uipath-mapping.md` for the UiPath ↔ Caissa vocabulary map.
 
 ---
 
+## Amiga/FS-UAE Automation Layer (`bin/Code/Amiga/`) — Calibrated 2026-08-30
+
+### SDL2 relative-mouse-mode physics (macOS, this machine)
+
+- **Per-event X cap**: each `kCGEventMouseMoved` moves the Amiga cursor at most **89px**
+  regardless of the delta value, once the send value ≥ 150.
+- **Small-delta scale**: send ≤ 100 → scale ≈ **0.74 amiga-px / send-unit**
+  (e.g. send=100 → 74px, send=50 → 37px).
+- **Y behaves identically to X** (same cap and scale).
+- **Home position**: after `home_cursor()`, cursor is reliably at amiga content
+  **(86, 13)** — screenshot **(86, 45)**.
+- **SDL2 wake on fresh launch**: on a brand-new FS-UAE process, delta events are
+  silently ignored until SDL2 mouse capture is activated. `home_cursor()` handles
+  this by clicking the macOS **title bar** (y = win_y + 15 in screen coords) before
+  sending negative steps.  The title-bar click does **not** interact with Amiga UI.
+
+### One-shot positioning algorithm (implemented in `_move_to_amiga`)
+
+```
+home_cursor()  →  cursor at (HOME_X=86, HOME_Y=13)
+dx = target_x - 86
+dy = target_y - 13
+full_steps = dx // 89           # send _X_FULL_SEND=150 per step → 89px each
+rem_x = dx - full_steps * 89    # 0 ≤ rem_x < 89
+
+for _ in range(full_steps):
+    send event (150, 0)    # X only; Y sent in final event
+send event (rem_x / 0.74, dy / 0.74)   # final: remaining X + all Y
+```
+
+Example: icon at amiga (516, 56) → dx=430, dy=43 → 4 full steps + final (100, 58) → lands at (515, 56), 1px error.
+
+### BattleChess disk icon on Workbench
+
+- Icon centre in Amiga content pixels (screenshot Y − 32px title bar):
+  `WORKBENCH_ICON_X = 516`, `WORKBENCH_ICON_Y = 56`
+- Confirmed by `double_click(516, 56)` → screen brightness 7.72 → 12.33 (game loading)
+
+### FS-UAE window geometry
+
+- Config: `window_width=640`, `window_height=400` (Amiga content)
+- Actual window size including macOS title bar: 640×432
+- Window position on secondary display: typically X=640 (varies by monitor layout)
+
+---
+
 ## Context Compaction — Preventing Knowledge Loss Across Sessions
 
 Context compaction is automatic and lossy. When it fires, tool output, /tmp

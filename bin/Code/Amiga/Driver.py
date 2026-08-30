@@ -353,69 +353,93 @@ class FsUaeDriver:
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
         time.sleep(_SETTLE_S)
 
-    def home_cursor(self) -> None:
-        """Clamp the Amiga cursor to the top-left (0, 0) using small negative deltas.
+    # ---------------------------------------------------------------------------
+    # Calibrated cursor movement constants (measured 2026-08-30)
+    #
+    # SDL2 relative-mouse-mode physics on this machine:
+    #  - Each kCGEventMouseMoved event moves the Amiga cursor at most _X_STEP_PX
+    #    pixels in X, regardless of the send value once above _X_FULL_SEND.
+    #  - Small deltas (send ≤ _X_SMALL_MAX) follow a linear scale: _X_SMALL_SCALE.
+    #  - Y behaves identically to X.
+    #  - After home_cursor(), the Amiga cursor is at (_HOME_X, _HOME_Y).
+    #  - On a FRESH FS-UAE launch (no prior interaction), delta events do nothing
+    #    until SDL2 mouse capture is activated. home_cursor() handles this by
+    #    sending a click to the macOS title bar first.
+    # ---------------------------------------------------------------------------
+    _HOME_X       = 86    # amiga content X after home_cursor()
+    _HOME_Y       = 13    # amiga content Y after home_cursor()
+    _X_STEP_PX    = 89    # amiga pixels moved per full event (send ≥ _X_FULL_SEND)
+    _X_FULL_SEND  = 150   # send value that saturates to _X_STEP_PX
+    _X_SMALL_SCALE = 0.74  # amiga px per send unit for small deltas (send ≤ 100)
+    _TITLE_BAR_H  = 32    # macOS title bar height in the window screenshot
 
-        Sends ten steps of (−200, −200) to overflow any Amiga-screen bounds.  Small
-        steps avoid macOS acceleration attenuation, so the cursor reliably reaches (0,0).
-        After this call, delta moves from (0,0) are predictable.
+    def home_cursor(self) -> None:
+        """Clamp the Amiga cursor to the top-left and activate SDL2 mouse capture.
+
+        Sends a click to the macOS title bar (no Amiga UI effect) to ensure SDL2
+        receives HID events, then sends ten (−200, −200) delta events to push the
+        cursor to the top-left corner. After this call the cursor is reliably at
+        amiga content (_HOME_X, _HOME_Y).
         """
         import Quartz
 
         self.focus()
+        # Click macOS title bar to activate SDL2 mouse capture on fresh launch.
+        bounds = self._process.window_bounds()
+        if bounds is not None:
+            win_x, win_y, win_w, _ = bounds
+            pt_title = Quartz.CGPoint(win_x + win_w // 2, win_y + 15)
+            for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+                ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt_title, Quartz.kCGMouseButtonLeft)
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+                time.sleep(0.04)
+            time.sleep(0.2)
+            self.focus()
+        # Push cursor to top-left with ten strong negative steps.
         pt = Quartz.CGPoint(1000.0, 400.0)
         for _ in range(10):
             ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
             Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, -200.0)
             Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, -200.0)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
-            time.sleep(0.05)
-
-    # Single-event delta scale measured 2026-08-30:
-    # send delta=200 → ~89 Amiga pixels (X and Y same scale).
-    _DELTA_SCALE = 200.0 / 89.0   # send units per Amiga content pixel
-    # macOS title bar height in the window screenshot
-    _TITLE_BAR_H = 32
+            time.sleep(0.04)
 
     def _cursor_pos(self, img: "Image") -> "tuple[int, int] | None":
         """Detect the Amiga cursor tip position in screenshot coordinates.
 
-        Finds the top-most red pixel in the screenshot (the cursor tip of the
-        FS-UAE cursor arrow, which appears red).  Pixel comparison against a
-        slight delta move is not needed because the red arrow is always visible.
+        Finds the top-most red pixel cluster in the screenshot (the cursor tip of
+        the FS-UAE cursor arrow, which appears red).
 
         :param img: Screenshot PIL Image.
         :returns: ``(x, y)`` in screenshot pixels (including macOS title bar),
-            or ``None`` if no cursor detected.
+            or ``None`` if fewer than 3 red pixels found.
         """
         try:
             import numpy as np
             arr = np.array(img.convert("RGB"))
-            # FS-UAE cursor appears as a bright-red arrow: R>150, G<100, B<100
+            # FS-UAE cursor: R>150, G<100, B<100
             mask = (arr[:, :, 0] > 150) & (arr[:, :, 1] < 100) & (arr[:, :, 2] < 100)
             ys, xs = np.where(mask)
             if len(xs) < 3:
                 return None
-            # Cursor TIP = topmost pixel (smallest y) among red pixels
             top_idx = int(np.argmin(ys))
             return int(xs[top_idx]), int(ys[top_idx])
         except Exception:  # noqa: BLE001
             return None
 
-    # Iterative cursor positioning: tolerance in Amiga pixels and max iterations.
-    _MOVE_TOLERANCE = 8    # accept if within 8px of target
-    _MOVE_MAX_ITERS = 6    # at most 6 detect-move cycles
-
     def _move_to_amiga(self, amiga_x: int, amiga_y: int) -> None:
-        """Move the Amiga cursor to (*amiga_x*, *amiga_y*) in content coordinates.
+        """Move the Amiga cursor to (*amiga_x*, *amiga_y*) using calibrated fixed steps.
 
-        Uses iterative cursor detection: detect current cursor, compute remaining
-        delta, send ONE event, repeat until within ``_MOVE_TOLERANCE`` pixels or
-        ``_MOVE_MAX_ITERS`` iterations exhausted.
+        Algorithm (no cursor detection required):
 
-        Each iteration sends a delta proportionally reduced to avoid overshooting
-        (we send 80% of the remaining distance, scaled by ``_DELTA_SCALE``).
-        If cursor is not detectable, falls back to a blind delta from (0,0).
+        1. ``home_cursor()`` → cursor at (_HOME_X, _HOME_Y).
+        2. Compute dx = amiga_x − _HOME_X, dy = amiga_y − _HOME_Y.
+        3. Send ``full_steps`` events of (_X_FULL_SEND, 0) to cover dx in _X_STEP_PX
+           increments.
+        4. Send one final event for the remainder (sub-_X_STEP_PX distance in X and
+           all of dy) using the small-delta scale.
+
+        All constants are calibrated values in BattleChess.py / CLAUDE.md.
 
         :param amiga_x: Target X in Amiga content pixels (excluding title bar).
         :param amiga_y: Target Y in Amiga content pixels (excluding title bar).
@@ -424,54 +448,41 @@ class FsUaeDriver:
 
         self.focus()
         self.home_cursor()
-        time.sleep(0.15)
+        time.sleep(0.1)
+
+        dx = amiga_x - self._HOME_X
+        dy = amiga_y - self._HOME_Y
+
+        full_steps = dx // self._X_STEP_PX
+        rem_x = dx - full_steps * self._X_STEP_PX   # 0 ≤ rem_x < _X_STEP_PX
 
         pt = Quartz.CGPoint(1000.0, 400.0)
 
-        for iteration in range(self._MOVE_MAX_ITERS):
-            img = self.screenshot()
-            pos = self._cursor_pos(img)
-
-            if pos is None:
-                if iteration == 0:
-                    logger.warning("_move_to_amiga: cursor not detected; using blind (0,0)")
-                    cur_amiga_x, cur_amiga_y = 0, 0
-                else:
-                    logger.warning("_move_to_amiga: cursor lost at iter %d; stopping", iteration)
-                    break
-            else:
-                cur_amiga_x = pos[0]
-                cur_amiga_y = pos[1] - self._TITLE_BAR_H
-
-            dx_amiga = amiga_x - cur_amiga_x
-            dy_amiga = amiga_y - cur_amiga_y
-            dist = (dx_amiga ** 2 + dy_amiga ** 2) ** 0.5
-
-            logger.debug(
-                "_move_to_amiga iter %d: Amiga(%d,%d) → target(%d,%d) dist=%.1f",
-                iteration, cur_amiga_x, cur_amiga_y, amiga_x, amiga_y, dist,
-            )
-
-            if dist <= self._MOVE_TOLERANCE:
-                break
-
-            # Send 80% of the remaining distance to avoid overshoot
-            frac = 0.80
-            dx_send = float(dx_amiga) * frac * self._DELTA_SCALE
-            dy_send = float(dy_amiga) * frac * self._DELTA_SCALE
-
+        # Full steps (X only — Y is handled in the final event to keep it simple)
+        for _ in range(full_steps):
             ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
-            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, dx_send)
-            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, dy_send)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, float(self._X_FULL_SEND))
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, 0.0)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
-            time.sleep(0.15)
+            time.sleep(0.04)
+
+        # Final event: remaining X + all Y
+        send_x = int(rem_x / self._X_SMALL_SCALE) if rem_x > 0 else 0
+        send_y = int(dy / self._X_SMALL_SCALE)
+        if send_x != 0 or send_y != 0:
+            ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, float(send_x))
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, float(send_y))
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.08)
+
+        logger.debug(
+            "_move_to_amiga: target(%d,%d) dx=%d dy=%d full_steps=%d rem_x=%d",
+            amiga_x, amiga_y, dx, dy, full_steps, rem_x,
+        )
 
     def click(self, rel_x: int, rel_y: int) -> None:
         """Left-click at Amiga content coordinates (*rel_x*, *rel_y*).
-
-        Detects the current cursor position from a screenshot, then sends a
-        SINGLE delta event to reach the target.  Single events avoid macOS
-        mouse-acceleration non-linearity that plagues multi-event walks.
 
         :param rel_x: Target X in Amiga content pixels (0 = left edge, excluding title bar).
         :param rel_y: Target Y in Amiga content pixels (0 = top of Amiga content).
@@ -491,8 +502,7 @@ class FsUaeDriver:
     def double_click(self, rel_x: int, rel_y: int) -> None:
         """Double-click at Amiga content coordinates (*rel_x*, *rel_y*).
 
-        Moves cursor to position using cursor detection + single delta event,
-        then sends two click pairs within the Amiga double-click timeout (~300ms).
+        Moves cursor then sends two click pairs within the Amiga double-click timeout.
 
         :param rel_x: Target X in Amiga content pixels.
         :param rel_y: Target Y in Amiga content pixels.
@@ -502,15 +512,12 @@ class FsUaeDriver:
         self._move_to_amiga(rel_x, rel_y)
 
         pt = Quartz.CGPoint(1000.0, 400.0)
-        # First click
         for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
             ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
             Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 1)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
             time.sleep(0.03)
-        # Gap within Amiga double-click timeout
         time.sleep(0.15)
-        # Second click
         for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
             ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
             Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 2)

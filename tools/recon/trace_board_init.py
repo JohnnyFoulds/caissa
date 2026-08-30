@@ -1,213 +1,132 @@
-#!/usr/bin/env python3
 """
-Trace the game's board initialization to discover the exact 4-byte board format at 0x030F4.
-
-Calls 0x0183E (new_game_setup) under Unicorn, hooks all writes to 0x030F4..0x031F3,
-then dumps the resulting board state.  Also dumps a few piece entries from 0x0892.
+Trace writes during 0x84CC (board setup) and 0x7C34/0x7C8C (AI setup).
+Find where the board array is and what values are written.
 """
-import sys, struct
-sys.path.insert(0, "bin")
-import unicorn
-import unicorn.m68k_const as m68k
-from unicorn import UC_HOOK_INTR, UC_HOOK_MEM_INVALID, UC_HOOK_MEM_WRITE, UC_HOOK_CODE
-from unicorn import UC_HOOK_MEM_READ
+import sys, struct, logging, os
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+os.chdir(_ROOT)
+sys.path.insert(0, 'bin')
+import types
+sys.modules['psutil'] = types.ModuleType('psutil')
+logging.disable(logging.CRITICAL)
 
-from Code.Retro.Manifest import default_rom_path
-from Code.Retro.Rom import parse_amiga_hunk
+from Code.Retro.Traps import AmigaTraps
+from Code.Retro.Cpus.Unicorn68k import Unicorn68k
+from Code.Retro.Cpu import HOOK_CODE, HOOK_MEM_WRITE, HOOK_MEM_INVALID
+from pathlib import Path
+import unicorn.m68k_const as mc
 
-rom_data = open(default_rom_path(), "rb").read()
-regions = parse_amiga_hunk(rom_data)
+rom_data = Path(_ROOT + '/Resources/Retro/BattleChess.amiga').read_bytes()
+cs = 40
+code_bytes = rom_data[cs:]
 
-A4 = 0x7FFE
-CHIP_RAM_BASE = 0; CHIP_RAM_SIZE = 0x200000
-STACK_TOP = 0x1F0000; SENTINEL = 0xFFFF0000
+cpu = Unicorn68k()
+cpu.map_region(0x000000, 0x200000)
+cpu.map_region(0x200000, 0x300000)
+traps = AmigaTraps(cpu)
+traps.install(); traps.install_mem_hook()
+for base in [0xDFF000, 0xBFE000, 0xBFD000, 0xBFEC00]:
+    page = base & 0xFFFF0000
+    try: cpu.map_region(page, 0x10000)
+    except: pass
+try: cpu.map_region(0xFFFF0000, 0x10000)
+except: pass
+cpu.mem_write(0, code_bytes)
 
-BOARD_ADDR = A4 - 0x4F0A   # 0x030F4
-BOARD_SIZE = 64 * 4         # 256 bytes
-PIECE_TABLE_ADDR = 0x0892
-PIECE_ENTRY_SIZE = 32
-NUM_PIECE_ENTRIES = 32
+sp_init = 0x1F0000 - 4
+cpu.mem_write(sp_init, struct.pack('>I', 0xFFFF0000))
+cpu._uc.reg_write(mc.UC_M68K_REG_A7, sp_init)
 
-# Function addresses
-NEW_GAME_SETUP = 0x0183E
-
-uc = unicorn.Uc(unicorn.UC_ARCH_M68K, unicorn.UC_MODE_BIG_ENDIAN)
-uc.ctl_set_cpu_model(unicorn.m68k_const.UC_CPU_M68K_M68000)
-
-# Chip RAM
-uc.mem_map(CHIP_RAM_BASE, CHIP_RAM_SIZE)
-for r in regions:
-    if r.size > 0:
-        uc.mem_write(r.load_address, rom_data[r.offset:r.offset + r.size])
-
-# Exec library stub (all RTS) + AllocMem/FindName stubs
-EXEC_BASE = 0x800000
-LIB_RANGE = 0x040000
-uc.mem_map(EXEC_BASE - LIB_RANGE, LIB_RANGE * 2)
-uc.mem_write(EXEC_BASE - LIB_RANGE, b"\x4e\x75" * LIB_RANGE)
-
-# Sentinel page
-uc.mem_map(0xFFFF0000, 0x10000)
-uc.mem_write(SENTINEL, b"\x4e\x75")  # RTS at sentinel
-
-uc.reg_write(m68k.UC_M68K_REG_A4, A4)
-
-bump = [0x200000]  # AllocMem bump pointer (in the mapped alloc pool region above chip RAM)
-# Actually alloc pool is NOT mapped yet — map a simple pool
-ALLOC_BASE = 0x1A0000
-uc.mem_write(ALLOC_BASE, b"\x00" * (CHIP_RAM_SIZE - ALLOC_BASE))
-
-def code_stub(emu, addr, size, _):
-    if EXEC_BASE - LIB_RANGE <= addr < EXEC_BASE + LIB_RANGE:
-        offset = addr - EXEC_BASE
-        if offset == -0xC6:  # AllocMem
-            d0 = emu.reg_read(m68k.UC_M68K_REG_D0)
-            aligned = (d0 + 7) & ~7
-            result = bump[0]
-            bump[0] += max(aligned, 8)
-            emu.reg_write(m68k.UC_M68K_REG_D0, result)
-        elif offset == -0x198:  # FindName
-            emu.reg_write(m68k.UC_M68K_REG_D0, EXEC_BASE)
-
-uc.hook_add(UC_HOOK_CODE, code_stub)
-
-def mem_read_stub(emu, access, address, size, value, _):
-    if address == 0x4:  # AbsExecBase
-        emu.mem_write(0x4, EXEC_BASE.to_bytes(4, "big"))
-
-uc.hook_add(UC_HOOK_MEM_READ, mem_read_stub)
-
-def fault_h(emu, access, address, size, value, _):
-    import unicorn.unicorn_const as uc_const
-    pc = emu.reg_read(m68k.UC_M68K_REG_PC)
-    if address >= 0xFF000000:
-        print(f"  [FAULT] PC=0x{pc:05X} addr=0x{address:08X} — hit sentinel, stopping")
-        emu.emu_stop(); return False
-    if 0x200000 <= address < 0x7C0000:
-        print(f"  [FAULT] PC=0x{pc:05X} addr=0x{address:08X} size={size} — unmapped mid-RAM")
-        emu.emu_stop(); return False
+mapped_pages = set()
+def invalid_handler(emu, acc, addr, sz, val, _u=None):
+    page = addr & 0xFFFF0000
+    if page not in mapped_pages:
+        try:
+            emu.mem_map(page, 0x10000)
+            emu.mem_write(page, bytes(0x10000))
+            mapped_pages.add(page)
+        except: pass
     return True
+cpu.hook_add(HOOK_MEM_INVALID, invalid_handler)
 
-uc.hook_add(UC_HOOK_MEM_INVALID, fault_h)
+state = {
+    'count': 0,
+    'in_board_setup': False,
+    'writes': [],
+    'phase': 'init',
+    'call_stack': [],
+    'hit_7c34': False,
+    'hit_84cc': False,
+}
 
-# Track writes to board area
-board_writes = []
+def code_hook(_emu, addr, sz, _u=None):
+    state['count'] += 1
 
-def board_write_hook(emu, access, address, size, value, _):
-    if BOARD_ADDR <= address < BOARD_ADDR + BOARD_SIZE:
-        sq = (address - BOARD_ADDR) // 4
-        off = (address - BOARD_ADDR) % 4
-        pc = emu.reg_read(m68k.UC_M68K_REG_PC)
-        board_writes.append((address, sq, off, size, value, pc))
+    # Skip BSS clear
+    if addr == 0x110D8:
+        cpu._uc.reg_write(mc.UC_M68K_REG_PC, 0x110E6)
+        return
 
-uc.hook_add(UC_HOOK_MEM_WRITE, board_write_hook)
+    # Track entry into key functions
+    if addr == 0x7C34 and not state['hit_7c34']:
+        state['hit_7c34'] = True
+        print(f'[insn={state["count"]}] Entered 0x7C34 (AI setup)')
+        state['phase'] = 'ai_setup'
 
-# Also track writes to 0x0892 (piece entry table)
-piece_writes = []
+    if addr == 0x84CC and not state['hit_84cc']:
+        state['hit_84cc'] = True
+        print(f'[insn={state["count"]}] Entered 0x84CC (board setup)')
+        state['phase'] = 'board_setup'
+        state['in_board_setup'] = True
 
-def piece_write_hook(emu, access, address, size, value, _):
-    end = PIECE_TABLE_ADDR + NUM_PIECE_ENTRIES * PIECE_ENTRY_SIZE
-    if PIECE_TABLE_ADDR <= address < end:
-        entry = (address - PIECE_TABLE_ADDR) // PIECE_ENTRY_SIZE
-        off = (address - PIECE_TABLE_ADDR) % PIECE_ENTRY_SIZE
-        pc = emu.reg_read(m68k.UC_M68K_REG_PC)
-        piece_writes.append((address, entry, off, size, value, pc))
+    if addr == 0x7C5A and state['phase'] == 'board_setup':
+        print(f'[insn={state["count"]}] Back to AI loop 0x7C5A (board setup done)')
+        state['phase'] = 'ai_loop'
+        state['in_board_setup'] = False
+        raise Exception('BOARD_SETUP_DONE')
 
-# (We'll use the same generic hook)
+cpu.hook_add(HOOK_CODE, code_hook)
 
-# Stop hook: stop when 0x0183E returns (we pushed SENTINEL as return addr)
-def stop_hook(emu, address, size, _):
-    if address == SENTINEL:
-        emu.emu_stop()
-
-uc.hook_add(UC_HOOK_CODE, stop_hook)
-
-# Set up stack: push sentinel as return address, then call 0x0183E
-sp = STACK_TOP - 4
-uc.mem_write(sp, struct.pack(">I", SENTINEL))
-uc.reg_write(m68k.UC_M68K_REG_A7, sp)
-
-# Zero the board area before the call so we can see what gets written
-uc.mem_write(BOARD_ADDR, b"\x00" * BOARD_SIZE)
-uc.mem_write(PIECE_TABLE_ADDR, b"\x00" * NUM_PIECE_ENTRIES * PIECE_ENTRY_SIZE)
-
-# Initialize [0x04AA4] which 0x0183E copies to [0x04AA8] then uses as a heap ptr
-# 0x04AA4 = A4 - 0x355A
-# Set it to ALLOC_BASE
-uc.mem_write(0x04AA4, struct.pack(">I", ALLOC_BASE))
-
-# Initialize [0x028D6] = -$5728(a4): used in 0x0774E as a limit value
-# Set to large number so we don't bail out early
-uc.mem_write(0x028D6, struct.pack(">I", 0x0FFFFFFF))
-
-print(f"Calling 0x{NEW_GAME_SETUP:05X} (new_game_setup)...")
+def write_hook(_emu, _type, addr, sz, val, _u=None):
+    # Track all writes when in board setup phase
+    if state['phase'] in ('board_setup', 'ai_setup'):
+        pc = cpu._uc.reg_read(mc.UC_M68K_REG_PC)
+        state['writes'].append((state['count'], addr, sz, val & 0xFFFFFFFF, pc, state['phase']))
+cpu.hook_add(HOOK_MEM_WRITE, write_hook)
 
 try:
-    uc.emu_start(NEW_GAME_SETUP, SENTINEL, count=5_000_000)
-    final_pc = uc.reg_read(m68k.UC_M68K_REG_PC)
-    print(f"Finished, PC=0x{final_pc:05X}")
+    cpu.emu_start(0x0000, until=0xFFFF0000, count=10000)
 except Exception as e:
-    final_pc = uc.reg_read(m68k.UC_M68K_REG_PC)
-    print(f"Error: {e}, PC=0x{final_pc:05X}")
+    if 'BOARD_SETUP_DONE' in str(e):
+        print(f'\nBoard setup complete!')
+    else:
+        pc = cpu._uc.reg_read(mc.UC_M68K_REG_PC)
+        print(f'Exception: {e} at PC=0x{pc:04X} insn={state["count"]}')
 
-# Dump board writes
-print(f"\n{'='*60}")
-print(f"Writes to board area (0x{BOARD_ADDR:05X}): {len(board_writes)}")
-if board_writes:
-    for (addr, sq, off, size, val, pc) in board_writes[:80]:
-        rank = sq // 8
-        file = sq % 8
-        col = chr(ord('a') + file)
-        print(f"  PC=0x{pc:05X} sq[{sq:2d}] ({col}{rank+1}) +{off}: size={size} val=0x{val:X}")
+print(f'\nTotal writes during board/AI setup: {len(state["writes"])}')
+print('\nAll writes:')
+for n, addr, sz, val, pc, phase in state['writes']:
+    a4 = 0x7FFE
+    a4rel = addr - a4 if addr <= a4 else None
+    if a4rel is not None:
+        relstr = f' (A4{a4rel:+d})'
+    else:
+        relstr = f' (A4+0x{addr-a4:04X})' if addr > a4 else ''
+    print(f'  [{phase}] insn={n:4d} [0x{addr:04X}]{relstr} sz={sz} val=0x{val:08X} pc=0x{pc:04X}')
 
-# Dump final board state
-print(f"\n{'='*60}")
-print(f"Board state at 0x{BOARD_ADDR:05X} after new_game_setup:")
-board_data = bytes(uc.mem_read(BOARD_ADDR, BOARD_SIZE))
-
-if all(b == 0 for b in board_data):
-    print("  All zeros — board was NOT initialized by this function path")
-else:
-    PIECE_NAMES = ['?', 'pawn', 'knight', 'bishop', 'rook', 'queen', 'king']
-    for sq in range(64):
-        entry = board_data[sq*4 : sq*4+4]
-        if any(entry):
-            rank = sq // 8
-            file = sq % 8
-            col = chr(ord('a') + file)
-            b0, b1, b2, b3 = entry
-            piece_name = PIECE_NAMES[b0] if 0 <= b0 < len(PIECE_NAMES) else f'type={b0}'
-            color = 'White' if b2 == 0 and b3 == 0 else f'c={b2:02x}{b3:02x}'
-            print(f"  sq{sq:2d} ({col}{rank+1}): {entry.hex()}  b0={b0} b1={b1} b2={b2} b3={b3}  [{piece_name}?]")
-
-# Dump piece entries at 0x0892
-print(f"\n{'='*60}")
-print(f"Piece entries at 0x{PIECE_TABLE_ADDR:05X} after new_game_setup:")
-pe_data = bytes(uc.mem_read(PIECE_TABLE_ADDR, NUM_PIECE_ENTRIES * PIECE_ENTRY_SIZE))
-for i in range(NUM_PIECE_ENTRIES):
-    e = pe_data[i*PIECE_ENTRY_SIZE : (i+1)*PIECE_ENTRY_SIZE]
-    if any(e):
-        w0 = int.from_bytes(e[0:2], 'big')
-        w1 = int.from_bytes(e[2:4], 'big')
-        b10 = e[10] if len(e) > 10 else 0
-        l14 = int.from_bytes(e[20:24], 'big') if len(e) >= 24 else 0
-        l1c = int.from_bytes(e[28:32], 'big') if len(e) >= 32 else 0
-        print(f"  entry[{i:2d}]: {e[:8].hex()}  w0=0x{w0:04X} w1=0x{w1:04X} b10=0x{b10:02X} l14=0x{l14:08X} l1c=0x{l1c:08X}")
-
-# Dump [0x01152] (linked list head)
-ll_head = struct.unpack(">I", bytes(uc.mem_read(0x01152, 4)))[0]
-print(f"\nLinked list head [0x01152] = 0x{ll_head:08X}")
-print(f"  (A4 - offset = 0x{ll_head:08X}, expected ~A4-0x6EAC = 0x{A4 - 0x6EAC:05X})")
-
-# Also dump globals that the AI checks
-print(f"\nKey globals after new_game_setup:")
-for addr, name in [
-    (0x0331C, "PLAYER2_COLOR_ADDR -$4ce2"),
-    (0x0331E, "PLAYER1_COLOR_ADDR -$4ce0"),
-    (0x03320, "PIECE_COUNTER -$4cde"),
-    (0x03322, "3322 (game_tree[0])"),
-    (A4 - 0x3556, "04AA8 heap_ptr"),
+# Snapshot key areas after setup
+print('\n\nMemory snapshot after board setup:')
+for label, addr, size in [
+    ('Move table [0x3322]', 0x3322, 24),
+    ('[0x4A5A] AI state', 0x4A5A, 2),
+    ('[0x4A5C] search mode?', 0x4A5C, 2),
+    ('[0x12B6] game flag', 0x12B6, 2),
+    ('[0x331C] turn', 0x331C, 2),
+    ('[0x07D4] player type', 0x07D4, 4),
+    ('[0x025F] move signal', 0x025F, 1),
 ]:
-    val_bytes = bytes(uc.mem_read(addr, 4))
-    val = struct.unpack(">I", val_bytes)[0]
-    print(f"  [0x{addr:05X}] {name}: 0x{val:08X} ({val})")
+    try:
+        val = bytes(cpu.mem_read(addr, size))
+        print(f'  {label}: {val.hex()}')
+    except:
+        pass

@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""
+tools/record-amiga-corpus — record one Battle Chess Amiga corpus entry from FS-UAE.
+
+Usage:
+    tools/record-amiga-corpus [FROM TO [LEVEL]]
+    # e.g. tools/record-amiga-corpus e2 e4 1
+
+Prerequisites:
+  - FS-UAE running Battle Chess Amiga, board visible (copy-protection dismissed)
+  - Run: /Users/johannes/code/lucaschess/.venv/bin/python3 tools/record-amiga-corpus
+
+Sequence:
+  1. EnsureBoard2D  — switch to 2D flat view via right-click-hold Settings menu
+  2. MovePiece      — two-click move (from_sq → to_sq)
+  3. WaitCpuReply   — poll for CPU response (≤90 s)
+  4. Write corpus entry to Resources/Retro/Corpus/fs-uae-manual.jsonl
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("record-amiga-corpus")
+
+# ---------------------------------------------------------------------------
+# Minimal FS-UAE process stub — same interface as DosBoxProcess
+# ---------------------------------------------------------------------------
+
+class FsUaeProcess:
+    """Stub that locates the running FS-UAE window and exposes the DosBoxProcess API."""
+
+    def window_bounds(self) -> tuple[int, int, int, int] | None:
+        """Return (x, y, w, h) of the FS-UAE window."""
+        try:
+            import Quartz
+            wins = Quartz.CGWindowListCopyWindowInfo(
+                Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
+            )
+            for w in wins:
+                if "fs-uae" in (w.get("kCGWindowOwnerName") or "").lower():
+                    b = w.get("kCGWindowBounds", {})
+                    return (int(b["X"]), int(b["Y"]), int(b["Width"]), int(b["Height"]))
+        except Exception as exc:
+            logger.warning("window_bounds: %s", exc)
+        return None
+
+    def window_number(self) -> int | None:
+        """Return the Quartz window ID of the FS-UAE window."""
+        try:
+            import Quartz
+            wins = Quartz.CGWindowListCopyWindowInfo(
+                Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
+            )
+            for w in wins:
+                if "fs-uae" in (w.get("kCGWindowOwnerName") or "").lower():
+                    return int(w["kCGWindowNumber"])
+        except Exception as exc:
+            logger.warning("window_number: %s", exc)
+        return None
+
+    def focus(self) -> None:
+        """Bring FS-UAE to the foreground."""
+        try:
+            import Quartz
+            import AppKit
+            apps = AppKit.NSRunningApplication.runningApplicationsWithBundleIdentifier_("no.fengsrud.fs-uae")
+            if not apps:
+                # fall back: activate by window click
+                bounds = self.window_bounds()
+                if bounds:
+                    wx, wy, ww, wh = bounds
+                    pt = Quartz.CGPoint(wx + ww // 2, wy + wh // 2)
+                    ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseDown, pt, Quartz.kCGMouseButtonLeft)
+                    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+                    time.sleep(0.05)
+                    ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, pt, Quartz.kCGMouseButtonLeft)
+                    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+                return
+            for app in apps:
+                app.activateWithOptions_(AppKit.NSApplicationActivateIgnoringOtherApps)
+        except ImportError:
+            pass
+
+    # Satisfy isinstance check in DosBoxDriver.__init__
+    @property
+    def is_running(self) -> bool:
+        return self.window_number() is not None
+
+
+# Monkey-patch DosBoxDriver to accept FsUaeProcess
+def _make_driver(proc: FsUaeProcess):
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "bin"))
+    # Temporarily bypass the isinstance check
+    from Code.Dos import Driver as _drv_mod
+    orig_init = _drv_mod.DosBoxDriver.__init__
+
+    def _patched_init(self, process):
+        self._process = process
+
+    _drv_mod.DosBoxDriver.__init__ = _patched_init
+    driver = _drv_mod.DosBoxDriver(proc)
+    _drv_mod.DosBoxDriver.__init__ = orig_init
+    return driver
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    args = sys.argv[1:]
+    from_sq = args[0] if len(args) > 0 else "e2"
+    to_sq   = args[1] if len(args) > 1 else "e4"
+    level   = int(args[2]) if len(args) > 2 else 1
+
+    repo_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(repo_root / "bin"))
+
+    proc   = FsUaeProcess()
+    driver = _make_driver(proc)
+
+    bounds = proc.window_bounds()
+    if bounds is None:
+        sys.exit("ERROR: FS-UAE window not found — is the emulator running?")
+    logger.info("FS-UAE window: %s", bounds)
+
+    from Code.Dos.Activities import (
+        DosRunner,
+        EnsureBoard2D,
+        FocusDosBox,
+        MovePiece,
+        WaitCpuReply,
+    )
+
+    # Amiga board yellow squares have B≈92 (vs DOS B<80), so the standard
+    # DOS color mask produces fraction ≈0.09 instead of ≈0.14.  Lower the
+    # visibility threshold and relax the blue channel cap to match.
+    import numpy as np
+    from Code.Dos.BattleChess import _BOARD_REGION as _BR
+
+    def _amiga_board_visible(img) -> bool:
+        if img is None:
+            return False
+        bx, by, bw, bh = _BR
+        arr = np.array(img.crop((bx, by, bx + bw, by + bh)).convert("RGB"))
+        r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
+        mask = (r > 100) & (g > 100) & (b < 100) & (r.astype(int) + g > 200)
+        fraction = float(mask.sum()) / max(1, arr.shape[0] * arr.shape[1])
+        return fraction >= 0.07
+
+    def _amiga_is_2d_mode(img) -> bool:
+        if img is None:
+            return False
+        bx, by, bw, bh = _BR
+        arr = np.array(img.crop((bx, by, bx + bw, by + bh)).convert("RGB"))
+        r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
+        mask = (r > 100) & (g > 100) & (b < 100) & (r.astype(int) + g > 200)
+        fraction = float(mask.sum()) / max(1, arr.shape[0] * arr.shape[1])
+        logger.debug("_amiga_is_2d_mode fraction=%.3f", fraction)
+        return fraction >= 0.25
+
+    EnsureBoard2D._board_visible = staticmethod(_amiga_board_visible)
+    EnsureBoard2D._is_2d_mode    = staticmethod(_amiga_is_2d_mode)
+
+    wait_cpu = WaitCpuReply(from_sq, to_sq)
+    wait_cpu.verify_ms = 90_000  # Amiga AI can take a while
+
+    runner = DosRunner(save_dir="/tmp/amiga_corpus")
+    Path("/tmp/amiga_corpus").mkdir(exist_ok=True)
+
+    logger.info("Starting: %s → %s at level %d", from_sq, to_sq, level)
+
+    ctx = runner.run(driver, [
+        FocusDosBox(),
+        EnsureBoard2D(),
+        MovePiece(from_sq, to_sq),
+        wait_cpu,
+    ])
+
+    cpu_move = ctx.get("cpu_move")
+    if not cpu_move:
+        sys.exit("ERROR: CPU move not detected")
+
+    logger.info("CPU replied: %s", cpu_move)
+
+    # Derive FEN from move sequence (startpos + our move)
+    try:
+        import chess
+        board = chess.Board()
+        board.push_uci(from_sq + to_sq)
+        fen = board.fen()
+    except Exception:
+        fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+
+    entry = {
+        "fen": fen,
+        "level": level,
+        "expected_uci": cpu_move,
+        "source": "fs-uae-manual",
+        "our_move": from_sq + to_sq,
+        "moves_from_startpos": [from_sq + to_sq],
+    }
+
+    corpus_path = repo_root / "Resources/Retro/Corpus/fs-uae-manual.jsonl"
+    corpus_path.parent.mkdir(parents=True, exist_ok=True)
+    with corpus_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+
+    logger.info("Corpus entry written: %s", corpus_path)
+    print(f"RECORDED: {from_sq}{to_sq} → {cpu_move}  (level {level})")
+    print(f"FEN: {fen}")
+
+
+if __name__ == "__main__":
+    main()

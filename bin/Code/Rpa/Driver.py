@@ -125,6 +125,94 @@ class Driver:
 
 
 # ---------------------------------------------------------------------------
+# widget_info helpers — module-level so they can be memoised cheaply
+# ---------------------------------------------------------------------------
+
+import inspect as _inspect
+
+_PAINT_METHODS = frozenset({"paintEvent", "sizeHint", "tabSizeHint"})
+_paint_override_cache: dict[type, list[dict]] = {}
+
+
+def _paint_overrides_for(w) -> list[dict]:
+    """Return paint/size methods overridden in the concrete class of *w*.
+
+    Results are memoised per class for the process lifetime — ``inspect.getsourcelines``
+    does file I/O and must not run on every widget on every snapshot.
+
+    :param w: QWidget instance.
+    :returns: List of dicts with ``method``, ``cls``, ``file``, ``line`` keys.
+    """
+    cls = type(w)
+    if cls in _paint_override_cache:
+        return _paint_override_cache[cls]
+
+    overrides = []
+    for name in _PAINT_METHODS:
+        for klass in type(w).__mro__:
+            if klass.__name__ == "QWidget":
+                break
+            if name in klass.__dict__:
+                try:
+                    src_file = _inspect.getsourcefile(klass) or ""
+                    _, line = _inspect.getsourcelines(klass.__dict__[name])
+                except (OSError, TypeError):
+                    src_file, line = "", 0
+                overrides.append({
+                    "method": name,
+                    "cls": klass.__name__,
+                    "file": src_file,
+                    "line": line,
+                })
+                break  # first override in MRO wins
+
+    _paint_override_cache[cls] = overrides
+    return overrides
+
+
+def _sub_rects_for(w) -> list[dict]:
+    """Return per-element geometry for composite painted widgets.
+
+    Handles ``QTabBar`` (per-tab rects via ``tabRect``), ``QTabWidget`` (delegates
+    to its ``tabBar()``), and ``QToolBar``/``QMenuBar`` (per-action rects via
+    ``actionGeometry``).  Returns an empty list for all other widget types.
+
+    :param w: QWidget instance.
+    :returns: List of sub-rect dicts with ``index``, ``role``, ``rect``, ``text``,
+        ``selected`` keys — the same shape as :class:`~Code.Rpa.Types.SubRect`.
+    """
+    from PySide6 import QtWidgets
+    results = []
+
+    if isinstance(w, QtWidgets.QTabBar):
+        current = w.currentIndex()
+        for i in range(w.count()):
+            r = w.tabRect(i)
+            results.append({
+                "index": i, "role": "tab",
+                "rect": {"x": r.x(), "y": r.y(), "w": r.width(), "h": r.height()},
+                "text": w.tabText(i),
+                "selected": i == current,
+            })
+    elif isinstance(w, QtWidgets.QTabWidget):
+        results = _sub_rects_for(w.tabBar())
+    elif isinstance(w, (QtWidgets.QToolBar, QtWidgets.QMenuBar)):
+        for i, action in enumerate(w.actions()):
+            try:
+                r = w.actionGeometry(action)
+                results.append({
+                    "index": i, "role": "action",
+                    "rect": {"x": r.x(), "y": r.y(), "w": r.width(), "h": r.height()},
+                    "text": action.text(),
+                    "selected": action.isChecked(),
+                })
+            except Exception:
+                pass
+
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Qt-backed concrete driver
 # ---------------------------------------------------------------------------
 
@@ -380,6 +468,23 @@ class QtDriver(Driver):
                     break
             except Exception:
                 pass
+
+        # sub_rects: per-element geometry for composite painted widgets
+        try:
+            sub_rects = _sub_rects_for(w)
+            if sub_rects:
+                info["sub_rects"] = sub_rects
+        except Exception:
+            pass
+
+        # paint_overrides: which Qt virtual methods are overridden in the concrete class
+        try:
+            overrides = _paint_overrides_for(w)
+            if overrides:
+                info["paint_overrides"] = overrides
+        except Exception:
+            pass
+
         if depth > 0:
             children = []
             for child in w.children():

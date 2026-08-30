@@ -205,7 +205,7 @@ class Runner:
         self._workflow_name = workflow_name
         self._run_dir = run_dir
         self._graph = graph or DEFAULT_GRAPH
-        self._ctx = Context(driver=driver, graph=self._graph, run_id=run_id, extra=extra)
+        self._ctx = Context(driver=driver, graph=self._graph, run_id=run_id, extra=extra, run_dir=run_dir)
         self._rng = random.Random(run_id)
 
         # Frame stack — start with a single sequence frame for top-level activities

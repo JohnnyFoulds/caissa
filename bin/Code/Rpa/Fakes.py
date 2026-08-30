@@ -114,15 +114,25 @@ class World:
 
     :param current_state:   The name of the current app state (e.g. ``"HOME"``).
     :param widget_trees:    Mapping of state name → list of widget-info dicts.
+                            Each dict may include ``sub_rects`` (list of sub-element
+                            geometry dicts) and ``paint_overrides`` (list of override
+                            dicts) alongside the standard ``cls``, ``rect``, etc. keys.
                             :meth:`FakeDriver.snapshot` returns the tree for
                             ``current_state``.
     :param transition_effects: Optional mapping of transition name →
                                 resulting state name.  Used by future phases to
                                 simulate state transitions without a real Qt app.
+    :param screenshot:      Optional synthetic screenshot object (e.g. a
+                            ``Vision.Capture.Screenshot`` instance or any object
+                            accepted by :class:`~Code.Rpa.Types.Snapshot`).  When
+                            provided, :meth:`FakeDriver.snapshot` attaches it to the
+                            returned :class:`~Code.Rpa.Types.Snapshot` so that tests
+                            can exercise vision-tier code paths without a real display.
     """
     current_state: str
     widget_trees: dict[str, list[dict]] = dataclasses.field(default_factory=dict)
     transition_effects: dict[str, str] = dataclasses.field(default_factory=dict)
+    screenshot: typing.Any = None
 
 
 # ---------------------------------------------------------------------------
@@ -163,12 +173,17 @@ class FakeDriver(Driver):
 
         :param depth: Ignored — the world fixture is flat.
         :returns:     :class:`~Code.Rpa.Types.Snapshot` for ``world.current_state``.
+            The returned snapshot carries ``world.screenshot`` when set, so tests
+            can exercise vision-tier paths (fill detection, OCR, etc.) without a
+            real display.  Widget dicts in ``world.widget_trees`` may include
+            ``sub_rects`` and ``paint_overrides`` keys populated from fixture data.
         """
         tree = self.world.widget_trees.get(self.world.current_state, [])
         return Snapshot(
             state_name=self.world.current_state,
             widget_tree=tree,
             timestamp_ms=self.clock.now_ms,
+            screenshot=self.world.screenshot,
         )
 
     def click(self, selector: str, target_type: str = "widget") -> dict:

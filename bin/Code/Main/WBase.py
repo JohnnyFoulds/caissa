@@ -137,6 +137,10 @@ class WBase(QtWidgets.QWidget):
         elif self.configuration.x_tb_orientation_horizontal:
             ly_ai = Colocacion.H().set_separation(0).control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
             ly = Colocacion.V().relleno().otro(ly_ai).relleno().margen(0)
+        else:
+            # Vertical (activity-bar) toolbar: toolbar left, board and info right.
+            ly_ai = Colocacion.H().control(self.tb).otroi(ly_t).otroi(ly_bi).relleno().margen(0)
+            ly = Colocacion.V().relleno().otro(ly_ai).relleno().margen(0)
 
         self.setLayout(ly)
 

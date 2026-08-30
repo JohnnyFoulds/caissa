@@ -55,15 +55,25 @@ def install(
         spec = RibbonModel.load(path)
 
         # Fetch pane_api from the active mode hook if available.
+        # Defer main_window lookup to each call — at install time main_window
+        # may not yet be assigned on Procesador, so _fritz_panes would be
+        # missing and all pane checkboxes would be permanently inert.
         pane_api: dict | None = None
         try:
             from Code.UIModes import UIModes
+            mode_dict = UIModes.active_mode()
+            hook_override = mode_dict.get("hook")
             hook = UIModes.load_mode_hook(
                 base.manager.configuration.x_ui_mode,
-                hook=None,
+                hook=hook_override,
             )
             if hook and hasattr(hook, "pane_api"):
-                pane_api = hook.pane_api(base.manager.main_window)
+                _hook, _base = hook, base
+                pane_api = {
+                    "names": _hook.pane_api(None).get("names", []),
+                    "get": lambda key: _hook.pane_api(_base.manager.main_window)["get"](key),
+                    "set": lambda key, vis: _hook.pane_api(_base.manager.main_window)["set"](key, vis),
+                }
         except Exception:
             pass
 

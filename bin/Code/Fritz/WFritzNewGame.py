@@ -66,7 +66,7 @@ class WFritzNewGame(QtWidgets.QDialog):
             | Qt.WindowType.Dialog
             | Qt.WindowType.WindowTitleHint
         )
-        self.setWindowTitle("New Game")
+        self.setWindowTitle("Levels")
         self.setObjectName("WFritzNewGame")
         self.setMinimumWidth(440)
 
@@ -242,7 +242,7 @@ class WFritzNewGame(QtWidgets.QDialog):
             "RIVAL": dr,
             "ADJUST": ADJUST_BETTER,
             "ANALYSIS_BAR": True,
-            "HINTS": 0,
+            "HINTS": 3,
             "THOUGHTTT": -1,
             "ARROWSTT": 0,
             "2CHANCE": True,

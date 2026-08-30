@@ -260,6 +260,13 @@ class WFritzAnalysisTable(QtWidgets.QWidget):
                 fen = bar.game.last_position.fen()
         except Exception:
             pass
+        if not fen:
+            # bar.game not yet set (engine fired before put_view).  Fall back
+            # to the board's current position which is always up to date.
+            try:
+                fen = bar.board.last_position.fen()
+            except Exception:
+                pass
 
         self._update_eval_summary(mrm)
 

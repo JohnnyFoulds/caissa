@@ -156,3 +156,136 @@ the polygon route themeable at no extra cost. The Phase 0 mockup renders a font-
 alongside the polygon one so the shape is still reviewed; only the implementation mechanism is decided.  
 **Alternative considered:** `QFontDatabase.addApplicationFont` with a bundled seven-segment `.ttf` —
 rejected on cost and licensing grounds relative to polygons.
+
+---
+
+## D12 — Raster Pillow mockup precedes the PySide6 widget harness
+
+**Resolved:** 2026-08-29  
+**Decision:** Design iteration starts with a pure-Pillow raster script (`tools/design/fritz_compare.py`)
+before any PySide6 widget code is written. The PySide6 harness (`tools/design/fritz_mock.py`) is
+used only once the raster design is approved.  
+**Rationale:** The Pillow loop is seconds per render, requires no Qt display, and produces a
+side-by-side comparison image that is easy to review. The PySide6 harness renders real widgets with
+real QSS, which is accurate but slower to iterate on and requires an offscreen display. Separating
+the two phases keeps the design loop fast during the visual exploration stage.  
+**How to apply:** Raster mockup approval comes first. Once the layout and group choices are signed
+off in the raster mockup, the PySide6 harness is updated to match the agreed design.
+
+---
+
+## D13 — Hint / Suggestion are plain action buttons; Coaching group uses `?` icon
+
+**Resolved:** 2026-08-29  
+**Decision:** The Caissa "Coaching" ribbon group contains two small flat buttons — Hint and
+Suggestion — each using a `?` icon. They are not radio buttons, not toggles, and not grouped as a
+selection control.  
+**Rationale:** Confirmed from Fritz 18 manual (`https://help.chessbase.com/Fritz/18/Eng/000018.htm`, `https://help.chessbase.com/Fritz/18/Eng/000070.htm`): Hint and Suggestion are plain one-shot actions. An earlier mockup used a circle outline icon that visually resembled a
+radio button; this was incorrect and has been replaced with the `?` icon.  
+**Alternative considered:** Radio buttons / toggle buttons — rejected because the Fritz manual
+confirms these are one-time actions, not mode selections.
+
+---
+
+## D14 — macOS QTabBar tab shapes require a full custom paintEvent
+
+**Resolved:** 2026-08-29  
+**Decision:** `_FlatTabBar` subclasses `QTabBar` and owns `paintEvent` entirely. No QSS selector
+or `QProxyStyle.drawControl` override is used for tab shape.  
+**Rationale:** macOS AppKit bypasses Qt's QSS rendering for native tab shapes. `border-radius: 0`
+in QSS and `QStyleFactory.create("Fusion")` both fail to remove rounded corners on macOS.
+Owning `paintEvent` gives full platform-independent control of tab geometry and colour.
+Same pattern as `_FritzPaneCheckBox` in the same file.  
+**Alternative considered:** `QProxyStyle.drawControl(CE_TabBarTabShape)` — rejected; it also
+routes through the native style on macOS and produces the same rounded result.
+
+---
+
+## D15 — `QFrame.VLine` is unreliable for 1px separators; use plain `QWidget`
+
+**Resolved:** 2026-08-29  
+**Decision:** Ribbon group separators are plain `QWidget` instances with `WA_StyledBackground`,
+`setFixedWidth(1)`, and `background-color` set via QSS.  
+**Rationale:** `QFrame.VLine` with `Plain` shadow still renders a thick bar on macOS because its
+internal minimum-size heuristics override Python `setFixedWidth(1)` when QSS is applied at polish
+time. `background-color` in QSS also paints the full implicit widget area rather than a 1px line.
+A plain `QWidget` with `WA_StyledBackground` and `setFixedWidth(1)` has no such baggage — `background-color`
+paints exactly the 1px-wide widget.  
+**Alternative considered:** `QFrame.VLine` + `min-width: 1px; max-width: 1px` in QSS — rejected;
+QSS width constraints are overridden by the frame's own size policy at polish time.
+
+---
+
+## D16 — QSS `font-size` on a parent selector does not cascade to child widgets
+
+**Resolved:** 2026-08-29  
+**Decision:** Every ribbon child widget selector that requires a specific font size carries its own
+explicit `font-size` rule in QSS (`#WRibbonPages QToolButton`, `#WRibbonGroupCaption`,
+`#WRibbonPages QCheckBox`).  
+**Rationale:** Qt's QSS `font-size` on a parent widget (e.g. `WRibbon { font-size: 10pt; }`) does
+not cascade through the widget hierarchy to child widgets. Each widget is styled independently.
+Python `setFont()` on a parent widget does cascade, but is overridden by any explicit QSS rule on
+a child — so an explicit QSS font on a child trumps a Python parent font.  
+**Alternative considered:** Python `setFont()` on the parent — rejected; child QSS rules override it,
+creating an order-of-operations trap where the visible font depends on which stylesheet is loaded.
+
+---
+
+## D17 — Layout `setSpacing` and QSS `margin` both contribute to visual gaps; use only one
+
+**Resolved:** 2026-08-29  
+**Decision:** Ribbon group separator `QWidget` carries `margin: 8px 0px` in QSS (top/bottom only).
+Horizontal spacing between groups comes entirely from the `QHBoxLayout.setSpacing(4)` on the page
+layout.  
+**Rationale:** If the separator has both a QSS horizontal margin (e.g. `margin: 4px 6px`) and the
+layout has `setSpacing(4)`, the visual gap between groups is the sum of both — `4 + 6 + 1 + 6 + 4
+= 21px` — which looks fat even though the line itself is 1px. Setting horizontal margin to 0 on the
+separator and letting layout spacing control horizontal gaps keeps the total gap predictable.
+
+---
+
+## D18 — `_swap_home_to_analysis` is deleted, not patched
+
+**Resolved:** 2026-08-29  
+**Decision:** `_swap_home_to_analysis` (`modern_fritz_ui.py:354-495`) is deleted in Phase 1.
+Its replacement is `_build_fritz_right_col(mw)`, which both the boot path and the game-start
+path call.  
+**Rationale:** `_swap_home_to_analysis` has two defects that cannot be fixed in isolation:
+it early-returns `False` when `_fritz_home is None` (`:368-371`), which is the permanent
+state after the landing screen is deleted; and it mutates `right_col` positionally, assuming
+the first child is always `WFritzHome` (`:405`, `:410-411`, `:414`). A patch that removes
+the early-return and fixes the positional mutation is larger than a clean rewrite, and
+leaves dead code paths. `_build_fritz_right_col` is the single function that builds the
+right column from the `_PANE_SPECS` order; it is idempotent and safe to call twice.  
+**Alternative considered:** Patch `_swap_home_to_analysis` — rejected because the function
+is premised on a widget (`WFritzHome`) that no longer exists.
+
+---
+
+## D19 — `WFritzHome.py` is deleted, not archived or emptied
+
+**Resolved:** 2026-08-29  
+**Decision:** `bin/Code/UIModes/WFritzHome.py` is deleted (`git rm`) in Phase 1.
+Its 33 associated `#WFritzHome*` QSS rules across three stylesheets are also deleted.  
+**Rationale:** The file has zero callers after the boot-state change. Keeping an empty or
+stub file wastes the purity-tier AST walk's attention and leaves dead QSS rules. Deleted
+files are still reachable in git history for any future reference.  
+**Alternative considered:** Leave an empty module or a deprecation notice — rejected as
+dead code.
+
+---
+
+## D20 — The `voyager2` route in `_dispatch_non_game_action` is removed, not fixed
+
+**Resolved:** 2026-08-29  
+**Decision:** `modern_fritz_ui.py:513` (`sh.play_menu().run_exec("voyager2")`) is deleted.
+The correct call for "Set up position" is `Voyager.voyager_position(mw, position)` called
+directly from the New Game ▼ panel's "Set up position" item.  
+**Rationale:** `play_menu().run_exec("voyager2")` routes through `BaseMenu.run_exec` →
+`PlayMenu.run_select`, which has no `voyager2` attribute, causing an `AttributeError` that
+is silently swallowed (`:515-516`). The only place `"voyager2"` is a real key is
+`Openings/WindowOpeningLine.py:744`, an unrelated opening-study dialog. `Voyager.voyager_position()`
+(`Voyager/Voyager.py:1038`) is the correct entry point for position setup.  
+**Alternative considered:** Add `voyager2` to `PlayMenu` — rejected; that would add a
+Lucas Chess internal routing key for a Fritz-specific use case, violating the architectural
+boundary.

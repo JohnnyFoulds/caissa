@@ -62,6 +62,12 @@ def all_slot_keys(spec: dict[str, Any]) -> list[str]:
                 if key and key not in seen:
                     seen.add(key)
                     result.append(key)
+        # backstage tabs use "items" instead of groups/slots
+        for item in tab.get("items", []):
+            key = item.get("key", "")
+            if key and key not in seen:
+                seen.add(key)
+                result.append(key)
     return result
 
 
@@ -97,6 +103,13 @@ def state(
                     continue
                 enabled = (key in active) if policy == "disable" else True
                 result[key] = (True, enabled, tab_id)
+        # backstage tabs use "items" instead of groups/slots
+        for item in tab.get("items", []):
+            key = item.get("key", "")
+            if not key:
+                continue
+            enabled = (key in active) if policy == "disable" else True
+            result[key] = (True, enabled, tab_id)
 
     return result
 
@@ -160,16 +173,23 @@ def compact(ribbon_height: int, threshold: int) -> bool:
 # ─────────────────────────── internal validation ─────────────────────────────
 
 _CAISSA_KEY_RE = re.compile(r"^caissa:[a-z_]+$")
+_TB_KEY_RE = re.compile(r"^TB_[A-Z_]+$")
+_VALID_SIZES = frozenset({"large", "small"})
+_VALID_KINDS = frozenset({"slots", "panes", "checkboxes", "backstage"})
 
 
 def _validate(data: dict[str, Any], path: str) -> None:
-    """Raise :class:`RibbonSpecError` if the spec has structural problems."""
+    """Raise :class:`RibbonSpecError` if the spec has structural problems.
+
+    Checks (FR-18):
+    - All TB_*/caissa:* keys have valid format.
+    - No duplicate slot keys within a tab (QAT/tab overlap is permitted).
+    - All ``size`` values are in ``{"large", "small"}``.
+    - All ``kind`` values are in ``{"slots", "panes", "checkboxes", "backstage"}``.
+    - ``default_tab`` names an existing tab id.
+    """
     tab_ids: set[str] = set()
     group_ids: set[str] = set()
-    all_keys: list[str] = []
-
-    for key in data.get("quick_access", []):
-        all_keys.append(key)
 
     for tab in data.get("tabs", []):
         tid = tab.get("id", "")
@@ -178,6 +198,15 @@ def _validate(data: dict[str, Any], path: str) -> None:
         if tid in tab_ids:
             raise RibbonSpecError(f"{path}: duplicate tab id {tid!r}")
         tab_ids.add(tid)
+
+        tab_kind = tab.get("kind")
+        if tab_kind is not None and tab_kind not in _VALID_KINDS:
+            raise RibbonSpecError(
+                f"{path}: tab {tid!r} has invalid kind {tab_kind!r}; "
+                f"expected one of {sorted(_VALID_KINDS)}"
+            )
+
+        tab_slot_keys: set[str] = set()
         for group in tab.get("groups", []):
             gid = group.get("id", "")
             if not gid:
@@ -185,7 +214,52 @@ def _validate(data: dict[str, Any], path: str) -> None:
             if gid in group_ids:
                 raise RibbonSpecError(f"{path}: duplicate group id {gid!r}")
             group_ids.add(gid)
+
+            group_kind = group.get("kind")
+            if group_kind is not None and group_kind not in _VALID_KINDS:
+                raise RibbonSpecError(
+                    f"{path}: group {gid!r} has invalid kind {group_kind!r}; "
+                    f"expected one of {sorted(_VALID_KINDS)}"
+                )
+
             for slot in group.get("slots", []):
                 key = slot.get("key", "")
-                if key:
-                    all_keys.append(key)
+                if not key:
+                    continue
+
+                # Key format: TB_* or caissa:*
+                if not (_TB_KEY_RE.match(key) or _CAISSA_KEY_RE.match(key)):
+                    raise RibbonSpecError(
+                        f"{path}: slot key {key!r} in group {gid!r} has invalid "
+                        "format; expected TB_UPPER_CASE or caissa:lower_case"
+                    )
+
+                # Duplicate within this tab
+                if key in tab_slot_keys:
+                    raise RibbonSpecError(
+                        f"{path}: duplicate slot key {key!r} in tab {tid!r}"
+                    )
+                tab_slot_keys.add(key)
+
+                size = slot.get("size")
+                if size is not None and size not in _VALID_SIZES:
+                    raise RibbonSpecError(
+                        f"{path}: slot {key!r} has invalid size {size!r}; "
+                        f"expected one of {sorted(_VALID_SIZES)}"
+                    )
+
+            for item in group.get("items", []):
+                key = item.get("key", "")
+                if key and not (_TB_KEY_RE.match(key) or _CAISSA_KEY_RE.match(key)):
+                    raise RibbonSpecError(
+                        f"{path}: backstage item key {key!r} in group {gid!r} "
+                        "has invalid format"
+                    )
+
+    # default_tab must name an existing tab
+    default_tab = data.get("default_tab")
+    if default_tab is not None and default_tab not in tab_ids:
+        raise RibbonSpecError(
+            f"{path}: default_tab {default_tab!r} does not match any tab id "
+            f"(known: {sorted(tab_ids)})"
+        )

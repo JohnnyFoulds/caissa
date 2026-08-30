@@ -11,20 +11,15 @@ The "classical" mode is the safety net: null allowlists leave everything intact.
 """
 import json
 import os
-from typing import Optional
 
 import Code
-from Code.Menus import BaseMenu
 from Code.Base import Constantes
+from Code.Menus import BaseMenu
 
 # Resolve TB_* name → int once at import time
 _TB_BY_NAME = {k: v for k, v in vars(Constantes).items() if k.startswith("TB_")}
 
-# TB_* values that must NEVER be filtered — closeEvent depends on them.
-NEVER_FILTER_TOOLBAR = frozenset({
-    Constantes.TB_QUIT, Constantes.TB_CLOSE, Constantes.TB_CANCEL,
-    Constantes.TB_STOP, Constantes.TB_TUTOR_STOP, Constantes.TB_END_REPLAY,
-})
+NEVER_FILTER_TOOLBAR = Constantes.NEVER_FILTER_TOOLBAR
 
 
 def _modes_folder() -> str:
@@ -46,7 +41,7 @@ def load_modes() -> list:
     return modes
 
 
-def find_mode(name: str) -> Optional[dict]:
+def find_mode(name: str) -> dict | None:
     for m in load_modes():
         if m.get("name", "").lower() == name.lower():
             return m
@@ -60,7 +55,7 @@ def active_mode() -> dict:
 
 # ── toolbar filtering ─────────────────────────────────────────────────────────
 
-def _resolve_toolbar_set(mode: dict) -> Optional[frozenset]:
+def _resolve_toolbar_set(mode: dict) -> frozenset | None:
     """Return frozenset of allowed TB_* int values, or None if mode allows all."""
     raw = mode.get("toolbar")
     if raw is None:
@@ -77,6 +72,9 @@ def _resolve_toolbar_set(mode: dict) -> Optional[frozenset]:
 
 
 def allows_toolbar(key) -> bool:
+    # Extension keys (caissa: prefix) are never filtered — they are not TB_* int keys.
+    if isinstance(key, str) and key.startswith("caissa:"):
+        return True
     if key in NEVER_FILTER_TOOLBAR:
         return True
     mode = active_mode()

@@ -346,3 +346,190 @@ def test_compact_below_threshold():
     """T-RM-17: compact() returns False when ribbon_height <= threshold."""
     assert rm.compact(1000, 1000) is False
     assert rm.compact(800, 1000) is False
+
+
+# ---------------------------------------------------------------------------
+# T-RIB-06  _validate() — key with invalid format is rejected
+# ---------------------------------------------------------------------------
+
+def test_ribbon_model_rejects_unknown_tb_key():
+    """T-RIB-06: _validate() raises for a slot key that is neither TB_* nor caissa:*."""
+    data = {
+        "$schema_version": 1,
+        "tabs": [
+            {
+                "id": "home",
+                "label": "Home",
+                "groups": [
+                    {
+                        "id": "home.game",
+                        "label": "Game",
+                        "slots": [
+                            {"key": "INVALID_KEY_FORMAT", "size": "large"},
+                        ],
+                    }
+                ],
+            }
+        ],
+        "quick_access": [],
+    }
+    path = _write_ribbon(data)
+    try:
+        with pytest.raises(RibbonSpecError, match="invalid format"):
+            rm.load(path)
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# T-RIB-07  _validate() — duplicate slot key within a tab is rejected
+# ---------------------------------------------------------------------------
+
+def test_ribbon_model_rejects_duplicate_slot_keys_within_tab():
+    """T-RIB-07: _validate() raises when the same key appears twice in one tab."""
+    data = {
+        "$schema_version": 1,
+        "tabs": [
+            {
+                "id": "home",
+                "label": "Home",
+                "groups": [
+                    {
+                        "id": "home.g1",
+                        "label": "G1",
+                        "slots": [{"key": "TB_RESIGN", "size": "large"}],
+                    },
+                    {
+                        "id": "home.g2",
+                        "label": "G2",
+                        "slots": [{"key": "TB_RESIGN", "size": "small"}],
+                    },
+                ],
+            }
+        ],
+        "quick_access": [],
+    }
+    path = _write_ribbon(data)
+    try:
+        with pytest.raises(RibbonSpecError, match="duplicate slot key"):
+            rm.load(path)
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# T-RIB-08  _validate() — invalid size value is rejected
+# ---------------------------------------------------------------------------
+
+def test_ribbon_model_rejects_invalid_size():
+    """T-RIB-08: _validate() raises when a slot has an unrecognised size value."""
+    data = {
+        "$schema_version": 1,
+        "tabs": [
+            {
+                "id": "home",
+                "label": "Home",
+                "groups": [
+                    {
+                        "id": "home.game",
+                        "label": "Game",
+                        "slots": [{"key": "TB_RESIGN", "size": "huge"}],
+                    }
+                ],
+            }
+        ],
+        "quick_access": [],
+    }
+    path = _write_ribbon(data)
+    try:
+        with pytest.raises(RibbonSpecError, match="invalid size"):
+            rm.load(path)
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# T-RIB-09  _validate() — invalid kind value is rejected
+# ---------------------------------------------------------------------------
+
+def test_ribbon_model_rejects_invalid_kind():
+    """T-RIB-09: _validate() raises when a group has an unrecognised kind value."""
+    data = {
+        "$schema_version": 1,
+        "tabs": [
+            {
+                "id": "home",
+                "label": "Home",
+                "groups": [
+                    {
+                        "id": "home.game",
+                        "label": "Game",
+                        "kind": "list",
+                        "slots": [],
+                    }
+                ],
+            }
+        ],
+        "quick_access": [],
+    }
+    path = _write_ribbon(data)
+    try:
+        with pytest.raises(RibbonSpecError, match="invalid kind"):
+            rm.load(path)
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# T-RIB-10  _validate() — default_tab naming a non-existent tab is rejected
+# ---------------------------------------------------------------------------
+
+def test_ribbon_model_rejects_unknown_default_tab():
+    """T-RIB-10: _validate() raises when default_tab does not match any tab id."""
+    data = {
+        "$schema_version": 1,
+        "default_tab": "nonexistent",
+        "tabs": [
+            {"id": "home", "label": "Home", "groups": []},
+        ],
+        "quick_access": [],
+    }
+    path = _write_ribbon(data)
+    try:
+        with pytest.raises(RibbonSpecError, match="default_tab"):
+            rm.load(path)
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# T-RIB-11  _validate() — same key in QAT and a tab slot is accepted
+# ---------------------------------------------------------------------------
+
+def test_ribbon_model_accepts_qat_tab_overlap():
+    """T-RIB-11: A key appearing in quick_access AND a tab slot is valid (Office pattern)."""
+    data = {
+        "$schema_version": 1,
+        "default_tab": "home",
+        "quick_access": ["TB_CLOSE"],
+        "tabs": [
+            {
+                "id": "home",
+                "label": "Home",
+                "groups": [
+                    {
+                        "id": "home.game",
+                        "label": "Game",
+                        # TB_CLOSE also in quick_access — must not raise
+                        "slots": [{"key": "TB_CLOSE", "size": "small"}],
+                    }
+                ],
+            }
+        ],
+    }
+    path = _write_ribbon(data)
+    try:
+        spec = rm.load(path)
+        assert spec is not None
+    finally:
+        os.unlink(path)

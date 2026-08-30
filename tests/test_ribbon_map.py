@@ -34,7 +34,7 @@ def _load_all_ribbons() -> list[tuple[str, dict]]:
 
 
 def _all_slot_keys(data: dict) -> list[str]:
-    """Flat list of every key in slots + quick_access (with duplicates preserved)."""
+    """Flat list of every key in slots + quick_access + backstage items (with duplicates preserved)."""
     keys: list[str] = []
     for key in data.get("quick_access", []):
         keys.append(key)
@@ -44,6 +44,62 @@ def _all_slot_keys(data: dict) -> list[str]:
                 k = slot.get("key", "")
                 if k:
                     keys.append(k)
+        # backstage tabs use "items" instead of groups/slots
+        for item in tab.get("items", []):
+            k = item.get("key", "")
+            if k:
+                keys.append(k)
+    return keys
+
+
+def _non_backstage_slot_keys(data: dict) -> list[str]:
+    """Keys in regular-tab slots + quick_access only (excluding backstage items).
+
+    Backstage items (File menu) legitimately duplicate regular slots — e.g.
+    "New Game" appears in File backstage AND in Home > Play, like every Office ribbon app.
+    """
+    keys: list[str] = []
+    for key in data.get("quick_access", []):
+        keys.append(key)
+    for tab in data.get("tabs", []):
+        if tab.get("kind") == "backstage":
+            continue
+        for group in tab.get("groups", []):
+            for slot in group.get("slots", []):
+                k = slot.get("key", "")
+                if k:
+                    keys.append(k)
+    return keys
+
+
+def _tab_only_slot_keys(data: dict) -> list[str]:
+    """Keys in regular-tab slots only — excludes quick_access and backstage.
+
+    Use this for duplicate detection: QAT items intentionally mirror their home
+    tab slot (Office ribbon pattern), so QAT/tab overlap is not a defect.
+    """
+    keys: list[str] = []
+    for tab in data.get("tabs", []):
+        if tab.get("kind") == "backstage":
+            continue
+        for group in tab.get("groups", []):
+            for slot in group.get("slots", []):
+                k = slot.get("key", "")
+                if k:
+                    keys.append(k)
+    return keys
+
+
+def _backstage_slot_keys(data: dict) -> set[str]:
+    """Keys that appear in any backstage tab's items list."""
+    keys: set[str] = set()
+    for tab in data.get("tabs", []):
+        if tab.get("kind") != "backstage":
+            continue
+        for item in tab.get("items", []):
+            k = item.get("key", "")
+            if k:
+                keys.add(k)
     return keys
 
 
@@ -83,9 +139,18 @@ def test_unique_tab_and_group_ids():
 
 
 def test_no_duplicate_slot_keys():
-    """T-RMAP-03: No key appears more than once across slots + quick_access."""
+    """T-RMAP-03: No key appears more than once within regular-tab slots.
+
+    Two kinds of duplication are intentional and explicitly excluded:
+    - Backstage items (File menu) may duplicate regular tab slots — Office pattern.
+    - QAT items may duplicate their home tab slot — QAT is a pinning shortcut,
+      not an independent placement.
+
+    Only true within-tab duplicates (the same key in two different non-backstage
+    tab groups) are considered defects.
+    """
     for basename, data in _load_all_ribbons():
-        all_keys = _all_slot_keys(data)
+        all_keys = _tab_only_slot_keys(data)
         seen: set[str] = set()
         dups: list[str] = []
         for k in all_keys:
@@ -93,7 +158,7 @@ def test_no_duplicate_slot_keys():
                 dups.append(k)
             seen.add(k)
         assert not dups, (
-            f"T-RMAP-03 FAIL: {basename} has duplicate keys: {sorted(set(dups))}"
+            f"T-RMAP-03 FAIL: {basename} has duplicate keys within tab slots: {sorted(set(dups))}"
         )
 
 
@@ -151,27 +216,59 @@ def test_all_fritz_toolbar_keys_in_slot_or_quick_access():
 
 
 def test_never_filter_keys_in_quick_access():
-    """T-RMAP-06: All NEVER_FILTER_TOOLBAR members appear in quick_access."""
+    """T-RMAP-06: Every NEVER_FILTER_TOOLBAR member is in quick_access or a backstage tab.
+
+    TB_QUIT lives in the File backstage (not QAT) by approved design: it is an
+    infrequent, destructive action that should not sit in the always-visible strip.
+    All other NEVER_FILTER_TOOLBAR members must remain in QAT for one-key reachability.
+    """
     from Code.Base import Constantes
-    from Code.UIModes.UIModes import NEVER_FILTER_TOOLBAR
+    from Code.Base.Constantes import NEVER_FILTER_TOOLBAR
 
     # Resolve TB_* int values back to names for readable error messages
     int_to_name = {v: k for k, v in vars(Constantes).items() if k.startswith("TB_")}
 
-    for basename, data in _load_all_ribbons():
-        qat_keys_raw = set(data.get("quick_access", []))
-        # Convert string names to int values for comparison
-        qat_ints: set = set()
-        for k in qat_keys_raw:
+    def _resolve_keys(raw_keys):
+        result: set = set()
+        for k in raw_keys:
             if isinstance(k, int):
-                qat_ints.add(k)
+                result.add(k)
             elif hasattr(Constantes, k):
-                qat_ints.add(getattr(Constantes, k))
+                result.add(getattr(Constantes, k))
+        return result
 
-        missing = NEVER_FILTER_TOOLBAR - qat_ints
+    for basename, data in _load_all_ribbons():
+        qat_ints = _resolve_keys(data.get("quick_access", []))
+        backstage_ints = _resolve_keys(_backstage_slot_keys(data))
+        reachable = qat_ints | backstage_ints
+
+        missing = NEVER_FILTER_TOOLBAR - reachable
         assert not missing, (
-            f"T-RMAP-06 FAIL: {basename} quick_access missing NEVER_FILTER_TOOLBAR members: "
+            f"T-RMAP-06 FAIL: {basename} has NEVER_FILTER_TOOLBAR members not in "
+            f"quick_access or backstage: "
             + str({int_to_name.get(v, v) for v in missing})
+        )
+
+
+def test_overflow_group_exists():
+    """T-RMAP-09: If a ribbon JSON specifies an overflow group, that group must exist."""
+    for basename, data in _load_all_ribbons():
+        overflow = data.get("overflow")
+        if not overflow:
+            continue
+        tab_id = overflow.get("tab")
+        group_id = overflow.get("group")
+        if not tab_id or not group_id:
+            continue
+        # Find the target tab
+        tab_data = next((t for t in data.get("tabs", []) if t.get("id") == tab_id), None)
+        assert tab_data is not None, (
+            f"T-RMAP-09 FAIL: {basename} overflow.tab={tab_id!r} names a tab that does not exist"
+        )
+        group_ids = {g.get("id") for g in tab_data.get("groups", [])}
+        assert group_id in group_ids, (
+            f"T-RMAP-09 FAIL: {basename} overflow.group={group_id!r} not found in tab {tab_id!r}. "
+            f"Available groups: {sorted(group_ids)}"
         )
 
 

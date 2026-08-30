@@ -23,8 +23,6 @@ import logging
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from Code.Fritz.WFritzLCD import WFritzLCD
-
 _log = logging.getLogger(__name__)
 
 
@@ -50,8 +48,15 @@ class _PlayerRow(QtWidgets.QWidget):
         self._name = QtWidgets.QLabel("", self)
         self._name.setObjectName("WFritzPlayerName")
 
-        self._clock = WFritzLCD(self)
+        self._clock = QtWidgets.QLabel("", self)
         self._clock.setObjectName("WFritzPlayerClock")
+        self._clock.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
+        _f = QtGui.QFont()
+        _f.setFamily("Monospace")
+        _f.setPointSize(12)
+        self._clock.setFont(_f)
 
         ly.addWidget(icon_lbl)
         ly.addWidget(self._name, 1)
@@ -59,7 +64,7 @@ class _PlayerRow(QtWidgets.QWidget):
 
     def update_text(self, name: str, clock: str):
         self._name.setText(name)
-        self._clock.set_time_text(clock)
+        self._clock.setText(clock or "")
 
     def paintEvent(self, event):
         opt = QtWidgets.QStyleOption()
@@ -165,12 +170,36 @@ class WFritzPlayerHeader(QtWidgets.QWidget):
     def _sync(self):
         base = self._base
         try:
-            bname = base.lb_player_black.text()
-            wname = base.lb_player_white.text()
+            bname = base.lb_player_black.text() or "Black"
+            wname = base.lb_player_white.text() or "White"
             bclk = base.lb_clock_black.text()
             wclk = base.lb_clock_white.text()
         except Exception:
             return
+
+        # In Infinite Analysis mode the clocks are empty — show current eval instead.
+        if not bclk and not wclk:
+            bar = getattr(base, "analysis_bar", None)
+            if bar is not None:
+                mrm = getattr(bar, "mrm", None)
+                if mrm and len(mrm) > 0:
+                    try:
+                        line = mrm[0]
+                        mate = getattr(line, "mate", None)
+                        if mate:
+                            eval_str = f"M{abs(mate)}"
+                        else:
+                            cp = getattr(line, "centipawns", 0) or 0
+                            sign = "+" if cp > 0 else ""
+                            eval_str = f"{sign}{cp / 100:.1f}"
+                        is_white_pov = getattr(line, "is_white", True)
+                        if is_white_pov:
+                            wclk, bclk = eval_str, ""
+                        else:
+                            bclk, wclk = eval_str, ""
+                    except Exception:
+                        pass
+
         self._black_row.update_text(bname, bclk)
         self._white_row.update_text(wname, wclk)
 

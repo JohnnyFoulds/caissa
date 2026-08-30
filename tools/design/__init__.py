@@ -42,6 +42,7 @@ SCENES = [
     "nag_row",
     "notation_tabs",
     "ribbon_home",
+    "ribbon_calib",
     "full",
 ]
 
@@ -54,5 +55,6 @@ SCENE_REF = {
     "nag_row":        "ref_nag_row.png",
     "notation_tabs":  "ref_notation_tabs.png",
     "ribbon_home":    "ribbon_home.png",
+    "ribbon_calib":   "ribbon_home.png",   # calibration scene vs same reference
     "full":           "fritz_152f18engshot.png",
 }

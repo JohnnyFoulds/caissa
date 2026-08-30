@@ -82,6 +82,13 @@ _PYSIDE6_ALLOWED_RELATIVE: set[str] = {
     # Phase 7: Ribbon widget and wiring — Qt allowlist tier.
     "WRibbon.py",
     "Ribbon.py",
+    # Phase 2 (fritz-mode-phase2): Dropdown panel — Qt allowlist tier.
+    "WDropdownPanel.py",
+    # Phase 6 (fritz-mode-phase6): WFritz* widgets moved from UIModes/ — Qt allowlist tier.
+    "WFritzAnalysisTable.py",
+    "WFritzEvalGraph.py",
+    "WFritzPlayerHeader.py",
+    "WFritzNewGame.py",
 }
 
 # Adapter-tier modules (relative to bin/Code/Fritz/) that may import Qt-tainted

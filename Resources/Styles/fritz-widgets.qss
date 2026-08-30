@@ -1,0 +1,544 @@
+/* fritz-widgets.qss — Fritz widget overlay, auto-applied in Fritz mode           */
+/* {KEY} placeholders are replaced at load time from the active theme's dic_colors */
+/* This file must NOT be listed in the theme selector — it is not a standalone QSS */
+
+/* FRITZ WIDGETS -------------------------------------------------------------- */
+
+WFritzPlayerHeader
+{
+    background-color: {CHROME_SURFACE};
+    qproperty-bgColor: {CHROME_SURFACE};
+    qproperty-borderColor: {CHROME_BORDER};
+    qproperty-rowHeight: 38;
+}
+
+#WFritzPlayerHeaderSep
+{
+    background-color: {CHROME_BORDER};
+    border: none;
+}
+
+#WFritzPlayerName
+{
+    color: {FOREGROUND};
+    font-size: 10pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+#WFritzPlayerClock
+{
+    color: {CHROME_ACCENT};
+    font-size: 10pt;
+    font-family: "Menlo", "Courier New", monospace;
+    background: transparent;
+}
+
+WFritzEvalGraph
+{
+    background-color: {CHROME_SURFACE_2};
+    qproperty-bgColor: {CHROME_SURFACE_2};
+    qproperty-dividerColor: {CHROME_BORDER};
+    qproperty-whiteBarColor: {CHROME_ACCENT};
+    qproperty-blackBarColor: {CHROME_DANGER};
+    qproperty-currentBarColor: {FOREGROUND};
+    qproperty-graphHeight: 80;
+}
+
+WFritzAnalysisTable
+{
+    background-color: {BACKGROUND};
+    qproperty-accentColor: {CHROME_ACCENT};
+    qproperty-dangerColor: {CHROME_DANGER};
+    qproperty-headerHeight: 28;
+    qproperty-rowHeight: 22;
+}
+
+#WFritzAnalysisHeader
+{
+    background-color: {CHROME_SURFACE};
+    border-bottom: 1px solid {CHROME_BORDER};
+}
+
+#WFritzAnalysisEngineLabel
+{
+    color: {CHROME_TEXT_DIM};
+    font-size: 11px;
+    background: transparent;
+}
+
+#WFritzAnalysisDepthLabel
+{
+    color: {CHROME_TEXT_DIM};
+    font-size: 11px;
+    background: transparent;
+}
+
+#WFritzAnalysisDecBtn, #WFritzAnalysisIncBtn
+{
+    color: {FOREGROUND};
+    background-color: {CHROME_SURFACE_2};
+    border: 1px solid {CHROME_BORDER};
+    font-size: 13px;
+    font-weight: bold;
+}
+
+#WFritzAnalysisDecBtn:hover, #WFritzAnalysisIncBtn:hover
+{
+    background-color: {CHROME_BORDER};
+}
+
+#WFritzAnalysisDecBtn:pressed, #WFritzAnalysisIncBtn:pressed
+{
+    background-color: {CHROME_ACCENT};
+}
+
+#WFritzAnalysisGrid
+{
+    background-color: {CHROME_SURFACE_2};
+    color: {FOREGROUND};
+    font-size: 11px;
+    border: none;
+    gridline-color: transparent;
+}
+
+#WFritzAnalysisGrid::item
+{
+    padding: 0px 4px;
+    border: none;
+}
+
+#WFritzNewGame
+{
+    background-color: {BACKGROUND};
+    color: {FOREGROUND};
+}
+
+#WFritzNewGameSection
+{
+    color: {CHROME_TEXT_DIM};
+    font-size: 10px;
+    letter-spacing: 1px;
+    background: transparent;
+}
+
+#WFritzNewGameToggle
+{
+    background-color: {CHROME_SURFACE_2};
+    color: {FOREGROUND};
+    border: 1px solid {CHROME_BORDER};
+    border-radius: 3px;
+    padding: 0 10px;
+}
+
+#WFritzNewGameToggle:hover
+{
+    background-color: {CHROME_SURFACE};
+}
+
+#WFritzNewGameToggle[selected="1"]
+{
+    background-color: {CHROME_ACCENT};
+    color: {CHROME_SURFACE_2};
+    border: 1px solid {CHROME_ACCENT};
+}
+
+#WFritzNewGameCancel
+{
+    background-color: {CHROME_SURFACE_2};
+    color: {FOREGROUND};
+    border: 1px solid {CHROME_BORDER};
+    border-radius: 3px;
+    padding: 0 16px;
+}
+
+#WFritzNewGameCancel:hover
+{
+    background-color: {CHROME_SURFACE};
+}
+
+#WFritzNewGameOk
+{
+    background-color: {CHROME_ACCENT};
+    color: {CHROME_SURFACE_2};
+    border: none;
+    border-radius: 3px;
+    padding: 0 20px;
+    font-weight: bold;
+}
+
+#WFritzNewGameOk:hover
+{
+    background-color: {CHROME_ACCENT_HOVER};
+}
+
+/* SPLITTER HANDLES ─────────────────────────────────────────────────────────── */
+
+QSplitter::handle
+{
+background-color: {CHROME_SURFACE};
+}
+
+QSplitter::handle:hover
+{
+background-color: {CHROME_BORDER};
+}
+
+QSplitter::handle:horizontal
+{
+width: 4px;
+}
+
+QSplitter::handle:vertical
+{
+height: 4px;
+}
+
+/* WFRITZPANE — pane wrapper with gradient title bar ─────────────────────────── */
+
+WFritzPane
+{
+qproperty-titleHeight: 20;
+qproperty-titleTop: {CHROME_SURFACE};
+qproperty-titleBottom: {CHROME_BORDER};
+qproperty-titlePadX: 6;
+background-color: {CHROME_SURFACE_2};
+border: 1px solid {CHROME_BORDER};
+}
+
+#WFritzPaneTitle
+{
+font-size: 8pt;
+font-weight: bold;
+color: {FOREGROUND};
+}
+
+WFritzLCD
+{
+qproperty-litColor: #00ee77;
+qproperty-dimColor: #104020;
+qproperty-boxHeight: 34;
+qproperty-boxWidth: 150;
+qproperty-segmentThickness: 8;
+background-color: #000000;
+border-radius: 2px;
+}
+
+#WFritzEvalSummary
+{
+font-size: 8pt;
+color: {FOREGROUND};
+padding: 2px 8px;
+}
+
+/* RIBBON ─────────────────────────────────────────────────────────────────────── */
+
+QToolBar#BASIC
+{
+background-color: {CHROME_SURFACE_2};
+border: none;
+padding: 0px;
+spacing: 0px;
+}
+
+WRibbon
+{
+background-color: {CHROME_SURFACE_2};
+border-bottom: 1px solid {CHROME_BORDER};
+font-family: "Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", Arial, sans-serif;
+font-size: 10pt;
+qproperty-qatRowHeight: 29;
+qproperty-tabRowHeight: 21;
+qproperty-contentHeight: 91;
+qproperty-largeBtnHeight: 64;
+qproperty-largeIconSize: 28;
+}
+
+#WRibbonQATRow
+{
+background-color: {CHROME_SURFACE};
+}
+
+#WRibbonQAT
+{
+background-color: transparent;
+}
+
+#WRibbonTabRow
+{
+background-color: {CHROME_SURFACE};
+}
+
+#WRibbonTabBar
+{
+background: transparent;
+border: none;
+}
+
+#WRibbonTabBar::tab
+{
+background: transparent;
+color: {FOREGROUND};
+padding: 4px 13px;
+border: none;
+border-radius: 0;
+font-size: 8pt;
+}
+
+#WRibbonTabBar::tab:first
+{
+background-color: {CHROME_ACCENT};
+color: {CHROME_SURFACE_2};
+border-radius: 0;
+}
+
+#WRibbonTabBar::tab:selected
+{
+background-color: {CHROME_SURFACE_2};
+color: {CHROME_ACCENT};
+border-top: 1px solid {CHROME_BORDER};
+border-left: 1px solid {CHROME_BORDER};
+border-right: 1px solid {CHROME_BORDER};
+border-bottom: none;
+border-radius: 0;
+}
+
+#WRibbonTabBar::tab:first:selected
+{
+background-color: {CHROME_ACCENT};
+color: {CHROME_SURFACE_2};
+border-top: 1px solid {CHROME_ACCENT_HOVER};
+border-left: 1px solid {CHROME_ACCENT_HOVER};
+border-right: 1px solid {CHROME_ACCENT_HOVER};
+border-bottom: none;
+border-radius: 0;
+}
+
+#WRibbonTabBar::tab:hover:!selected:!first
+{
+background-color: {CHROME_SURFACE};
+color: {FOREGROUND};
+}
+
+#WRibbonRule
+{
+background-color: {CHROME_BORDER};
+max-height: 1px;
+}
+
+#WRibbonPages
+{
+background-color: {CHROME_SURFACE_2};
+}
+
+#WRibbonPages > QWidget
+{
+background-color: {CHROME_SURFACE_2};
+}
+
+QWidget[ribbonGroup="1"]
+{
+background-color: {CHROME_SURFACE_2};
+}
+
+#WRibbonGroupCaption
+{
+font-size: 10pt;
+color: {FOREGROUND};
+padding: 0px 2px;
+}
+
+#WRibbonGroupSep
+{
+background-color: {CHROME_SEP};
+margin: 8px 0px;
+}
+
+#WRibbonQAT QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+padding: 1px;
+}
+
+#WRibbonQAT QToolButton:hover
+{
+background-color: {CHROME_SURFACE};
+border-color: {CHROME_BORDER};
+}
+
+#WRibbonPages QToolButton
+{
+background: transparent;
+border: 1px solid transparent;
+border-radius: 2px;
+color: {FOREGROUND};
+font-size: 10pt;
+padding: 1px 4px;
+}
+
+#WRibbonPages QToolButton:hover
+{
+background-color: {CHROME_SURFACE};
+border-color: {CHROME_BORDER};
+}
+
+#WRibbonPages QToolButton:checked
+{
+background-color: {CHROME_ACCENT};
+border-color: {CHROME_ACCENT_HOVER};
+color: {CHROME_SURFACE_2};
+}
+
+#WRibbonPages QToolButton:pressed
+{
+background-color: {CHROME_ACCENT_HOVER};
+border-color: {CHROME_ACCENT};
+color: {CHROME_SURFACE_2};
+}
+
+#WRibbonPages QToolButton:disabled
+{
+color: {CHROME_TEXT_DIM};
+}
+
+#WRibbonPages QCheckBox
+{
+color: {FOREGROUND};
+font-size: 10pt;
+spacing: 5px;
+}
+
+#WRibbonPages QCheckBox:disabled
+{
+color: {CHROME_TEXT_DIM};
+}
+
+#WRibbonPages QCheckBox::indicator
+{
+width: 11px;
+height: 11px;
+border: 1px solid {CHROME_TEXT_DIM};
+border-radius: 0px;
+background-color: {CHROME_SURFACE_2};
+}
+
+#WRibbonPages QCheckBox::indicator:checked
+{
+background-color: {CHROME_SURFACE_2};
+border-color: {CHROME_TEXT_DIM};
+}
+
+#WRibbonPages QCheckBox::indicator:hover
+{
+border-color: {CHROME_ACCENT};
+}
+
+#WRibbonPages QCheckBox::indicator:disabled
+{
+background-color: {BACKGROUND};
+border-color: {CHROME_TEXT_DIM};
+}
+
+/* BACKSTAGE PANEL (File tab) -------------------------------------------------- */
+
+#WRibbonBackstageSidebar
+{
+background-color: {CHROME_ACCENT};
+}
+
+#WRibbonBackstageTitle
+{
+color: {CHROME_SURFACE_2};
+font-size: 14pt;
+font-weight: bold;
+background-color: transparent;
+}
+
+#WRibbonBackstageSubtitle
+{
+color: {CHROME_ACCENT_HOVER};
+font-size: 8pt;
+background-color: transparent;
+}
+
+#WRibbonBackstageContent
+{
+background-color: {CHROME_SURFACE_2};
+}
+
+#WRibbonBackstageItem
+{
+background: transparent;
+border: none;
+border-radius: 0px;
+color: {FOREGROUND};
+font-size: 9pt;
+padding: 2px 12px;
+text-align: left;
+}
+
+#WRibbonBackstageItem:hover
+{
+background-color: {CHROME_SURFACE};
+}
+
+#WRibbonBackstageItem:pressed
+{
+background-color: {CHROME_BORDER};
+}
+
+#WRibbonBackstageItem:disabled
+{
+color: {CHROME_TEXT_DIM};
+}
+
+#WRibbonBackstageSep
+{
+color: {CHROME_BORDER};
+background-color: {CHROME_BORDER};
+max-height: 1px;
+margin: 2px 8px;
+}
+
+/* DROPDOWN PANEL (WDropdownPanel) -------------------------------------------- */
+
+#WDropdownPanel
+{
+    background-color: {CHROME_SURFACE};
+    border: 1px solid {CHROME_BORDER};
+    border-radius: 3px;
+}
+
+#WDropdownPanelHeader
+{
+    background-color: {CHROME_ACCENT};
+    color: {FOREGROUND};
+    font-size: 9pt;
+    font-weight: bold;
+    padding: 4px 10px;
+    qproperty-alignment: AlignLeft;
+}
+
+#WDropdownPanelItem
+{
+    background-color: transparent;
+    border: none;
+    border-radius: 0px;
+    color: {FOREGROUND};
+    font-size: 9pt;
+    padding: 3px 10px;
+    text-align: left;
+    min-width: 120px;
+}
+
+#WDropdownPanelItem:hover
+{
+    background-color: {CHROME_SURFACE_2};
+}
+
+#WDropdownPanelItem:pressed
+{
+    background-color: {CHROME_BORDER};
+}

@@ -123,3 +123,135 @@ pages for `ribbon.htm`, `home.htm`, `menu.htm` and `mainwindow.htm` all return 4
 2. Run `make test` — T-RMAP-01..08 validate schema, uniqueness, key resolution and coverage.
 3. If the new key is in `modern-fritz.json`'s `toolbar` allowlist it must appear in a slot or
    QAT or T-RMAP-05 fails.
+
+---
+
+## Measured reference (Fritz 18 — `ribbon_home.png` / Board tab)
+
+Measured from `~/Pictures/fritz-reference/ribbon_home.png` (820×242) by pixel analysis.
+This file is the Board tab of Fritz 18 (the filename is a misnomer). The file lives outside
+the repo — ChessBase copyright, GPL-3.0 repo — see `docs/standards/ui-design-process.md` §3.
+
+### Band geometry — total ribbon height 143 px
+
+| Band | y range | Height |
+|---|---|---|
+| QAT row | 5..33 | 29 |
+| Tab row | 34..54 | 21 |
+| Rule under tabs | 55 | 1 |
+| Content | 56..146 | 91 |
+| Bottom border | 147 | 1 |
+
+Content breakdown: 4 px top pad → large buttons y=60..125 (66 px) → 6 px gap → caption text
+y=132..139 (8 px) → 7 px bottom pad.
+
+The QAT is its own row **above** the tab row — not side-by-side with the tabs.
+
+### Palette
+
+| Role | Hex |
+|---|---|
+| Chrome background (all bands) | `#efeff2` |
+| Separators, rules, borders | `#cccedb` |
+| Accent | `#007acc` |
+| Body / caption / tab / button text | `#1e1e1e` |
+| Selected-tab text | `#005b99` |
+| Disabled text + checkbox border | `#a2a4a5` |
+| Checkbox indicator fill | `#ffffff` |
+
+The entire ribbon is one uniform `#efeff2` — no banding, no tint variation between bands.
+
+### Tab strip
+
+- 10 tabs: File, Home, Insert, Board, Training, Analysis, Opening, Engine, View, Help.
+- **File tab**: solid `#007acc` fill, white text — always blue.
+- Unselected tabs: transparent on `#efeff2`, `#1e1e1e` text, ~13 px horizontal padding, 8 pt.
+- **Selected tab** (Board, w=58 px): fill `#efeff2` (same as background), 1 px `#cccedb` border
+  on top/left/right only, no bottom border — the "tab opens into content" look. Text `#005b99`.
+  The tab-row rule is `#cccedb` across the full width *except* below the selected tab.
+
+### Content groups
+
+Vertical `#cccedb` group separators span ~86/91 px of the content height
+(`margin: 2px 4px`, not `6px 4px`). **No group box outlines — groups are delimited by hairline
+separators only.**
+
+### Large-button anatomy (measured on "Square", w=36 px)
+
+| Part | Extent |
+|---|---|
+| Icon | 32×32, y=63..94 |
+| Gap | 5 px |
+| Text (1-2 lines, 8 pt) | y=100..109 |
+| Gap | 6 px |
+| Dropdown chevron (where applicable) | y=115..117, 5×3 px centred |
+| Total height | ~66 px |
+
+Active/toggled large button ("Flip Board") is filled solid `#007acc`.
+
+### Checkbox
+
+Indicator: 11×11 px, 1 px `#a2a4a5` border, `#ffffff` fill, `#1e1e1e` check mark.
+Labels: left-aligned vertical column, `#1e1e1e` text, disabled variant `#a2a4a5`.
+
+---
+
+## Fritz Home tab — group inventory (from manual)
+
+Source: Fritz 18 online manual (live at `https://help.chessbase.com/Fritz/18/Eng/`).
+Key pages: `000031` (clocks/board), `000058` (levels/dropdown), `000018` (Hint), `000070` (Suggestion), `000104` (Panes).
+The Board tab image is the most photographed ribbon; the Home tab content was inferred from manual text and the reference screenshot.
+
+### Fritz Home tab groups
+
+| Group | Buttons | Notes |
+|---|---|---|
+| **New Game** | New Game ▼ (dropdown) | Opens a level/opponent selection panel (see Dropdown pattern below) |
+| **Level** | Levels ▼ (dropdown) | Opens a time-control selection panel (Blitz, Rapid, Classical, Custom…) |
+| **Game** | Resign, Offer Draw, Abort | Flat icon buttons. **NOT radio buttons** — confirmed `https://help.chessbase.com/Fritz/18/Eng/000018.htm` |
+| **Game** | Takeback | Small flat button |
+| **Coaching** | Hint, Suggestion | Plain action buttons (`https://help.chessbase.com/Fritz/18/Eng/000018.htm`, `https://help.chessbase.com/Fritz/18/Eng/000070.htm`). **NOT radio buttons, NOT toggles** |
+| **Panes** | Players, Engine analysis, Eval profile, Notation, Eval bar | QCheckBox column; checked = pane visible |
+
+### Dropdown panel visual pattern (`https://help.chessbase.com/Fritz/18/Eng/000058.htm`)
+
+When a button with a ▼ chevron is clicked, a floating panel opens **directly below the button**:
+
+- **No arrow/caret** connecting button to panel
+- **Blue header bar** (same blue as File tab, `#005b99` / `#007acc`) with white label text
+- **White background** panel body with a thin `#b0b0b8` border
+- **Vertical list of items**, plain text, 8 pt, ~20 px row height
+- **Highlighted row** on hover: solid blue tint fill, e.g. `#cce4ff`
+- **Drop shadow** visible on right/bottom edges
+- Panel dismisses on selection or outside click
+
+Example: "Levels" dropdown shows time-control options (Blitz 5min, Rapid 15min, etc.)
+
+---
+
+## Caissa Home tab — design choices (D12, D13)
+
+These are our specific design decisions for the Caissa Fritz Home tab, recorded so future changes
+have context. See also `docs/fritz/decisions.md` D12 and D13.
+
+### Group layout
+
+| Group caption | Contents | Rationale |
+|---|---|---|
+| **Play** | New Game ▼ (large), Levels ▼ (large) | Category name "Play" covers both launch actions; matches Fritz naming pattern of grouping by category not action |
+| **Game** | Resign, Offer Draw, Abort, Takeback (2×2 small grid) | Four mid-game controls logically belong together |
+| **Coaching** | Hint (small), Suggestion (small) | Plain action buttons — confirmed NOT radio buttons (`https://help.chessbase.com/Fritz/18/Eng/000018.htm`); `?` / lightbulb icon |
+| **Panes** | Players ✓, Engine analysis ✓, Eval profile ✓, Notation ✓, Eval bar ☐ | Matches Fritz Panes group; last pane defaults unchecked |
+
+### Caption styling
+
+- **No separator line** above caption row — Fritz reference shows none
+- **Caption text `#444444`** — dark, not grey (`#888888` was too light)
+- Caption is centred over its group's full width
+
+### Buttons
+
+- Large buttons (New Game, Levels): icon + text + `▼` dropdown chevron at bottom
+- Small buttons: icon left, text right, flat — no border at rest
+- Resign = flag icon (red), Offer Draw = half-circle (green), Abort = king (dark), Takeback = back-arrow (dark)
+- Hint / Suggestion: `?` icon (not a circle/radio indicator)

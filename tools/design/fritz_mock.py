@@ -665,164 +665,232 @@ def render_notation_tabs(out_dir: Path, variant: str, width: int) -> Path:
 
 # ── scene: ribbon_home ────────────────────────────────────────────────────────
 
+# Dev-only spec that mirrors Fritz's Board tab: 10 tabs (File first), Board
+# selected, 5 groups with Fritz's labels and a realistic button/checkbox mix.
+# Lives here rather than in Resources/Ribbons/ so it cannot reach the product.
+_CALIB_SPEC = {
+    "$schema_version": 1,
+    "default_tab": "board",
+    "missing_key_policy": "skip",
+    "quick_access": ["TB_CLOSE", "TB_CANCEL", "TB_OPTIONS"],
+    "overflow": [],
+    "tabs": [
+        {
+            "id": "file", "label": "File",
+            "groups": [
+                {"id": "file.pgn", "label": "PGN", "kind": "slots", "slots": [
+                    {"key": "TB_OPEN",       "size": "large"},
+                    {"key": "TB_SAVE",       "size": "small"},
+                    {"key": "TB_SAVE_AS",    "size": "small"},
+                    {"key": "TB_READ_PGN",   "size": "small"},
+                    {"key": "TB_PASTE_PGN",  "size": "small"},
+                ]},
+            ],
+        },
+        {
+            "id": "home", "label": "Home",
+            "groups": [
+                {"id": "home.game", "label": "Game", "kind": "slots", "slots": [
+                    {"key": "caissa:fritz_level", "size": "large"},
+                    {"key": "TB_RESIGN",   "size": "small"},
+                    {"key": "TB_DRAW",     "size": "small"},
+                    {"key": "TB_TAKEBACK", "size": "small"},
+                ]},
+                {"id": "home.panes", "label": "Panes", "kind": "panes", "panes": [
+                    {"pane": "Players",          "label": "Players"},
+                    {"pane": "Engine analysis",  "label": "Engine analysis"},
+                    {"pane": "Eval profile",     "label": "Eval profile"},
+                    {"pane": "Notation",         "label": "Notation"},
+                    {"pane": "Eval bar",         "label": "Eval bar"},
+                ]},
+            ],
+        },
+        {
+            "id": "board", "label": "Board",
+            "groups": [
+                {"id": "board.flip", "label": "Board", "kind": "slots", "slots": [
+                    {"key": "TB_REINIT",  "size": "large"},
+                ]},
+                {"id": "board.2d", "label": "Board 2d", "kind": "slots", "slots": [
+                    {"key": "TB_OPTIONS",    "size": "large"},
+                    {"key": "TB_CONFIG",     "size": "large"},
+                    {"key": "TB_VARIATIONS", "size": "large"},
+                ]},
+                {"id": "board.3d", "label": "Board 3d", "kind": "slots", "slots": [
+                    {"key": "TB_UTILITIES", "size": "large"},
+                    {"key": "TB_TOOLS",     "size": "large"},
+                ]},
+                {"id": "board.clocks", "label": "Clocks", "kind": "slots", "slots": [
+                    {"key": "TB_PAUSE", "size": "large"},
+                ]},
+                {"id": "board.dgt", "label": "DGT board", "kind": "slots", "slots": [
+                    {"key": "TB_CONTINUE", "size": "small"},
+                    {"key": "TB_STOP",     "size": "small"},
+                ]},
+            ],
+        },
+        {"id": "training", "label": "Training", "groups": [
+            {"id": "tr.coach", "label": "Coach", "kind": "slots", "slots": [
+                {"key": "TB_ADVICE", "size": "large"},
+                {"key": "TB_HELP",   "size": "small"},
+            ]},
+        ]},
+        {"id": "analysis", "label": "Analysis", "groups": [
+            {"id": "an.engine", "label": "Engine", "kind": "slots", "slots": [
+                {"key": "TB_SETTINGS", "size": "large"},
+                {"key": "TB_ENGINES",  "size": "small"},
+            ]},
+        ]},
+        {"id": "opening", "label": "Opening", "groups": [
+            {"id": "op.replay", "label": "Replay", "kind": "slots", "slots": [
+                {"key": "TB_REPLAY",     "size": "large"},
+                {"key": "TB_PGN_REPLAY", "size": "small"},
+            ]},
+        ]},
+        {"id": "engine", "label": "Engine", "groups": [
+            {"id": "en.set", "label": "Settings", "kind": "slots", "slots": [
+                {"key": "TB_UTILITIES", "size": "large"},
+            ]},
+        ]},
+        {"id": "view", "label": "View", "groups": [
+            {"id": "vw.show", "label": "Show", "kind": "slots", "slots": [
+                {"key": "TB_INFORMATION", "size": "small"},
+            ]},
+        ]},
+        {"id": "help", "label": "Help", "groups": [
+            {"id": "hl.help", "label": "Help", "kind": "slots", "slots": [
+                {"key": "TB_HELP", "size": "large"},
+            ]},
+        ]},
+    ],
+}
+
+
+def _build_ribbon(spec: dict, selected_tab: str | None = None):
+    """Build and return a WRibbon from *spec* using real QActions.
+
+    The app-level stylesheet (Fritz.qss / Modern Fritz.qss, fully preprocessed by
+    ``_init()`` → ``InitApp.init_app_style``) is already applied to the QApplication,
+    so NO per-widget ``setStyleSheet`` call is made here.  That cascade is both
+    simpler and more faithful to the live app.
+
+    :param spec: Ribbon spec dict (from a file or the dev-only _CALIB_SPEC).
+    :param selected_tab: Tab id to select after construction, or None for default.
+    :returns: A ``WRibbon`` instance ready to grab.
+    """
+    from PySide6 import QtGui, QtWidgets
+
+    from Code.Fritz.WRibbon import WRibbon
+    from Code.Main.WBase import WBase
+
+    # Build a dic_toolbar from the real static action registry.
+    # WBase.dic_opciones_tb() returns {key: (label, QIcon)} where key is the
+    # integer TB_* constant.  The ribbon spec uses the string name "TB_RESIGN"
+    # etc., so we store each action under BOTH the integer key and the string
+    # name so that WRibbon's _dic_toolbar.get("TB_RESIGN") succeeds.
+    import Code.Base.Constantes as _C
+    _tb_by_int = {getattr(_C, n): n for n in dir(_C) if n.startswith("TB_")}
+
+    raw = WBase.dic_opciones_tb()
+
+    # Also pull in caissa: actions (registered by UIModes/Actions.py)
+    try:
+        from Code.UIModes import Actions
+        for k, action_def in Actions.all_items():
+            raw[k] = (action_def["label"], action_def["icon"])
+    except Exception:
+        pass
+
+    dic_toolbar = {}
+    for key, (label, icon) in raw.items():
+        act = QtGui.QAction(label)
+        act.setIcon(icon)
+        act.setIconText(label)
+        act.key = key
+        dic_toolbar[key] = act
+        # Also register by string name for spec lookups
+        if isinstance(key, int) and key in _tb_by_int:
+            dic_toolbar[_tb_by_int[key]] = act
+
+    # Static pane_api for calibration (always visible).
+    _pane_state = {p["pane"]: True
+                   for tab in spec.get("tabs", [])
+                   for grp in tab.get("groups", [])
+                   for p in grp.get("panes", [])}
+    pane_api = {
+        "names": list(_pane_state.keys()),
+        "get": lambda name: _pane_state.get(name, True),
+        "set": lambda name, v: _pane_state.update({name: v}),
+    }
+
+    ribbon = WRibbon(spec, dic_toolbar, pane_api=pane_api)
+    ribbon.ensurePolished()
+    QtWidgets.QApplication.processEvents()
+
+    if selected_tab:
+        ribbon.select_tab(selected_tab)
+        QtWidgets.QApplication.processEvents()
+
+    return ribbon
+
+
 @scene("ribbon_home")
 def render_ribbon_home(out_dir: Path, variant: str, width: int) -> Path:
-    """Fritz Office-style ribbon mock — Home tab (Phase 7 design).
+    """Render the real WRibbon widget — Home tab — using the shipping QSS.
 
-    Shows: tab strip (Home / Board / Training / Analysis / Opening / Engine),
-    Game group (New Game large + Resign/Draw/Takeback small),
-    Panes group (checkbox list).
+    Uses ``Code.Fritz.WRibbon.WRibbon`` built from the real
+    ``Resources/Ribbons/modern-fritz.json`` spec and real QActions.  The
+    app-level stylesheet (Fritz.qss, preprocessed by InitApp) cascades in — no
+    per-widget ``setStyleSheet`` override.
+
+    :param out_dir: Output directory.
+    :param variant: ``"light"`` or ``"dark"`` (selects the QSS / colors file).
+    :param width: Widget width in logical pixels.
+    :returns: Path to the saved PNG.
     """
-    from PySide6 import QtCore, QtWidgets
+    import json
 
-    qss = _load_qss(variant)
+    from Code.Fritz import RibbonModel, Ribbon
 
-    bg_ribbon  = "#e8eef4" if variant == "light" else "#2d2d2d"
-    bg_page    = "#f4f8fc" if variant == "light" else "#333333"
-    bg_group   = "#eef2f8" if variant == "light" else "#3a3a3a"
-    tc         = "#1a1a1a" if variant == "light" else "#d4d4d4"
-    tc_cap     = "#555566" if variant == "light" else "#888899"
-    sep_color  = "#a0b4c8" if variant == "light" else "#505050"
-    btn_bg     = "#dce8f4" if variant == "light" else "#3c3c3c"
-    btn_hover  = "#c0d4e8" if variant == "light" else "#505060"
-    accent     = "#0060b0" if variant == "light" else "#0078d4"
+    path = Ribbon.spec_path_for_name("modern-fritz")
+    spec = RibbonModel.load(path)
 
-    TABS = ["Home", "Board", "Training", "Analysis", "Opening", "Engine"]
+    ribbon = _build_ribbon(spec, selected_tab="home")
+    ribbon.resize(width, ribbon.height())
+    ribbon.show()
 
-    container = QtWidgets.QWidget()
-    container.setObjectName("WRibbonDemo")
-    container.setFixedHeight(120)
-    container.setStyleSheet(f"background:{bg_ribbon};")
+    from PySide6 import QtWidgets
+    QtWidgets.QApplication.processEvents()
 
-    outer = QtWidgets.QVBoxLayout(container)
-    outer.setContentsMargins(0, 0, 0, 0)
-    outer.setSpacing(0)
-
-    # ── Tab strip + quick-access ──────────────────────────────────────────────
-    header = QtWidgets.QWidget()
-    header.setFixedHeight(26)
-    header.setStyleSheet(f"background:{bg_ribbon};")
-    hly = QtWidgets.QHBoxLayout(header)
-    hly.setContentsMargins(4, 0, 4, 0)
-    hly.setSpacing(0)
-
-    tabbar = QtWidgets.QTabBar()
-    tabbar.setObjectName("WRibbonTabBar")
-    tabbar.setExpanding(False)
-    tabbar.setDrawBase(False)
-    for tab in TABS:
-        tabbar.addTab(tab)
-    tabbar.setCurrentIndex(0)
-
-    hly.addWidget(tabbar, 1)
-
-    # Quick-access strip (right side of header)
-    for icon_text in ["✕", "↩", "⏸"]:
-        qab = QtWidgets.QToolButton()
-        qab.setText(icon_text)
-        qab.setFixedSize(20, 20)
-        qab.setStyleSheet(
-            f"QToolButton {{ border:none; background:transparent; color:{tc_cap}; }}"
-            f"QToolButton:hover {{ color:{accent}; }}"
-        )
-        hly.addWidget(qab)
-
-    outer.addWidget(header)
-
-    # ── Rule ──────────────────────────────────────────────────────────────────
-    rule = QtWidgets.QFrame()
-    rule.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-    rule.setFixedHeight(1)
-    rule.setStyleSheet(f"color:{sep_color};")
-    outer.addWidget(rule)
-
-    # ── Page ──────────────────────────────────────────────────────────────────
-    page = QtWidgets.QWidget()
-    page.setStyleSheet(f"background:{bg_page};")
-    page_ly = QtWidgets.QHBoxLayout(page)
-    page_ly.setContentsMargins(6, 4, 6, 4)
-    page_ly.setSpacing(8)
-
-    # ── Game group ────────────────────────────────────────────────────────────
-    game_grp = QtWidgets.QWidget()
-    game_grp.setStyleSheet(
-        f"background:{bg_group}; border:1px solid {sep_color}; border-radius:3px;"
-    )
-    gg_ly = QtWidgets.QVBoxLayout(game_grp)
-    gg_ly.setContentsMargins(6, 4, 6, 2)
-    gg_ly.setSpacing(2)
-
-    # Large "New Game" button
-    new_game = QtWidgets.QToolButton()
-    new_game.setText("New\nGame")
-    new_game.setFixedSize(56, 52)
-    new_game.setStyleSheet(
-        f"QToolButton {{ background:{btn_bg}; color:{tc}; font-size:10px; "
-        f"border:1px solid {sep_color}; border-radius:3px; }}"
-        f"QToolButton:hover {{ background:{btn_hover}; }}"
-    )
-
-    small_row = QtWidgets.QHBoxLayout()
-    small_row.setSpacing(3)
-    for label in ["Resign", "Draw", "Takeback"]:
-        sb = QtWidgets.QToolButton()
-        sb.setText(label)
-        sb.setFixedHeight(20)
-        sb.setStyleSheet(
-            f"QToolButton {{ background:{btn_bg}; color:{tc}; font-size:9px; "
-            f"border:1px solid {sep_color}; border-radius:2px; }}"
-            f"QToolButton:hover {{ background:{btn_hover}; }}"
-        )
-        small_row.addWidget(sb)
-
-    gg_top = QtWidgets.QHBoxLayout()
-    gg_top.addWidget(new_game)
-    gg_top.addLayout(small_row)
-    gg_ly.addLayout(gg_top)
-
-    cap_game = QtWidgets.QLabel("Game")
-    cap_game.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-    cap_game.setStyleSheet(f"color:{tc_cap}; font-size:8px; background:transparent; border:none;")
-    gg_ly.addWidget(cap_game)
-
-    page_ly.addWidget(game_grp)
-
-    # ── Vertical separator ─────────────────────────────────────────────────────
-    vsep = QtWidgets.QFrame()
-    vsep.setFrameShape(QtWidgets.QFrame.Shape.VLine)
-    vsep.setStyleSheet(f"color:{sep_color};")
-    page_ly.addWidget(vsep)
-
-    # ── Panes group ────────────────────────────────────────────────────────────
-    panes_grp = QtWidgets.QWidget()
-    panes_grp.setStyleSheet(
-        f"background:{bg_group}; border:1px solid {sep_color}; border-radius:3px;"
-    )
-    pg_ly = QtWidgets.QVBoxLayout(panes_grp)
-    pg_ly.setContentsMargins(6, 4, 6, 2)
-    pg_ly.setSpacing(1)
-
-    PANES = ["Players", "Engine analysis", "Eval profile", "Notation", "Eval bar"]
-    for pane in PANES:
-        cb = QtWidgets.QCheckBox(pane)
-        cb.setChecked(True)
-        cb.setStyleSheet(
-            f"QCheckBox {{ color:{tc}; font-size:9px; background:transparent; border:none; }}"
-        )
-        pg_ly.addWidget(cb)
-
-    cap_panes = QtWidgets.QLabel("Panes")
-    cap_panes.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-    cap_panes.setStyleSheet(f"color:{tc_cap}; font-size:8px; background:transparent; border:none;")
-    pg_ly.addWidget(cap_panes)
-
-    page_ly.addWidget(panes_grp)
-    page_ly.addStretch()
-
-    outer.addWidget(page, 1)
-
-    px = _grab(container, width, 120, qss)
+    px = ribbon.grab()
     out = out_dir / f"ribbon_home_{variant}.png"
+    _save(px, out)
+    return out
+
+
+@scene("ribbon_calib")
+def render_ribbon_calib(out_dir: Path, variant: str, width: int) -> Path:
+    """Render a calibration ribbon using the Fritz-mirroring dev-only spec.
+
+    Same real WRibbon widget and same active QSS as ribbon_home, but fed a spec
+    that mirrors Fritz's Board tab (10 tabs, File first, Board selected, 5 groups
+    with Fritz's labels and button/checkbox mix).  This scene is what the pixel
+    diff numbers score — content matches Fritz, so style differences dominate.
+
+    :param out_dir: Output directory.
+    :param variant: ``"light"`` or ``"dark"``.
+    :param width: Widget width in logical pixels.
+    :returns: Path to the saved PNG.
+    """
+    ribbon = _build_ribbon(_CALIB_SPEC, selected_tab="board")
+    ribbon.resize(width, ribbon.height())
+    ribbon.show()
+
+    from PySide6 import QtWidgets
+    QtWidgets.QApplication.processEvents()
+
+    px = ribbon.grab()
+    out = out_dir / f"ribbon_calib_{variant}.png"
     _save(px, out)
     return out
 

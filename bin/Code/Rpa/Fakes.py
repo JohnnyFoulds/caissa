@@ -13,7 +13,7 @@ Usage in unit tests::
     clock = FakeClock(start_ms=0.0)
     world = World(
         current_state="HOME",
-        widget_trees={"HOME": [{"class": "QPushButton", "text": "Play"}]},
+        widget_trees={"HOME": [{"cls": "QPushButton", "text": "Play"}]},
     )
     driver = FakeDriver(world=world, clock=clock)
     snap = driver.snapshot()

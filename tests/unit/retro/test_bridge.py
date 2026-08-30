@@ -23,6 +23,8 @@ from Code.Retro.Bridge import (
     PLAYER_TYPE_BASE,
     Bridge,
     alg_to_sq88,
+    flip_fen,
+    flip_sq88,
     parse_fen,
     parse_piece_placement,
     sq88,
@@ -233,3 +235,74 @@ def test_bridge_set_computer_color():
     # Black (color=1) at PLAYER_TYPE_BASE + 1*2 = base+2 → Computer=2
     raw_black = cpu.mem_read(PLAYER_TYPE_BASE + 2, 2)
     assert struct.unpack(">H", raw_black)[0] == 2
+
+
+# ---------------------------------------------------------------------------
+# Board-flip helpers
+# ---------------------------------------------------------------------------
+
+def test_flip_sq88_e2_to_e7():
+    """flip_sq88: e2 (rank 1, 0-based) → e7 (rank 6, 0-based)."""
+    e2 = sq88(4, 1)   # file=e, rank=1 (0-based rank 1 = rank-2)
+    e7 = sq88(4, 6)   # file=e, rank=6 (0-based rank 6 = rank-7)
+    assert flip_sq88(e2) == e7
+
+
+def test_flip_sq88_a1_to_a8():
+    """flip_sq88: a1 → a8."""
+    a1 = sq88(0, 0)
+    a8 = sq88(0, 7)
+    assert flip_sq88(a1) == a8
+
+
+def test_flip_sq88_h8_to_h1():
+    """flip_sq88: h8 → h1."""
+    h8 = sq88(7, 7)
+    h1 = sq88(7, 0)
+    assert flip_sq88(h8) == h1
+
+
+def test_flip_sq88_is_involution():
+    """flip_sq88(flip_sq88(sq)) == sq for all valid 0x88 squares."""
+    for rank in range(8):
+        for file in range(8):
+            s = rank * 16 + file
+            assert flip_sq88(flip_sq88(s)) == s
+
+
+def test_flip_fen_active_color():
+    """flip_fen: White-to-move FEN produces Black-to-move FEN."""
+    flipped = flip_fen(_STARTPOS)
+    fields = flipped.split()
+    assert fields[1] == 'b'
+
+
+def test_flip_fen_startpos_pawn_rows():
+    """flip_fen: White pawns on rank 2 become Black pawns on rank 7 (flipped)."""
+    flipped = flip_fen(_STARTPOS)
+    # Parse the flipped FEN and check a square
+    pieces = parse_fen(flipped)["pieces"]
+    # In the original: White pawn (color=0, type=6) on e2 = sq88(4,1).
+    # After flip: sq=(4,6)=e7, color=1 (Black), type=6 (pawn).
+    e7 = sq88(4, 6)
+    match = [p for p in pieces if p[0] == e7]
+    assert len(match) == 1
+    sq, color, piece_type = match[0]
+    assert color == 1       # was White, now Black
+    assert piece_type == 6  # pawn
+
+
+def test_flip_fen_roundtrip():
+    """flip_fen applied twice returns the original position (ignoring castling/ep)."""
+    flipped_twice = flip_fen(flip_fen(_STARTPOS))
+    # Piece positions in both must match (castling/ep fields discarded, so compare pieces only)
+    orig_pieces  = sorted(parse_fen(_STARTPOS)["pieces"])
+    round_pieces = sorted(parse_fen(flipped_twice)["pieces"])
+    assert orig_pieces == round_pieces
+
+
+def test_flip_fen_black_to_move():
+    """flip_fen: Black-to-move FEN produces White-to-move FEN."""
+    black_fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+    flipped = flip_fen(black_fen)
+    assert flipped.split()[1] == 'w'

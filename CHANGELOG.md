@@ -60,6 +60,14 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
 ### Fixed
+- **Retro Engine — White-to-move support (board-flip technique, Phase G)**: Engine now
+  returns a real AI move for both sides.  Root cause: the AI's TC abort mechanism
+  requires `PLAYER2_COLOR=1` (Black) and hangs when set to White.  Fix: when
+  `computer_color=0`, mirror the board (ranks flipped, colors swapped) so the AI
+  always searches as Black; the result move is flipped back to original coordinates.
+  `Bridge.flip_sq88()` and `Bridge.flip_fen()` added; 8 new unit tests.  CLAUDE.md
+  smoke test (`position startpos go`) now produces `bestmove h2h4` (AI move, not
+  fallback).
 - **Retro Engine — multi-move robustness (TC-snapshot + write-snapshot)**:
   `Think.py` now uses a two-snapshot strategy to prevent illegal moves across all
   valid positions.  When the TC (time-check) hook fires with a root-valid move

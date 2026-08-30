@@ -31,7 +31,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from Code.Retro.Bridge import A4 as _A4_VALUE
-from Code.Retro.Bridge import AI_BEST_MOVE_ADDR, AI_INIT_ADDR, BOARD_ARRAY_ADDR, Bridge
+from Code.Retro.Bridge import (
+    AI_BEST_MOVE_ADDR, AI_INIT_ADDR, BOARD_ARRAY_ADDR, Bridge,
+    flip_fen as _flip_fen, flip_sq88 as _flip_sq88,
+)
 from Code.Retro.Cpu import HOOK_CODE, HOOK_MEM_INVALID, HOOK_MEM_WRITE, Cpu
 from Code.Retro.Errors import EmulatorUnavailableError, RomNotFoundError, ThinkError
 from Code.Retro.Types import Level, MoveSpec, ThinkResult
@@ -212,9 +215,20 @@ class ThinkSession:
         cpu = self._ensure_cpu()
         bridge = Bridge(cpu)
 
+        # The AI's TC abort mechanism requires PLAYER2_COLOR=1 (Black).
+        # For White-to-move positions, mirror the board so the AI sees a
+        # Black-to-move problem; flip the result move back afterwards.
+        _board_flipped = (request.computer_color == 0)
+        if _board_flipped:
+            _search_fen = _flip_fen(request.fen)
+            _search_cc  = 1
+        else:
+            _search_fen = request.fen
+            _search_cc  = request.computer_color
+
         bridge.clear_best_move()
-        bridge.write_position(request.fen)
-        bridge.set_computer_color(request.computer_color)
+        bridge.write_position(_search_fen)
+        bridge.set_computer_color(_search_cc)
 
         # Initialise registers and place the sentinel return address.
         cpu.reg_write("A4", _A4_VALUE)
@@ -222,9 +236,9 @@ class ThinkSession:
         cpu.mem_write(sp, struct.pack(">I", _SENTINEL))
         cpu.reg_write("A7", sp)
 
-        # Snapshot of the root board, taken before emulation.  The search
-        # modifies BOARD_ARRAY_ADDR in-place during make/unmake, so we must
-        # capture it here and use it throughout for root-position validation.
+        # Snapshot of the root board (may be the flipped board), taken before
+        # emulation.  The search modifies BOARD_ARRAY_ADDR in-place during
+        # make/unmake, so we must capture it here.
         _root_board: bytes = bytes(cpu.mem_read(BOARD_ARRAY_ADDR, 128 * 4))
 
         _mapped: set[int] = set()
@@ -250,9 +264,9 @@ class ThinkSession:
             from_color = _root_board[from_sq * 4 + 1]
             dest_type  = _root_board[to_sq  * 4]
             dest_color = _root_board[to_sq  * 4 + 1]
-            if from_color != request.computer_color:
+            if from_color != _search_cc:
                 return False
-            if dest_type != 0 and dest_color == request.computer_color:
+            if dest_type != 0 and dest_color == _search_cc:
                 return False
             from_type = _root_board[from_sq * 4]
             if (from_type == 6
@@ -266,8 +280,7 @@ class ThinkSession:
                 # TC fires once per depth iteration.  When AI_BEST_MOVE_ADDR holds a
                 # root-valid move, snapshot it and redirect PC to sentinel so emulation
                 # stops immediately — this prevents any deeper search node from
-                # overwriting the result with a sub-variation move (e.g. a pawn push
-                # through an occupied square that became empty at depth 2).
+                # overwriting the result with a sub-variation move.
                 raw = bytes(cpu.mem_read(AI_BEST_MOVE_ADDR, 4))
                 to_sq, from_sq = struct.unpack(">HH", raw)
                 _passes_88 = (
@@ -281,8 +294,7 @@ class ThinkSession:
                     _tc_snapshot[0] = struct.pack(">HH", to_sq, from_sq)
                     cpu.reg_write("PC", _SENTINEL)
                     return
-                # TC fired but AI_BEST_MOVE_ADDR is garbage or root-illegal —
-                # return normally so the search can continue.
+                # TC fired but result is garbage or root-illegal — return normally.
                 try:
                     a7 = cpu.reg_read("A7")
                     ret = struct.unpack(">I", bytes(cpu.mem_read(a7, 4)))[0]
@@ -372,6 +384,17 @@ class ThinkSession:
                 raise ThinkError(
                     "emulation completed without writing a best move to AI_BEST_MOVE_ADDR"
                 )
+
+        # Un-flip the move back to original board orientation when we searched
+        # on the mirrored board (White-to-move positions).
+        if _board_flipped and move is not None:
+            move = MoveSpec(
+                from_sq=_flip_sq88(move.from_sq),
+                to_sq=_flip_sq88(move.to_sq),
+                flags=move.flags,
+                piece=move.piece,
+                legal=move.legal,
+            )
 
         # Final legality check: validate the move against python-chess before
         # returning it.  The emulated AI can produce moves that pass the 0x88

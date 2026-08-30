@@ -249,6 +249,87 @@ def _read_entry(data: bytes) -> tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
+# Board-flip helpers (for White-to-move search)
+# ---------------------------------------------------------------------------
+
+def flip_sq88(sq: int) -> int:
+    """Mirror a 0x88 square vertically: rank r → rank (7 - r), file unchanged.
+
+    Used to convert between the original board orientation and the flipped
+    board used for White-to-move searches (see :func:`flip_fen`).
+
+    :param sq: Source 0x88 square index (0x00–0x77, no off-board bits).
+    :returns: Mirrored 0x88 square index.
+    """
+    rank = sq >> 4
+    file = sq & 0x0F
+    return (7 - rank) * 16 + file
+
+
+def _build_fen_placement(pieces: list[tuple[int, int, int]]) -> str:
+    """Reconstruct a FEN piece-placement string from a list of pieces.
+
+    :param pieces: List of ``(sq88, color, piece_type)`` tuples.
+    :returns: FEN piece-placement string (rank-8 first, ``/``-separated).
+    """
+    _chars: dict[tuple[int, int], str] = {
+        (0, 1): 'K', (0, 2): 'Q', (0, 3): 'R', (0, 4): 'B', (0, 5): 'N', (0, 6): 'P',
+        (1, 1): 'k', (1, 2): 'q', (1, 3): 'r', (1, 4): 'b', (1, 5): 'n', (1, 6): 'p',
+    }
+    board: dict[tuple[int, int], str] = {}
+    for sq, color, piece_type in pieces:
+        board[(sq & 0x0F, sq >> 4)] = _chars[(color, piece_type)]
+    ranks = []
+    for rank in range(7, -1, -1):   # rank-8 first in FEN
+        row = ''
+        empty = 0
+        for file in range(8):
+            ch = board.get((file, rank))
+            if ch is None:
+                empty += 1
+            else:
+                if empty:
+                    row += str(empty)
+                    empty = 0
+                row += ch
+        if empty:
+            row += str(empty)
+        ranks.append(row)
+    return '/'.join(ranks)
+
+
+def flip_fen(fen: str) -> str:
+    """Return a FEN with board mirrored: ranks and colors both inverted.
+
+    The Battle Chess AI is hard-wired to search as Black (PLAYER2_COLOR=1
+    must remain 1 for the TC abort mechanism to work).  For White-to-move
+    positions, flip the board so the AI sees a Black-to-move problem.  After
+    getting the AI's move, flip each square back with :func:`flip_sq88` to
+    recover coordinates in the original board orientation.
+
+    Transformation applied to every piece:
+    - Square rank:  r → 7 - r   (rank-1 ↔ rank-8, etc.)
+    - Square file:  unchanged
+    - Color:        0 (White) ↔ 1 (Black)
+
+    Active color is swapped accordingly.  Castling rights and en-passant are
+    discarded (simplified FEN ``- - 0 1``); Battle Chess does not use them.
+
+    :param fen: Source FEN string.
+    :returns: Mirrored FEN string.
+    :raises BridgeError: If *fen* is malformed.
+    """
+    board = parse_fen(fen)
+    flipped = [
+        (flip_sq88(sq), 1 - color, piece_type)
+        for sq, color, piece_type in board["pieces"]
+    ]
+    placement = _build_fen_placement(flipped)
+    active = 'b' if board["side_to_move"] == 0 else 'w'
+    return f"{placement} {active} - - 0 1"
+
+
+# ---------------------------------------------------------------------------
 # Bridge class
 # ---------------------------------------------------------------------------
 

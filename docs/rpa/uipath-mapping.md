@@ -66,6 +66,46 @@ or a Caissa developer who wants to understand the UiPath vocabulary.
 
 ---
 
+## When to Use an Activity vs Ad-Hoc Code
+
+Use this decision tree before writing any automation code.
+
+```
+Q: Do I need to interact with a running process (click, type, screenshot, window event)?
+   → YES → Activity subclass in bin/Code/<Target>/Activities.py
+   → NO  → Plain Python function (no RPA needed)
+
+Q: Does the action need to be verified — how do I know it worked?
+   → Always: use postcondition + verify_ms
+   → Never assume success; always verify with a screenshot check
+   → This is identical to UiPath's postcondition on every activity
+
+Q: Does the app need to be in a specific state before this action?
+   → Use precondition (same as a UiPath guard/condition)
+   → The DosRunner / AmigaRunner handles convergence and retry
+
+Q: Can I write this as a /tmp script instead?
+   → NO. /tmp scripts:
+     - have no verifiable postcondition
+     - are invisible after context compaction
+     - cannot be unit-tested without the running application
+     - cannot be retried or rewound
+   → The question is not "can I" but "will a future session know this worked?"
+
+Q: I need to measure a coordinate or colour threshold. Where do I put it?
+   → Immediately into bin/Code/<Target>/BattleChess.py AND into CLAUDE.md.
+   → Never in a local variable. Never in /tmp. Never only in memory.
+```
+
+**The UiPath parallel:**
+In UiPath you do not write ad-hoc VBA inside a Code activity to click a button. You use
+`Click`, set the selector, test it in the Test Activity pane, then wire it into the
+Sequence. The Activity object IS the documentation — its name, selector, and
+postcondition describe exactly what it does and how you know it worked. Follow the same
+discipline here.
+
+---
+
 ## What Is Intentionally Different
 
 Caissa intentionally diverges from UiPath in a few places:

@@ -11,21 +11,38 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
-### Fixed
-- **Fritz right column panel position**: Right-column panel now physically starts below the ribbon via a wrapper widget with a fixed-height spacer, so the panel background begins at the board level, not y=0.
-- **Fritz notation tabs**: Restored all six tabs (Notation, Training, Score sheet, LiveBook, Openings Book, My Moves). Notation tab shows flowing move text ("1. e4 e5 2. Nf3…"), Score sheet shows the N./White/Black grid, NAG palette shown on Notation tab only. Fixed pgn grid re-showing after ManagerSolo.active_game() call.
-- **Fritz notation tabs**: Switching between Notation and Score Sheet tabs in the right column now shows/hides the move list and NAG palette correctly.
-- **Fritz Levels button**: Clicking Levels now opens the level/time-control picker dialog directly, without also opening a dropdown panel.
-- **Fritz player header clocks**: Replaced unreadable seven-segment LCD display with a plain monospace QLabel showing readable time/eval text.
-- **Fritz ribbon "New Game" icon**: Changed from gear (`Configurar`) to `NuevaPartida` (chess game icon) to match the button's purpose.
-
-### Changed
-- **Fritz ribbon height**: Increased from 113 px to 142 px to match Fritz 18 proportions.
-  QAT strip (quick-access buttons) is now a separate 29 px row above the 21 px tab bar;
-  content band grows to 91 px. Adds `qatRowHeight` qproperty to `WRibbon`; all three Fritz
-  QSS files (`fritz-widgets.qss`, `Fritz.qss`, `Modern Fritz.qss`) updated accordingly.
-
 ### Added
+- **Amiga RPA layer (Phase E)**: `bin/Code/Amiga/` — FS-UAE automation module mirroring
+  `bin/Code/Dos/`.  `Driver.py` (`FsUaeProcess` + `FsUaeDriver`): Quartz screenshot
+  (`screencapture -x -o -l <wid>`), SDL-safe two-step click (MOUSEMOVE→DOWN→UP), raw
+  keycode send.  `Activities.py` (`AmigaRunner` + 8 `AmigaActivity` subclasses):
+  `EnsureFsUaeRunning`, `WaitForTitle`, `WaitForBoard`, `AdvancePastTitle`,
+  `StartNewGame`, `PlayMove`, `WaitForComputerReply`, `ExtractComputerMove`; each with
+  precondition/execute/postcondition following the CHECK_PRE→ACT→SETTLE→VERIFY contract.
+  `BattleChess.py`: geometry constants stubbed pending calibration.
+  `tests/unit/amiga/test_activities.py`: 32 unit tests (all passing) using `FakeDriver`.
+- **RPA process documentation**: `CLAUDE.md` adds "RPA Pattern for Automation —
+  Non-Negotiable" rule; `docs/rpa/new-target-guide.md` — step-by-step guide for
+  creating RPA layers for new application targets; `docs/rpa/uipath-mapping.md` gains
+  a "When to Use an Activity vs Ad-Hoc Code" decision tree.
+- **DOS corpus collection — reliable multi-move pipeline**: `WaitCpuReply` rewritten to use
+  color-based `board_state()` comparison (pink/blue piece classification) instead of pixel-diff
+  heuristics.  Two-phase detection: wait for first movement sign → 0.8s animation settle → read
+  final board state.  Handles captures correctly (pink square becomes blue).  `MovePiece` gains
+  a precondition that verifies a white piece is actually at the source square, catching stale game
+  state from previous runs.  Fresh DOSBox-X kill-and-relaunch guarantees startpos.  Pipeline now
+  records 5+ consecutive moves including captures without error.
+- **DOS automation — first ground-truth corpus entry**: `Resources/Retro/Corpus/dosbox-manual.jsonl`
+  records Battle Chess (DOS) responding `c7c5` (Sicilian Defence) to `1.e4`, verified deterministic
+  across two independent fresh-launch runs.  Full pipeline: DOSBox-X launch → 2D board mode →
+  two-click `e2e4` → CPU reply detected and verified.
+- **DOS automation — two-click move and CPU detection improvements**:
+  `DismissTitleScreen` now calls `driver.focus()` + 0.3s delay before ENTER to prevent keypresses
+  reaching the user's focused window; `WaitCpuReply` gains `settle_ms=3000` (artefact decay) and
+  a double-check (`inner_square_changed` on both CPU squares before accepting); brightness-delta
+  direction rule (`Δbright after−before`) replaces the broken "brighter-in-before = FROM" heuristic
+  that inverted from/to for black pieces.
+
 - **Retro Engine — Phase A ground-truth attempt (A5 documented negative result)**:
   `docs/retro/reverse-engineering.md` now records two failed boot attempts: `vamos` crashes
   at PC=0xFFFF807C (exec library stubs not mapped); FS-UAE + AROS quits on
@@ -42,70 +59,26 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   execution" rule; Gate D and Gate E require evidence of a real run before any feature with
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
-- **Fritz Mode defects #6 and #11 (select-engine crash + display checkboxes)**:
-  `caissa:select_engine` action now routes to `_fritz_new_game` instead of calling
-  the non-existent `Code.procesador.motores()` (crash on every click). Board ▸ Display
-  checkboxes (`modern-fritz.json`) now have `key` fields (`caissa:board_coordinates`,
-  `caissa:board_arrows`, `caissa:board_hints`). `WRibbon.set_display_api(api)` wires
-  per-key callbacks so toggling "Coordinates" calls `board.show_coordinates(bool)` and
-  "Show arrows" toggles `configuration.x_show_bestmove`. 4 tests in
-  `tests/ui/test_fritz_display.py` (T-DSP-01..04).
-- **Fritz Mode Behaviour — Phase 6 (Polish — WFritz* widget relocation)**:
-  `WFritzAnalysisTable.py`, `WFritzEvalGraph.py`, `WFritzPlayerHeader.py`, and
-  `WFritzNewGame.py` moved from `bin/Code/UIModes/` to `bin/Code/Fritz/` so the
-  purity AST walk in `test_completeness.py` covers them. All four added to
-  `_PYSIDE6_ALLOWED_RELATIVE`. Import sites in `modern_fritz_ui.py` and
-  `tests/ui/test_fritz_clocks.py` updated accordingly.
-- **Fritz Mode Behaviour — Phase 5 (View Tab — Layouts + Splitter Persistence)**:
-  `bin/Code/Fritz/Layouts.py` — six named presets (Standard / Big Board / Big Notation /
-  Big Engine / Board Only / All Windows); `apply_preset(name, main_sp, rc_sp)` scales
-  proportional weights to pixels via `QSplitter.setSizes`; `factory_name()` returns
-  `"Standard"`. `GeometryStore.save_splitters` now called in `on_mode_exit` — last
-  layout persists across sessions (manual §000078). Fixed silent import bug in
-  `on_mode_enter` (`from Code.Fritz.GeometryStore import GeometryStore` → module-level
-  import; `GeometryStore` has no class). Standard Layouts ▼ dropdown wired with all
-  six presets + Factory Settings. 10 unit tests in `tests/unit/fritz/test_layouts.py`.
-- **Fritz Mode Behaviour — Phase 4 (Analysis + Engine Tab Wiring)**:
-  `ManagerSolo.run_action` dispatches `caissa:infinite_analysis` — toggles
-  `play_against_engine`: game→analysis terminates rival engine and calls
-  `play_next_move()`; analysis→game opens `WFritzNewGame`; `TB_STOP` and `TB_LEVEL`
-  also dispatch to `WFritzNewGame` in `ManagerSolo`. Ribbon toggle API wired in
-  `_register_ribbon_dropdowns`: `ribbon.set_toggle_api(_get_toggle)` proxies
-  `manager.play_against_engine` so `TB_STOP` button checked state tracks live mode.
-  Tests: T-P4-01 (toggle getter mirrors `play_against_engine`), T-P4-02 (`WRibbon.sync()`
-  reflects toggled state); T-P4-03..05 are `xfail(strict=True)` stubs pending
-  circular-import resolution in `ManagerSolo`.
-- **Fritz Mode Behaviour — Phase 3 (Home + Board Tab Wiring)**:
-  `caissa:flip_board` now calls `Board.rotate_board()` (fixes coordinate labels,
-  arrow repositioning, and captures-panel flip — was direct `is_white_bottom` mutation);
-  `WFritzNewGame.get_dic()` `"HINTS"` changed from 0→3 (enables `TB_ADVICE` Hint button
-  in games); `TB_LEVEL` dispatched in `ManagerPlayAgainstEngine.run_action` → opens
-  WFritzNewGame level picker in-game; ribbon dropdowns registered in `on_mode_enter`
-  for `caissa:fritz_level`, `TB_LEVEL`, `caissa:piece_style` (Alpha/Berlin/Cburnett/
-  Leipzig/Merida/Regular/Staunton 3D + More…), `caissa:sq_color`, `caissa:std_layout`,
-  `caissa:select_engine` — all `has_dropdown: true` buttons now open real panels.
-- **Fritz Mode Behaviour — Phase 2 (Dropdown + Toggle Infrastructure)**:
-  `WDropdownPanel` — blue-header floating selection panel (Qt.Popup semantics,
-  checkmark support, `popup(button)` positions below anchor); QSS rules added to
-  `fritz-widgets.qss`; `WRibbon` toggle support: `"toggle": true` in ribbon JSON
-  → `setCheckable(True)` (applied after `setDefaultAction` to survive Qt action sync),
-  tracked in `_toggle_btns`, synced via `set_toggle_api` + `sync()`; `▼` on large
-  buttons only when `"has_dropdown": true` (was always appended); `RibbonModel._validate()`
-  now enforces key format (`TB_*` / `caissa:*`), duplicate slot keys within a tab, valid
-  `size` / `kind` values, and `default_tab` resolution; `WDropdownPanel.py` added to
-  `_PYSIDE6_ALLOWED_RELATIVE` purity allowlist; 11 new tests (T-RIB-01..05 UI,
-  T-RIB-06..11 unit).
-- **Fritz Mode Behaviour — Phase 1 (Boot State)**: Fritz mode now boots directly
-  into Infinite Analysis — engine analyses but never replies, no landing screen.
-  `WFritzHome.py` deleted; `_build_fritz_right_col()` replaces `_swap_home_to_analysis`;
-  `on_mode_enter` terminates `ManagerChallenge101` then boots `ManagerSolo` headlessly
-  (`PLAY_AGAINST_ENGINE: False`); `GeometryStore.load_splitters` wired for layout
-  persistence; `Ribbon.py` pane-API timing fixed (deferred `main_window` lookup);
-  `Ribbon.py` `hook` override respected for Dark variant; `eval_bar` added to
-  `_PANE_SPECS`; 75 dead `#WFritzHome*` QSS rules removed from three stylesheets;
-  mode descriptions updated in `modern-fritz.json` and `modern-fritz-dark.json`.
-
 ### Fixed
+- **Retro Engine — White-to-move support (board-flip technique, Phase G)**: Engine now
+  returns a real AI move for both sides.  Root cause: the AI's TC abort mechanism
+  requires `PLAYER2_COLOR=1` (Black) and hangs when set to White.  Fix: when
+  `computer_color=0`, mirror the board (ranks flipped, colors swapped) so the AI
+  always searches as Black; the result move is flipped back to original coordinates.
+  `Bridge.flip_sq88()` and `Bridge.flip_fen()` added; 8 new unit tests.  CLAUDE.md
+  smoke test (`position startpos go`) now produces `bestmove h2h4` (AI move, not
+  fallback).
+- **Retro Engine — multi-move robustness (TC-snapshot + write-snapshot)**:
+  `Think.py` now uses a two-snapshot strategy to prevent illegal moves across all
+  valid positions.  When the TC (time-check) hook fires with a root-valid move
+  the PC is redirected to the sentinel, stopping emulation immediately before any
+  deeper-search node can overwrite the result slot.  A `_mem_write` fallback
+  snapshot (filtered against a pre-emulation root-board snapshot) handles positions
+  where TC fires after the result is already overwritten with garbage.  Root-board
+  validation rejects pawn-straight-pushes to occupied squares, own-piece captures,
+  and moves from squares that don't belong to the computer in the root position.
+  Result: engine plays 17+ consecutive legal moves in the game test (was 2 before).
+  `tests/unit/retro/test_retro_game.py` assertion raised to ≥10 engine moves.
 - **Retro — Traps.py buffer overflow**: `AmigaTraps.install()` was writing
   `b"\x4e\x75" * size` (2×size bytes) into a size-byte region; corrected to `*(size//2)`.
 - **Retro — Rom.py silent truncation**: hunk parser now emits one clear warning on the

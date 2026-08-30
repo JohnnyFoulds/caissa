@@ -166,8 +166,27 @@ class UciSession:
         except (ValueError, KeyError):
             level = Level.L1
 
+        # Apply move list to get actual position FEN before calling the AI.
+        fen = self._fen
+        if self._moves:
+            try:
+                import chess as _chess  # noqa: PLC0415
+                _board = _chess.Board(fen)
+                for _mv in self._moves:
+                    _board.push_uci(_mv)
+                fen = _board.fen()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("move application failed (%s); using base FEN", exc)
+
+        # Infer which side the computer plays from the FEN active-color field.
+        _fen_fields = fen.split()
+        _active = _fen_fields[1] if len(_fen_fields) > 1 else "w"
+        computer_color = 0 if _active == "w" else 1
+
         try:
-            result = self._session.think(ThinkRequest(fen=self._fen, level=level))
+            result = self._session.think(
+                ThinkRequest(fen=fen, level=level, computer_color=computer_color)
+            )
             uci = result.move.to_uci() if result.move else "0000"
         except Exception as exc:  # noqa: BLE001
             logger.error("think() failed: %s", exc, exc_info=True)

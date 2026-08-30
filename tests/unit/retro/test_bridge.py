@@ -23,6 +23,8 @@ from Code.Retro.Bridge import (
     PLAYER_TYPE_BASE,
     Bridge,
     alg_to_sq88,
+    flip_fen,
+    flip_sq88,
     parse_fen,
     parse_piece_placement,
     sq88,
@@ -87,10 +89,10 @@ def test_parse_piece_placement_startpos():
     """Starting position must yield 32 pieces with kings at e1 and e8."""
     pieces = parse_piece_placement("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
     assert len(pieces) == 32
-    # White king at e1: file=4, rank=0 → sq=0x04; color=0, piece=6
-    assert (sq88(4, 0), 0, 6) in pieces
-    # Black king at e8: file=4, rank=7 → sq=0x74; color=1, piece=6
-    assert (sq88(4, 7), 1, 6) in pieces
+    # White king at e1: file=4, rank=0 → sq=0x04; color=0, piece_type=1 (K=1 in game encoding)
+    assert (sq88(4, 0), 0, 1) in pieces
+    # Black king at e8: file=4, rank=7 → sq=0x74; color=1, piece_type=1
+    assert (sq88(4, 7), 1, 1) in pieces
 
 
 def test_parse_piece_placement_empty_ranks():
@@ -172,14 +174,14 @@ def test_bridge_read_best_move_empty():
 def test_bridge_read_best_move_valid():
     """read_best_move must return the correct MoveSpec for a written move."""
     cpu = _make_cpu()
-    # Write e2e4: from=0x14, to=0x34, flags=0, piece=1 (pawn), legal=1
-    raw = struct.pack(">HHHBB", 0x14, 0x34, 0, 1, 1)
+    # Entry format: offset 0 = to_sq, offset 2 = from_sq (confirmed from disassembly).
+    # e2e4: from=0x14 (e2), to=0x34 (e4)
+    raw = struct.pack(">HH4x", 0x34, 0x14)
     cpu.mem_write(AI_BEST_MOVE_ADDR, raw)
     move = Bridge(cpu).read_best_move()
     assert move is not None
     assert move.from_sq == 0x14
     assert move.to_sq == 0x34
-    assert move.piece == 1
 
 
 # ---------------------------------------------------------------------------
@@ -187,35 +189,19 @@ def test_bridge_read_best_move_valid():
 # ---------------------------------------------------------------------------
 
 def test_bridge_fen_round_trip():
-    """write_position + read_piece_entries must reproduce 32 correctly-typed pieces."""
+    """write_position + read_piece_entries must reproduce 32 non-zero from_sq entries."""
     cpu = _make_cpu()
     b = Bridge(cpu)
     b.write_position(_STARTPOS)
     entries = b.read_piece_entries()
 
-    # 32 pieces total
+    # 32 pieces total; each entry is (to_sq, from_sq)
     assert len(entries) == 32
 
-    whites = [(sq, pt) for sq, c, pt in entries if c == 0]
-    blacks = [(sq, pt) for sq, c, pt in entries if c == 1]
-    assert len(whites) == 16
-    assert len(blacks) == 16
-
-    # 2 kings (one per side)
-    white_kings = [pt for _, pt in whites if pt == 6]
-    black_kings = [pt for _, pt in blacks if pt == 6]
-    assert len(white_kings) == 1
-    assert len(black_kings) == 1
-
-    # 8 pawns per side
-    white_pawns = [pt for _, pt in whites if pt == 1]
-    black_pawns = [pt for _, pt in blacks if pt == 1]
-    assert len(white_pawns) == 8
-    assert len(black_pawns) == 8
-
-    # All squares are valid 0x88 squares
-    for sq, _c, _pt in entries:
-        assert sq & 0x88 == 0, f"square 0x{sq:02X} is not a valid 0x88 square"
+    # Before search runs, to_sq is 0; from_sq holds the piece's position.
+    # All from_sq values must be valid 0x88 squares (sq=0 is valid: a1 rook).
+    for _to_sq, from_sq in entries:
+        assert from_sq & 0x88 == 0, f"from_sq 0x{from_sq:02X} is not a valid 0x88 square"
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +211,8 @@ def test_bridge_fen_round_trip():
 def test_bridge_clear_best_move():
     """clear_best_move must zero the buffer so read_best_move returns None."""
     cpu = _make_cpu()
-    raw = struct.pack(">HHHBB", 0x14, 0x34, 0, 1, 1)
+    # Write a valid move entry (to_sq=0x34, from_sq=0x14) then clear it.
+    raw = struct.pack(">HH4x", 0x34, 0x14)
     cpu.mem_write(AI_BEST_MOVE_ADDR, raw)
     b = Bridge(cpu)
     b.clear_best_move()
@@ -248,3 +235,74 @@ def test_bridge_set_computer_color():
     # Black (color=1) at PLAYER_TYPE_BASE + 1*2 = base+2 → Computer=2
     raw_black = cpu.mem_read(PLAYER_TYPE_BASE + 2, 2)
     assert struct.unpack(">H", raw_black)[0] == 2
+
+
+# ---------------------------------------------------------------------------
+# Board-flip helpers
+# ---------------------------------------------------------------------------
+
+def test_flip_sq88_e2_to_e7():
+    """flip_sq88: e2 (rank 1, 0-based) → e7 (rank 6, 0-based)."""
+    e2 = sq88(4, 1)   # file=e, rank=1 (0-based rank 1 = rank-2)
+    e7 = sq88(4, 6)   # file=e, rank=6 (0-based rank 6 = rank-7)
+    assert flip_sq88(e2) == e7
+
+
+def test_flip_sq88_a1_to_a8():
+    """flip_sq88: a1 → a8."""
+    a1 = sq88(0, 0)
+    a8 = sq88(0, 7)
+    assert flip_sq88(a1) == a8
+
+
+def test_flip_sq88_h8_to_h1():
+    """flip_sq88: h8 → h1."""
+    h8 = sq88(7, 7)
+    h1 = sq88(7, 0)
+    assert flip_sq88(h8) == h1
+
+
+def test_flip_sq88_is_involution():
+    """flip_sq88(flip_sq88(sq)) == sq for all valid 0x88 squares."""
+    for rank in range(8):
+        for file in range(8):
+            s = rank * 16 + file
+            assert flip_sq88(flip_sq88(s)) == s
+
+
+def test_flip_fen_active_color():
+    """flip_fen: White-to-move FEN produces Black-to-move FEN."""
+    flipped = flip_fen(_STARTPOS)
+    fields = flipped.split()
+    assert fields[1] == 'b'
+
+
+def test_flip_fen_startpos_pawn_rows():
+    """flip_fen: White pawns on rank 2 become Black pawns on rank 7 (flipped)."""
+    flipped = flip_fen(_STARTPOS)
+    # Parse the flipped FEN and check a square
+    pieces = parse_fen(flipped)["pieces"]
+    # In the original: White pawn (color=0, type=6) on e2 = sq88(4,1).
+    # After flip: sq=(4,6)=e7, color=1 (Black), type=6 (pawn).
+    e7 = sq88(4, 6)
+    match = [p for p in pieces if p[0] == e7]
+    assert len(match) == 1
+    sq, color, piece_type = match[0]
+    assert color == 1       # was White, now Black
+    assert piece_type == 6  # pawn
+
+
+def test_flip_fen_roundtrip():
+    """flip_fen applied twice returns the original position (ignoring castling/ep)."""
+    flipped_twice = flip_fen(flip_fen(_STARTPOS))
+    # Piece positions in both must match (castling/ep fields discarded, so compare pieces only)
+    orig_pieces  = sorted(parse_fen(_STARTPOS)["pieces"])
+    round_pieces = sorted(parse_fen(flipped_twice)["pieces"])
+    assert orig_pieces == round_pieces
+
+
+def test_flip_fen_black_to_move():
+    """flip_fen: Black-to-move FEN produces White-to-move FEN."""
+    black_fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+    flipped = flip_fen(black_fen)
+    assert flipped.split()[1] == 'w'

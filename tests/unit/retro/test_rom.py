@@ -152,6 +152,70 @@ def test_parse_amiga_hunk_with_reloc():
     assert regions[0].label == "HUNK_CODE"
 
 
+def test_parse_amiga_hunk_bss_region_has_correct_size():
+    """A HUNK_BSS region must carry the declared zero-fill size, not zero.
+
+    BSS has no file bytes, but the consumer needs the size to know how many
+    bytes to zero-fill at load time.
+
+    :spec: feature_spec.md §5
+    """
+    from Code.Retro.Rom import parse_amiga_hunk
+
+    bss_longs = 10  # 40 bytes of BSS
+    code = b"\x4e\x75" + b"\x00\x00"  # RTS padded to 4 bytes
+
+    n_longs = len(code) // 4
+    hdr = (
+        struct.pack(">IIIII", 0x3F3, 0, 2, 0, 1)  # 2 hunks: hunk 0 and hunk 1
+        + struct.pack(">I", n_longs)               # hunk 0 size
+        + struct.pack(">I", bss_longs)             # hunk 1 size
+    )
+    body_code = struct.pack(">II", 0x3E9, n_longs) + code
+    end_code  = struct.pack(">I", 0x3F2)
+    body_bss  = struct.pack(">II", 0x3EB, bss_longs)
+    end_bss   = struct.pack(">I", 0x3F2)
+    hunk = hdr + body_code + end_code + body_bss + end_bss
+
+    regions = parse_amiga_hunk(hunk)
+
+    bss = next(r for r in regions if r.label == "HUNK_BSS")
+    assert bss.size == bss_longs * 4, (
+        f"HUNK_BSS.size should be {bss_longs * 4} but got {bss.size}"
+    )
+
+
+def test_parse_amiga_hunk_multi_hunk_returns_two_regions():
+    """parse_amiga_hunk with CODE + BSS hunks returns two MemRegion objects.
+
+    :spec: feature_spec.md §5
+    """
+    from Code.Retro.Rom import parse_amiga_hunk
+
+    code = b"\x4e\x71" * 2  # 4 bytes of NOPs
+    n_longs = 1
+    bss_longs = 8
+
+    hdr = (
+        struct.pack(">IIIII", 0x3F3, 0, 2, 0, 1)
+        + struct.pack(">I", n_longs)
+        + struct.pack(">I", bss_longs)
+    )
+    body_code = struct.pack(">II", 0x3E9, n_longs) + code
+    end_code  = struct.pack(">I", 0x3F2)
+    body_bss  = struct.pack(">II", 0x3EB, bss_longs)
+    end_bss   = struct.pack(">I", 0x3F2)
+    hunk = hdr + body_code + end_code + body_bss + end_bss
+
+    regions = parse_amiga_hunk(hunk)
+
+    assert len(regions) == 2
+    assert regions[0].label == "HUNK_CODE"
+    assert regions[1].label == "HUNK_BSS"
+    # BSS load address follows CODE
+    assert regions[1].load_address == regions[0].size
+
+
 # ---------------------------------------------------------------------------
 # parse_amiga_hunk() — error paths
 # ---------------------------------------------------------------------------

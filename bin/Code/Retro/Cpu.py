@@ -94,13 +94,27 @@ class Cpu:
         """
         raise NotImplementedError
 
-    def hook_add(self, hook_type: str, callback) -> int:
+    def hook_add(
+        self,
+        hook_type: str,
+        callback,
+        begin: int | None = None,
+        end: int | None = None,
+    ) -> int:
         """Register *callback* for the given hook type.
+
+        When *begin* and *end* are given the hook fires only for addresses
+        in the inclusive range ``[begin, end]``.  Address-specific hooks are
+        far cheaper than global hooks because the Python callback is invoked
+        only at the specified addresses instead of on every instruction /
+        memory access.
 
         :param hook_type: One of ``HOOK_CODE``, ``HOOK_MEM_READ``,
             ``HOOK_MEM_WRITE``, ``HOOK_MEM_INVALID``.
         :param callback: Callable invoked when the hook fires.  Signature
             varies by hook type (mirrors the Unicorn convention).
+        :param begin: Optional start of address range (inclusive).
+        :param end: Optional end of address range (inclusive).
         :return: Opaque integer handle, passed to :meth:`hook_del` to remove.
         :raises CpuError: If *hook_type* is not recognised.
         """

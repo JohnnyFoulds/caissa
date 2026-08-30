@@ -1,0 +1,154 @@
+#!/opt/homebrew/Caskroom/miniconda/base/envs/uci-screen-bridge/bin/python3
+"""
+tools/bc-calibrate — Battle Chess DOSBox-X test driver.
+
+Commands (mutually exclusive; default = screenshot + board inspection):
+
+  (no args)       Attach to running DOSBox-X, take screenshot, check square
+                  states for every piece on the starting rank.
+  --switch-2d     Navigate Settings → 2D Board (switches to top-down view).
+  --move e2e4     Make a move (e.g. e2e4), wait for CPU reply, print it.
+  --corpus        Make e2e4, detect CPU reply, append a corpus entry.
+
+Run from the repo root so Code.* imports resolve:
+
+    python3 tools/bc-calibrate
+    python3 tools/bc-calibrate --switch-2d
+    python3 tools/bc-calibrate --move e2e4
+    python3 tools/bc-calibrate --corpus
+"""
+
+import sys
+import os
+import types
+import importlib.util
+import argparse
+import logging
+
+# Bypass Code/__init__.py (which imports psutil via Code.Z.Util)
+_BIN = os.path.join(os.path.dirname(__file__), "..", "bin")
+sys.path.insert(0, _BIN)
+_code_pkg = types.ModuleType("Code")
+_code_pkg.__path__ = [os.path.join(_BIN, "Code")]
+sys.modules["Code"] = _code_pkg
+_dos_pkg = types.ModuleType("Code.Dos")
+_dos_pkg.__path__ = [os.path.join(_BIN, "Code", "Dos")]
+sys.modules["Code.Dos"] = _dos_pkg
+
+
+def _load(dotpath: str, relpath: str):
+    filepath = os.path.join(_BIN, relpath)
+    spec = importlib.util.spec_from_file_location(dotpath, filepath)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[dotpath] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_load("Code.Dos.Process",     "Code/Dos/Process.py")
+_load("Code.Dos.Ocr",         "Code/Dos/Ocr.py")
+_load("Code.Dos.Driver",      "Code/Dos/Driver.py")
+_load("Code.Dos.Activities",  "Code/Dos/Activities.py")
+BC = _load("Code.Dos.BattleChess", "Code/Dos/BattleChess.py")
+BattleChessSession = BC.BattleChessSession
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(levelname)s %(name)s: %(message)s",
+)
+
+
+def cmd_screenshot(session: BattleChessSession) -> None:
+    """Take a screenshot and check piece/selection state on white's back rank."""
+    img = session._shot("calibrate")
+    print(f"Screenshot saved to {session._save_dir / 'calibrate.png'}")
+
+    print("\nBoard state check (2D white back rank):")
+    for sq in ["a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+               "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2"]:
+        white = BC.is_white_piece_at(img, sq)
+        black = BC.is_black_piece_at(img, sq)
+        sel   = BC.is_selected(img, sq)
+        status = "WHITE" if white else ("BLACK" if black else "empty")
+        flag = " [SEL]" if sel else ""
+        print(f"  {sq}: {status}{flag}")
+
+    cx, cy = BC.square_center("e2")
+    crop = BC.square_crop(img, "e2")
+    crop.save(str(session._save_dir / "sq_e2.png"))
+    print(f"\ne2 center=({cx},{cy}), crop saved to sq_e2.png")
+
+
+def cmd_switch_2d(session: BattleChessSession) -> None:
+    """Switch to 2D board view via the Settings menu."""
+    print("Switching to 2D board view…")
+    ok = session.switch_to_2d()
+    print(f"Switch completed: {ok}")
+    session._shot("after_switch_2d")
+    print(f"Screenshot saved to {session._save_dir}/after_switch_2d.png")
+
+
+def cmd_move(session: BattleChessSession, move: str) -> None:
+    """Make one move and print the CPU reply."""
+    if len(move) != 4:
+        print(f"ERROR: move must be 4 chars, got {move!r}", file=sys.stderr)
+        sys.exit(1)
+    from_sq, to_sq = move[:2], move[2:]
+    print(f"Making move {from_sq}→{to_sq}…")
+    cpu_reply = session.make_move(from_sq, to_sq, wait_for_cpu_s=25.0)
+    if cpu_reply:
+        print(f"CPU replied: {cpu_reply}")
+    else:
+        print("CPU move not detected — check debug screenshots in", session._save_dir)
+
+
+def cmd_corpus(session: BattleChessSession) -> None:
+    """Make e2-e4, detect CPU reply, record corpus entry."""
+    import chess
+
+    our_move = "e2e4"
+    print(f"Making move {our_move} for corpus entry…")
+    cpu_reply = session.make_move("e2", "e4", wait_for_cpu_s=25.0)
+    if not cpu_reply:
+        print("ERROR: CPU move not detected — aborting corpus entry")
+        sys.exit(1)
+
+    # Compute FEN after e2e4 (position the CPU was responding to)
+    board = chess.Board()
+    board.push_uci(our_move)
+    fen = board.fen()
+
+    session.record_corpus_entry(
+        fen=fen,
+        our_move=our_move,
+        cpu_move=cpu_reply,
+        moves_from_startpos=[our_move],
+    )
+    print(f"Corpus entry recorded: {our_move} → {cpu_reply}")
+    print(f"FEN: {fen}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Battle Chess DOSBox-X test driver")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--switch-2d", action="store_true", help="Switch to 2D view")
+    group.add_argument("--move", metavar="MOVE", help="Make a move (e.g. e2e4)")
+    group.add_argument("--corpus", action="store_true", help="Make e2e4 and record corpus entry")
+    args = parser.parse_args()
+
+    print("Opening Battle Chess session (launching DOSBox-X if needed)…")
+    session = BattleChessSession.open(level=1, save_dir="/tmp/bc_session")
+    print(f"Ready. Debug screenshots will go to {session._save_dir}/")
+
+    if args.switch_2d:
+        cmd_switch_2d(session)
+    elif args.move:
+        cmd_move(session, args.move)
+    elif args.corpus:
+        cmd_corpus(session)
+    else:
+        cmd_screenshot(session)
+
+
+if __name__ == "__main__":
+    main()

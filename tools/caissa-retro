@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/johannes/code/lucaschess/.venv/bin/python3
 """
 tools/caissa-retro — UCI entry point for the Battle Chess Retro Engine.
 

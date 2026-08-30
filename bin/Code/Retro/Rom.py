@@ -182,11 +182,11 @@ def parse_amiga_hunk(data: bytes) -> list[MemRegion]:
             elif hunk_type == _HUNK_BSS:
                 size_longs, pos = _read_u32(data, pos)
                 size_bytes = (size_longs & _MEMF_MASK) * 4
-                # BSS has no data in the file; offset points to next block.
+                # BSS has no file bytes; size is the zero-fill extent at runtime.
                 regions.append(
                     MemRegion(
                         offset=pos,
-                        size=0,
+                        size=size_bytes,
                         label="HUNK_BSS",
                         load_address=load_address,
                     )

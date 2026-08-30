@@ -165,17 +165,34 @@ class Unicorn68k(Cpu):
         except UcError as exc:
             raise CpuError(f"emu_stop failed: {exc}") from exc
 
-    def hook_add(self, hook_type: str, callback) -> int:
+    def hook_add(
+        self,
+        hook_type: str,
+        callback,
+        begin: int | None = None,
+        end: int | None = None,
+    ) -> int:
         """Register *callback* for the given hook type.
+
+        When *begin* / *end* are given the hook fires only within that
+        inclusive address range, avoiding per-instruction Python overhead
+        for all other addresses.
 
         :param hook_type: One of the ``HOOK_*`` constants from ``Code.Retro.Cpu``.
         :param callback: Unicorn-style hook callback.
+        :param begin: Optional start of address range (inclusive).
+        :param end: Optional end of address range (inclusive).
         :return: Opaque integer handle.
         :raises CpuError: If *hook_type* is not recognised.
         """
         if hook_type not in _HOOK_MAP:
             raise CpuError(f"unknown hook type {hook_type!r}")
-        return self._uc.hook_add(_HOOK_MAP[hook_type], callback)
+        kwargs: dict = {}
+        if begin is not None:
+            kwargs["begin"] = begin
+        if end is not None:
+            kwargs["end"] = end
+        return self._uc.hook_add(_HOOK_MAP[hook_type], callback, **kwargs)
 
     def hook_del(self, handle: int) -> None:
         """Remove a previously registered hook.

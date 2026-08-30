@@ -151,14 +151,72 @@ def test_uci_position_fen_sets_state():
 # go without ROM
 # ---------------------------------------------------------------------------
 
-def test_uci_go_without_rom_returns_info_error_and_null_move():
+def test_uci_go_without_rom_returns_info_error_and_null_move(monkeypatch):
     """go without a ROM configured must emit info string error + bestmove 0000 (FR-2)."""
+    import Code.Retro.Manifest as _manifest_mod
+    monkeypatch.setattr(_manifest_mod, "default_rom_path", lambda: None)
     lines = _run("uci\ngo movetime 100\nquit\n")
     info_errors = [ln for ln in lines if ln.startswith("info string error")]
     bestmove = [ln for ln in lines if ln.startswith("bestmove")]
     assert len(info_errors) >= 1
     assert len(bestmove) == 1
     assert bestmove[0] == "bestmove 0000"
+
+
+# ---------------------------------------------------------------------------
+# go with moves — position application
+# ---------------------------------------------------------------------------
+
+def test_uci_go_applies_moves_to_fen(monkeypatch):
+    """go after 'position startpos moves e2e4' must submit the post-e2e4 FEN."""
+    submitted: list[str] = []
+
+    class _CaptureFen:
+        def __init__(self, **_kw): pass
+        def think(self, req):
+            submitted.append(req.fen)
+            from Code.Retro.Types import MoveSpec, ThinkResult
+            mv = MoveSpec(from_sq=0x67, to_sq=0x47, flags=0, piece=0, legal=1)
+            return ThinkResult(move=mv, level=req.level, instructions=0)
+
+    import Code.Retro.Manifest as _manifest_mod
+    import Code.Retro.Uci as _uci_mod
+    monkeypatch.setattr(_uci_mod, "ThinkSession", _CaptureFen)
+    monkeypatch.setattr(_manifest_mod, "default_rom_path", lambda: "fake.amiga")
+
+    inp = io.StringIO("uci\nposition startpos moves e2e4\ngo\nquit\n")
+    out = io.StringIO()
+    UciSession(inp=inp, out=out).run()
+
+    assert len(submitted) == 1
+    expected = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    assert submitted[0] == expected, f"got FEN: {submitted[0]}"
+
+
+def test_uci_go_without_moves_passes_fen_unmodified(monkeypatch):
+    """go after 'position fen <fen>' (no moves) must pass that FEN unchanged."""
+    submitted: list[str] = []
+    fen = "8/8/8/8/4k3/8/4K3/8 w - - 0 1"
+
+    class _CaptureFen:
+        def __init__(self, **_kw): pass
+        def think(self, req):
+            submitted.append(req.fen)
+            from Code.Retro.Types import MoveSpec, ThinkResult
+            mv = MoveSpec(from_sq=0x04, to_sq=0x14, flags=0, piece=0, legal=1)
+            return ThinkResult(move=mv, level=req.level, instructions=0)
+
+    import Code.Retro.Manifest as _manifest_mod
+    import Code.Retro.Uci as _uci_mod
+    monkeypatch.setattr(_uci_mod, "ThinkSession", _CaptureFen)
+    monkeypatch.setattr(_manifest_mod, "default_rom_path", lambda: "fake.amiga")
+
+    inp = io.StringIO(f"uci\nposition fen {fen}\ngo\nquit\n")
+    out = io.StringIO()
+    UciSession(inp=inp, out=out).run()
+
+    assert len(submitted) == 1
+    assert submitted[0] == fen
 
 
 # ---------------------------------------------------------------------------

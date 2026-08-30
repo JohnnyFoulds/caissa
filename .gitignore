@@ -17,3 +17,10 @@ docs/_build/
 # Retro Engine — never commit user ROMs or full traces
 Resources/Retro/Fixtures/
 UserData/Retro/
+
+# Retro Engine — copyright-protected binary ROMs
+Resources/Retro/BattleChess.amiga
+Resources/Retro/BattleChess.adf
+Resources/Retro/BattleChess.dos
+Resources/Retro/Kickstarts/
+Resources/Retro/ChessStuff

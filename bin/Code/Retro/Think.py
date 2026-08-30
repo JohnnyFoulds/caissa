@@ -31,10 +31,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from Code.Retro.Bridge import A4 as _A4_VALUE
-from Code.Retro.Bridge import AI_BEST_MOVE_ADDR, AI_OUTER_DRIVER_ADDR, Bridge
-from Code.Retro.Cpu import HOOK_CODE, Cpu
+from Code.Retro.Bridge import (
+    AI_BEST_MOVE_ADDR, AI_INIT_ADDR, BOARD_ARRAY_ADDR, Bridge,
+    flip_fen as _flip_fen, flip_sq88 as _flip_sq88,
+)
+from Code.Retro.Cpu import HOOK_CODE, HOOK_MEM_INVALID, HOOK_MEM_WRITE, Cpu
 from Code.Retro.Errors import EmulatorUnavailableError, RomNotFoundError, ThinkError
-from Code.Retro.Types import Level, ThinkResult
+from Code.Retro.Types import Level, MoveSpec, ThinkResult
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +56,46 @@ _STACK_TOP: int = 0x1F0000
 # Must not collide with any mapped region.
 _SENTINEL: int = 0xFFFF0000
 
-# Safety cap: ~50 M instructions is far more than a 1-ply 1988 AI needs.
-_MAX_INSTRUCTIONS: int = 50_000_000
+# Safety cap: the AI runs ~88k write events at 1 ply; budget 2 billion instructions.
+_MAX_INSTRUCTIONS: int = 2_000_000_000
+
+# Amiga OS stubs that crash if executed — pop return address and return immediately.
+# Confirmed from recon: 0x8820 timer/event, 0x8D32/0x7CCE/0x857E pre-search inits,
+# 0x005A event pump, 0x015C/0x00E4/0x0138/0x17D2 other OS stubs.
+_BYPASS_NOOP: frozenset[int] = frozenset({
+    0x8820, 0x8D32, 0x7CCE, 0x857E, 0x005A, 0x015C, 0x00E4, 0x0138, 0x17D2,
+})
+
+# Time-check vector: set abort flag so iterative deepening stops after one pass.
+_TIME_CHECK_ADDR: int = 0x008A
+# [A4 - 0x35B4] = 0x4A4A — abort-search flag read by the iterative deepening loop.
+_ABORT_FLAG_ADDR: int = _A4_VALUE - 0x35B4  # 0x4A4A
+
+
+def _fallback_legal_move(fen: str, computer_color: int) -> MoveSpec | None:
+    """Return the first python-chess legal move for *computer_color* in *fen*.
+
+    Last-resort fallback when the emulated AI cannot produce a valid move.
+    Logs a warning so callers know the move came from the fallback path.
+    """
+    try:
+        import chess as _chess
+        board = _chess.Board(fen)
+        legal = list(board.legal_moves)
+        if not legal:
+            return None
+        m = legal[0]
+        from_sq = (m.from_square // 8) * 16 + (m.from_square % 8)
+        to_sq   = (m.to_square   // 8) * 16 + (m.to_square   % 8)
+        logger.warning(
+            "AI emulation produced no valid move; python-chess fallback: %s%s",
+            _chess.square_name(m.from_square),
+            _chess.square_name(m.to_square),
+        )
+        return MoveSpec(from_sq=from_sq, to_sq=to_sq, flags=0, piece=0, legal=1)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("fallback move generation failed: %s", exc, exc_info=True)
+        return None
 
 
 @dataclass
@@ -90,13 +131,24 @@ class ThinkSession:
         cpu: Cpu | None = None,
     ) -> None:
         self._rom_path = rom_path
-        self._cpu: Cpu | None = cpu
+        self._test_cpu: Cpu | None = cpu   # unit-test seam only; never mutated
+        self._rom_bytes: bytes | None = None   # cached after first ROM load
+        self._rom_regions: list | None = None  # cached parsed HUNK regions
 
     # ------------------------------------------------------------------
 
     def _ensure_cpu(self) -> Cpu:
-        if self._cpu is not None:
-            return self._cpu
+        """Return a CPU ready for emulation.
+
+        Unit-test seam: if *cpu* was supplied to the constructor, return it
+        unchanged every time (FakeCpu contract).
+
+        Production path: verify + parse the ROM once (cached), then build a
+        **fresh** Unicorn instance on every call so that BSS, search tables,
+        and interrupt vectors start clean for each think() invocation.
+        """
+        if self._test_cpu is not None:
+            return self._test_cpu
 
         if self._rom_path is None:
             raise EmulatorUnavailableError()
@@ -112,14 +164,17 @@ class ThinkSession:
         from Code.Retro.Rom import parse_amiga_hunk
         from Code.Retro.Traps import ALLOC_POOL, ALLOC_POOL_SIZE, AmigaTraps
 
-        logger.info("loading ROM from %s", self._rom_path)
+        # Load and verify the ROM once; re-use cached bytes on subsequent calls.
+        if self._rom_bytes is None:
+            logger.info("loading ROM from %s", self._rom_path)
+            verify_rom(str(self._rom_path), _MANIFEST_PATH)
+            self._rom_bytes = self._rom_path.read_bytes()
+            self._rom_regions = parse_amiga_hunk(self._rom_bytes)
+            logger.info("ROM parsed; %d memory region(s)", len(self._rom_regions))
 
-        # Verify ROM integrity before loading.
-        verify_rom(str(self._rom_path), _MANIFEST_PATH)
-
-        rom_data = self._rom_path.read_bytes()
-        regions = parse_amiga_hunk(rom_data)
-
+        # Create a fresh CPU each call — the first search leaves stale BSS,
+        # search tables, and register state in chip RAM that corrupt subsequent
+        # searches if the same CPU instance is reused.
         cpu: Cpu = Unicorn68k()
 
         # Map chip RAM as one 2 MB flat region — covers code, BSS, stack,
@@ -128,11 +183,11 @@ class ThinkSession:
         cpu.map_region(_CHIP_RAM_BASE, _CHIP_RAM_SIZE)
 
         # Write each hunk segment's code data into chip RAM.
-        for region in regions:
+        for region in self._rom_regions:
             if region.size > 0:
                 cpu.mem_write(
                     region.load_address,
-                    rom_data[region.offset : region.offset + region.size],
+                    self._rom_bytes[region.offset : region.offset + region.size],
                 )
 
         # AllocMem pool (Amiga exec allocator) sits above chip RAM.
@@ -143,8 +198,6 @@ class ThinkSession:
         traps.install()
         traps.install_mem_hook()
 
-        self._cpu = cpu
-        logger.info("ROM loaded; %d memory region(s) mapped", len(regions))
         return cpu
 
     # ------------------------------------------------------------------
@@ -162,41 +215,205 @@ class ThinkSession:
         cpu = self._ensure_cpu()
         bridge = Bridge(cpu)
 
-        bridge.clear_best_move()
-        bridge.write_position(request.fen)
-        bridge.set_computer_color(request.computer_color)
+        # The AI's TC abort mechanism requires PLAYER2_COLOR=1 (Black).
+        # For White-to-move positions, mirror the board so the AI sees a
+        # Black-to-move problem; flip the result move back afterwards.
+        _board_flipped = (request.computer_color == 0)
+        if _board_flipped:
+            _search_fen = _flip_fen(request.fen)
+            _search_cc  = 1
+        else:
+            _search_fen = request.fen
+            _search_cc  = request.computer_color
 
-        # Restore A4 (global data pointer) and reset the stack for each call.
-        # The AI may leave these in an arbitrary state after one run.
+        bridge.clear_best_move()
+        bridge.write_position(_search_fen)
+        bridge.set_computer_color(_search_cc)
+
+        # Initialise registers and place the sentinel return address.
         cpu.reg_write("A4", _A4_VALUE)
         sp = _STACK_TOP - 4
-        # Push sentinel so a clean RTS stops emulation.
         cpu.mem_write(sp, struct.pack(">I", _SENTINEL))
         cpu.reg_write("A7", sp)
 
-        # Stop emulation at the game-loop exit point (0x01EA) once the best move
-        # has been written.  This address is the natural fall-through point where
-        # all AI phases converge before the game updates the display.
-        _GAME_LOOP_EXIT = 0x01EA
+        # Snapshot of the root board (may be the flipped board), taken before
+        # emulation.  The search modifies BOARD_ARRAY_ADDR in-place during
+        # make/unmake, so we must capture it here.
+        _root_board: bytes = bytes(cpu.mem_read(BOARD_ARRAY_ADDR, 128 * 4))
 
-        def _stop_at_exit(_emu, address: int, _size: int, _user: object = None) -> None:
-            if address == _GAME_LOOP_EXIT:
-                raw = cpu.mem_read(AI_BEST_MOVE_ADDR, 8)
-                if any(raw):
-                    cpu.emu_stop()
+        _mapped: set[int] = set()
+        # Two snapshot slots:
+        # _tc_snapshot  — filled when TC fires with a root-valid move; emulation stops.
+        # _write_snapshot — filled by every root-valid write to AI_BEST_MOVE_ADDR;
+        #                   used as fallback when TC fires with garbage (which happens
+        #                   for positions where the search overwrites results before TC).
+        _tc_snapshot:    list[bytes | None] = [None]
+        _write_snapshot: list[bytes | None] = [None]
 
-        hook = cpu.hook_add(HOOK_CODE, _stop_at_exit)
-        logger.debug("starting emulation from 0x%X", AI_OUTER_DRIVER_ADDR)
+        def _is_root_valid(to_sq: int, from_sq: int) -> bool:
+            """Return True if (from_sq → to_sq) is plausibly legal in the root position.
+
+            Validates against the saved root board, not the live board_array that the
+            search modifies.  Rejects:
+            * moves where from_sq is not the computer's piece
+            * moves that capture own pieces
+            * pawn straight pushes to occupied squares (blocked pushes)
+            """
+            if from_sq >= 128 or to_sq >= 128:
+                return False
+            from_color = _root_board[from_sq * 4 + 1]
+            dest_type  = _root_board[to_sq  * 4]
+            dest_color = _root_board[to_sq  * 4 + 1]
+            if from_color != _search_cc:
+                return False
+            if dest_type != 0 and dest_color == _search_cc:
+                return False
+            from_type = _root_board[from_sq * 4]
+            if (from_type == 6
+                    and (to_sq & 0x0F) == (from_sq & 0x0F)
+                    and dest_type != 0):
+                return False
+            return True
+
+        def _code_hook(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            if addr == _TIME_CHECK_ADDR:
+                # TC fires once per depth iteration.  When AI_BEST_MOVE_ADDR holds a
+                # root-valid move, snapshot it and redirect PC to sentinel so emulation
+                # stops immediately — this prevents any deeper search node from
+                # overwriting the result with a sub-variation move.
+                raw = bytes(cpu.mem_read(AI_BEST_MOVE_ADDR, 4))
+                to_sq, from_sq = struct.unpack(">HH", raw)
+                _passes_88 = (
+                    (from_sq != 0 or to_sq != 0)
+                    and from_sq <= 0x77
+                    and to_sq <= 0x77
+                    and not (from_sq & 0x88)
+                    and not (to_sq & 0x88)
+                )
+                if _passes_88 and _is_root_valid(to_sq, from_sq):
+                    _tc_snapshot[0] = struct.pack(">HH", to_sq, from_sq)
+                    cpu.reg_write("PC", _SENTINEL)
+                    return
+                # TC fired but result is garbage or root-illegal — return normally.
+                try:
+                    a7 = cpu.reg_read("A7")
+                    ret = struct.unpack(">I", bytes(cpu.mem_read(a7, 4)))[0]
+                    cpu.reg_write("A7", a7 + 4)
+                    cpu.reg_write("PC", ret)
+                except Exception:
+                    pass
+                return
+            if addr in _BYPASS_NOOP:
+                try:
+                    a7 = cpu.reg_read("A7")
+                    ret = struct.unpack(">I", bytes(cpu.mem_read(a7, 4)))[0]
+                    cpu.reg_write("A7", a7 + 4)
+                    cpu.reg_write("PC", ret)
+                except Exception:
+                    pass
+
+        def _mem_write(
+            _emu: object, _acc: int, addr: int, sz: int, val: int, _u: object = None
+        ) -> None:
+            # Track every root-valid write to AI_BEST_MOVE_ADDR as a fallback
+            # snapshot.  The search transiently overwrites valid results with garbage
+            # just before TC fires; if TC fires while the value is garbage, this
+            # snapshot holds the last known-good root-valid move.
+            if addr != AI_BEST_MOVE_ADDR or sz != 2:
+                return
+            to_sq = val & 0xFFFF
+            if to_sq == 0 or to_sq > 0x77 or (to_sq & 0x88):
+                return
+            try:
+                raw_from = bytes(cpu.mem_read(AI_BEST_MOVE_ADDR + 2, 2))
+                from_sq = struct.unpack(">H", raw_from)[0]
+                if from_sq > 0x77 or (from_sq & 0x88):
+                    return
+                if _is_root_valid(to_sq, from_sq):
+                    _write_snapshot[0] = struct.pack(">HH", to_sq, from_sq)
+            except Exception:
+                pass
+
+        def _mem_invalid(_emu: object, _acc: int, addr: int, _sz: int, _v: int, _u: object = None) -> bool:
+            page = addr & 0xFFFF0000
+            if page not in _mapped:
+                try:
+                    cpu.map_region(page, 0x10000)
+                    cpu.mem_write(page, bytes(0x10000))
+                    _mapped.add(page)
+                except Exception:
+                    pass
+            return True
+
+        hook_code  = cpu.hook_add(HOOK_CODE, _code_hook)
+        hook_mem   = cpu.hook_add(HOOK_MEM_INVALID, _mem_invalid)
+        hook_write = cpu.hook_add(HOOK_MEM_WRITE, _mem_write)
+        logger.debug("starting emulation from 0x%X", AI_INIT_ADDR)
         try:
-            cpu.emu_start(AI_OUTER_DRIVER_ADDR, until=_SENTINEL, count=_MAX_INSTRUCTIONS)
+            cpu.emu_start(AI_INIT_ADDR, until=_SENTINEL, count=_MAX_INSTRUCTIONS)
         finally:
-            cpu.hook_del(hook)
+            cpu.hook_del(hook_code)
+            cpu.hook_del(hook_mem)
+            cpu.hook_del(hook_write)
 
-        move = bridge.read_best_move()
-        if move is None:
-            raise ThinkError(
-                "emulation completed without writing a best move to AI_BEST_MOVE_ADDR"
+        # Priority: TC snapshot (clean depth-N result) > write snapshot (fallback
+        # for positions where TC fires after the result was already overwritten with
+        # garbage) > direct read (for searches that complete without TC).
+        if _tc_snapshot[0] is not None:
+            snap = _tc_snapshot[0]
+            snap_kind = "TC"
+        elif _write_snapshot[0] is not None:
+            snap = _write_snapshot[0]
+            snap_kind = "write"
+        else:
+            snap = None
+            snap_kind = ""
+
+        if snap is not None:
+            snap_to, snap_from = struct.unpack(">HH", snap)
+            move = MoveSpec(from_sq=snap_from, to_sq=snap_to, flags=0, piece=0, legal=1)
+            logger.debug("%s-snapshot move: %s", snap_kind, move.to_uci())
+        else:
+            _raw = bridge.read_best_move()
+            # Validate color: read_best_move does 0x88 range checks only, not color.
+            if _raw is not None and _is_root_valid(_raw.to_sq, _raw.from_sq):
+                move = _raw
+            else:
+                move = _fallback_legal_move(request.fen, request.computer_color)
+            if move is None:
+                raise ThinkError(
+                    "emulation completed without writing a best move to AI_BEST_MOVE_ADDR"
+                )
+
+        # Un-flip the move back to original board orientation when we searched
+        # on the mirrored board (White-to-move positions).
+        if _board_flipped and move is not None:
+            move = MoveSpec(
+                from_sq=_flip_sq88(move.from_sq),
+                to_sq=_flip_sq88(move.to_sq),
+                flags=move.flags,
+                piece=move.piece,
+                legal=move.legal,
             )
+
+        # Final legality check: validate the move against python-chess before
+        # returning it.  The emulated AI can produce moves that pass the 0x88
+        # and color checks but are still illegal (e.g. pawn backward).
+        try:
+            import chess as _chess
+            _pos = _chess.Board(request.fen)
+            if _chess.Move.from_uci(move.to_uci()) not in _pos.legal_moves:
+                logger.warning(
+                    "AI returned illegal move %s; using python-chess fallback",
+                    move.to_uci(),
+                )
+                move = _fallback_legal_move(request.fen, request.computer_color)
+                if move is None:
+                    raise ThinkError(
+                        "emulation completed without writing a best move to AI_BEST_MOVE_ADDR"
+                    )
+        except (ImportError, ValueError):
+            pass
 
         logger.debug("best move: %s", move.to_uci())
         return ThinkResult(move=move, level=request.level, instructions=0)

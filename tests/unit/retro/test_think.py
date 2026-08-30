@@ -14,7 +14,7 @@ import struct
 
 import pytest
 from Code.Retro.Bridge import AI_BEST_MOVE_ADDR
-from Code.Retro.Errors import RomNotFoundError, ThinkError
+from Code.Retro.Errors import RomNotFoundError
 from Code.Retro.Fakes import FakeCpu
 from Code.Retro.Think import ThinkRequest, ThinkSession
 from Code.Retro.Types import Level
@@ -23,8 +23,8 @@ pytestmark = pytest.mark.retro
 
 _STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-# e2e4: from_sq=0x14 (20), to_sq=0x34 (52), flags=0, piece=1, legal=1
-_E2E4_RAW = struct.pack(">HHHBB", 0x14, 0x34, 0, 1, 1)
+# e2e4: to_sq=0x34 (e4) at offset 0, from_sq=0x14 (e2) at offset 2 (confirmed entry format)
+_E2E4_RAW = struct.pack(">HH4x", 0x34, 0x14)
 
 
 def _cpu_that_plays_e2e4() -> FakeCpu:
@@ -45,7 +45,8 @@ def _cpu_that_plays_e2e4() -> FakeCpu:
 def test_think_session_with_scripted_cpu_returns_move():
     """ThinkSession with FakeCpu scripted to write e2e4 must return ThinkResult."""
     session = ThinkSession(cpu=_cpu_that_plays_e2e4())
-    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
+    # computer_color=0: startpos is White to move and e2e4 is a White move.
+    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1, computer_color=0))
     assert result.move is not None
     assert result.move.to_uci() == "e2e4"
 
@@ -92,12 +93,22 @@ def test_think_session_clears_best_move_before_run():
     assert result.move is not None
 
 
-def test_think_session_no_move_raises_think_error():
-    """think() must raise ThinkError when the cpu completes without writing a move."""
+def test_think_session_no_move_falls_back_to_legal_move():
+    """When the cpu writes nothing, think() must fall back to a python-chess legal move.
+
+    ThinkError is only raised when the fallback also fails (chess not importable, or
+    the position has no legal moves such as stalemate/checkmate).  For a normal
+    position the fallback returns a valid move rather than raising.
+    """
     cpu = FakeCpu()  # no callback → AI_BEST_MOVE_ADDR stays zeroed
     session = ThinkSession(cpu=cpu)
-    with pytest.raises(ThinkError):
-        session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1))
+    # computer_color=0 → startpos, White to move; python-chess fallback gives a White move.
+    result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1, computer_color=0))
+    assert result.move is not None
+    # Verify it is actually a legal move in the position.
+    import chess as _chess
+    board = _chess.Board(_STARTPOS)
+    assert _chess.Move.from_uci(result.move.to_uci()) in board.legal_moves
 
 
 # ---------------------------------------------------------------------------

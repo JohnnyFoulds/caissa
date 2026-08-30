@@ -12,6 +12,33 @@ from dataclasses import dataclass
 from enum import Enum
 
 
+class HunkType(Enum):
+    """Amiga HUNK block type codes.
+
+    Only the types relevant to executable loading are listed.  The top two bits
+    of the raw longword encode memory-type flags (CHIP/FAST) and are masked off
+    before comparison.
+
+    :cvar CODE: HUNK_CODE (0x3E9) — executable code bytes.
+    :cvar DATA: HUNK_DATA (0x3EA) — initialised data bytes.
+    :cvar BSS:  HUNK_BSS  (0x3EB) — uninitialised (zero-fill) region; no file bytes.
+    :cvar RELOC32: HUNK_RELOC32 (0x3EC) — 32-bit relocation fixup table.
+    :cvar SYMBOL: HUNK_SYMBOL (0x3F0) — symbol table (skip).
+    :cvar DEBUG:  HUNK_DEBUG  (0x3F1) — debug information (skip).
+    :cvar END:    HUNK_END    (0x3F2) — end-of-hunk sentinel.
+    :cvar HEADER: HUNK_HEADER (0x3F3) — file header, not a loadable block.
+    """
+
+    CODE    = 0x3E9
+    DATA    = 0x3EA
+    BSS     = 0x3EB
+    RELOC32 = 0x3EC
+    SYMBOL  = 0x3F0
+    DEBUG   = 0x3F1
+    END     = 0x3F2
+    HEADER  = 0x3F3
+
+
 class Platform(Enum):
     """Target CPU/OS platform of the ROM binary.
 

@@ -1,0 +1,23 @@
+{
+  "slug": "side-panel-captions",
+  "query": "the title bars in the side panel do not look right to me",
+  "scene": "full",
+  "render": "tools/design/fritz_mock.py --scene full --variant dark",
+  "expect_region": {
+    "phrase": "the side panel",
+    "source": "objectname",
+    "object_name": "WFritzRightCol"
+  },
+  "expect_cluster": {
+    "cluster_id": "pane_caption",
+    "size": 4
+  },
+  "expect_top_finding": {
+    "kind": "invisible_fill",
+    "min_nodes": 4,
+    "severity": "warn"
+  },
+  "expect_absent": ["spacing_uniformity", "fill_extent"],
+  "expect_hypothesis_ruled_out": "fill is sized to its text",
+  "notes": "Captions ARE full-width (566 px, spanning their pane) and ARE painted, with a vertical gradient #252526->#363636. The background is #2d2d2d, which lies between the two endpoints. Mean band colour ~#2d2d2e; delta from background ~1 at the midpoint, 8-9 at the extremes. The band is drawn, correctly sized, and invisible. fill_extent MUST NOT fire — the width is CONSTANT at 566 px (the pane width). The invisible_fill detector fires because the gradient straddles the background, not because the fill is narrow."
+}

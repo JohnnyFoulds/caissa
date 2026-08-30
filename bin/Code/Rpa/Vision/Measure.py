@@ -545,18 +545,21 @@ def surface_breaks(
         if s.shows_owner == "ancestor":
             breaks.append("seam_shows_ancestor")
 
-    # Fill mismatch between member[0] and member[1]
+    # Fill mismatch: the selected member's fill must differ visibly from the content
+    # fill — otherwise the tab conveys no selection signal (ΔE < 4 on the Caissa
+    # dark palette).  Only fire when both fills exist AND hexes differ AND delta < 4.
     if len(surface.member_ids) >= 2:
         n0 = node_index.get(surface.member_ids[0])
         n1 = node_index.get(surface.member_ids[1])
         if n0 and n1 and n0.fill is not None and n1.fill is not None:
             hex0 = n0.fill.hex_color or n0.fill.hex_start
             hex1 = n1.fill.hex_color or n1.fill.hex_start
-            if hex0 and hex1 and not fill_is_visible(hex0, hex1, delta=12):
-                pass  # fills match — good
-            elif hex0 and hex1 and hex0.lstrip("#").lower() != hex1.lstrip("#").lower():
-                if not fill_is_visible(hex0, hex1, delta=4):
-                    breaks.append("fill_mismatch")
+            if (
+                hex0 and hex1
+                and hex0.lstrip("#").lower() != hex1.lstrip("#").lower()
+                and not fill_is_visible(hex0, hex1, delta=4)
+            ):
+                breaks.append("fill_mismatch")
 
     return breaks
 

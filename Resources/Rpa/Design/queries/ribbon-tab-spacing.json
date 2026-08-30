@@ -1,0 +1,27 @@
+{
+  "slug": "ribbon-tab-spacing",
+  "query": "the spacing between File and Home is not the same as the other tabs",
+  "scene": "ribbon",
+  "render": "tools/design/fritz_mock.py --scene ribbon_home --variant dark",
+  "expect_region": {
+    "phrase": "the ribbon",
+    "object_name": "WRibbonTabBar"
+  },
+  "expect_cluster": {
+    "cluster_id": "ribbon_tab",
+    "size": 6
+  },
+  "expect_top_finding": {
+    "kind": "spacing_uniformity",
+    "min_nodes": 6,
+    "severity": "warn",
+    "verdict": "non_uniform",
+    "basis": "perceived"
+  },
+  "expect_also": ["basis_disagreement"],
+  "expect_absent": ["fill_extent"],
+  "expect_verdict": {
+    "spacing_uniformity.widget": "uniform"
+  },
+  "notes": "Widget gaps are all 0 (tabs abut) and ink gaps are 23-25 — both uniform. Only the perceived basis fires: File and Home have visible fills so their neighbours read ~12-13 px, while transparent tabs read ~24-25 px (2x spread). fill_extent MUST NOT fire — the basis_disagreement finding is the payoff that explains the discrepancy."
+}

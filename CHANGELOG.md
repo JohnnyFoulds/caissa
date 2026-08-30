@@ -47,6 +47,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
 ### Fixed
+- **Retro Engine — multi-move robustness (TC-snapshot + write-snapshot)**:
+  `Think.py` now uses a two-snapshot strategy to prevent illegal moves across all
+  valid positions.  When the TC (time-check) hook fires with a root-valid move
+  the PC is redirected to the sentinel, stopping emulation immediately before any
+  deeper-search node can overwrite the result slot.  A `_mem_write` fallback
+  snapshot (filtered against a pre-emulation root-board snapshot) handles positions
+  where TC fires after the result is already overwritten with garbage.  Root-board
+  validation rejects pawn-straight-pushes to occupied squares, own-piece captures,
+  and moves from squares that don't belong to the computer in the root position.
+  Result: engine plays 17+ consecutive legal moves in the game test (was 2 before).
+  `tests/unit/retro/test_retro_game.py` assertion raised to ≥10 engine moves.
 - **Retro — Traps.py buffer overflow**: `AmigaTraps.install()` was writing
   `b"\x4e\x75" * size` (2×size bytes) into a size-byte region; corrected to `*(size//2)`.
 - **Retro — Rom.py silent truncation**: hunk parser now emits one clear warning on the

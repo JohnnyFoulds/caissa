@@ -306,10 +306,11 @@ class Bridge:
         # Set piece counter to -1 (ai_phase0_init ready state)
         self._cpu.mem_write(PIECE_COUNTER_ADDR, struct.pack(">h", -1))
 
-        # Set player colors
-        side = board["side_to_move"]
-        self._cpu.mem_write(PLAYER1_COLOR_ADDR, struct.pack(">H", side))
-        self._cpu.mem_write(PLAYER2_COLOR_ADDR, struct.pack(">H", 1 - side))
+        # Player role identifiers: Player1=White (human), Player2=Black (computer).
+        # These are fixed role assignments, not side-to-move indicators.
+        # The AI is always called when it's the computer's (Player2/Black) turn.
+        self._cpu.mem_write(PLAYER1_COLOR_ADDR, struct.pack(">H", 0))  # White
+        self._cpu.mem_write(PLAYER2_COLOR_ADDR, struct.pack(">H", 1))  # Black
 
     def read_best_move(self) -> MoveSpec | None:
         """Read the AI's chosen move from the ``ai_best_move`` buffer.
@@ -326,7 +327,10 @@ class Bridge:
         from_sq = struct.unpack(">H", raw[2:4])[0]
         if from_sq == 0 and to_sq == 0:
             return None
-        if (from_sq & 0x88) or (to_sq & 0x88):
+        # Valid 0x88 squares are in range 0x00–0x77 with no bits of 0x88 set.
+        # The `& 0x88` mask alone is insufficient for 16-bit values: e.g.
+        # 0x4930 & 0x88 == 0x00 yet 0x4930 far exceeds the board range.
+        if from_sq > 0x77 or to_sq > 0x77 or (from_sq & 0x88) or (to_sq & 0x88):
             return None
         return MoveSpec(from_sq=from_sq, to_sq=to_sq, flags=0, piece=0, legal=1)
 

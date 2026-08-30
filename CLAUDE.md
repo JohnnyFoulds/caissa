@@ -324,6 +324,26 @@ discovered-and-discarded. Every constant must survive context compaction.
 See `docs/rpa/new-target-guide.md` for the full step-by-step guide.
 See `docs/rpa/uipath-mapping.md` for the UiPath ↔ Caissa vocabulary map.
 
+### Exception taxonomy — non-negotiable
+
+Two exception types govern how a broken automation step is handled.
+
+**SystemException** — the Activity or driver is broken.
+- Signal: an Activity fails **every** attempt across all retries (postcondition never True).
+- Rule: **STOP immediately.** Do not continue the workflow. Fix the Activity in isolation.
+- Protocol: (1) run the single Activity against the live app; (2) take a screenshot immediately
+  after execute; (3) fix the root cause (code, calibration, or driver); (4) verify the Activity
+  passes alone before re-chaining the workflow.
+- Adding more retries to a SystemException is WRONG. Retries are for transient environmental
+  flakiness only, not for fundamentally broken steps.
+
+**BusinessRuleException** — the automation ran correctly but the outcome is unexpected.
+- Signal: postcondition returned True but a later step found an unexpected state.
+- Rule: log full context (screenshot + ctx), decide if recovery is possible, compensate or halt.
+
+**Practical rule:** If a core Activity has NEVER succeeded in the current session, treat it
+as a SystemException — stop, diagnose, fix, verify, then re-run. Never move on.
+
 ---
 
 ## Amiga/FS-UAE Automation Layer (`bin/Code/Amiga/`) — Calibrated 2026-08-30
@@ -369,6 +389,35 @@ Example: icon at amiga (516, 56) → dx=430, dy=43 → 4 full steps + final (100
 - Config: `window_width=640`, `window_height=400` (Amiga content)
 - Actual window size including macOS title bar: 640×432
 - Window position on secondary display: typically X=640 (varies by monitor layout)
+
+### Battle Chess Amiga menu bar — calibrated 2026-08-30
+
+Menu bar is at Amiga content y=8.  Four headers (left to right):
+
+| Header | Amiga content X | What it opens |
+|---|---|---|
+| Disk | ~175 | Load/Save/New Game/Setup Board/Quit |
+| (Sound/Board/Player) | ~255 | Sound, 3D/2D Board, Human/Amiga/Modem Plays Red |
+| Settings | ~335 | TBD |
+| Level | ~415 | TBD |
+
+**Second menu items** (x=255, Amiga content Y):
+
+| Item | Amiga Y | Notes |
+|---|---|---|
+| Sound On | ~51 | + = currently on |
+| Sound Off | ~67 | |
+| 3D Board | ~83 | |
+| 2D Board | ~99 | + = currently 2D |
+| Human Plays Red | ~115 | + = default (human plays White/bottom) |
+| Amiga Plays Red | ~131 | Makes AI play White/bottom side |
+| Modem Plays Red | ~147 | |
+
+**To make AI play White**: navigate to second menu header (x=255), select "Amiga Plays Red" (y=131).
+Use `SetAmigaPlaysRed` activity. Restore with `SetHumanPlaysRed` (y=115) after corpus recording.
+
+**StartNewGame settle_ms = 4000** — Battle Chess needs ~4s after "New Game" before accepting move input.
+Confirmed: 2s was too short, 8s definitely works, 4s used as a safe value.
 
 ---
 

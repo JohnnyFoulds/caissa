@@ -394,10 +394,12 @@ def test_surface_breaks_corner_first_then_seam():
     )
 
     breaks = surface_breaks(surface, scene)
-    assert len(breaks) == 3, f"expected 3 breaks, got {breaks}"
+    # 2 corner breaks + seam_closed + fill_mismatch (tab #272728 vs content #252526, delta≈3.5 < 4)
+    assert len(breaks) == 4, f"expected 4 breaks, got {breaks}"
     # Corner breaks must come first
     assert breaks[0].startswith("corner_tl"), f"first break should be corner_tl, got {breaks[0]}"
     assert "seam_closed" in breaks
+    assert "fill_mismatch" in breaks
 
 
 def test_surface_no_breaks_when_open_seam_and_no_corners():

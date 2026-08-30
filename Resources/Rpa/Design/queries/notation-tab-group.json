@@ -1,0 +1,47 @@
+{
+  "slug": "notation-tab-group",
+  "query": "the tabs in the notation panel look like disconnected components",
+  "scene": "notation",
+  "render": "tools/design/fritz_mock.py --scene notation --variant dark",
+  "expect_region": {
+    "phrase": "the notation panel",
+    "source": "panespec",
+    "pane_key": "pgn"
+  },
+  "expect_cluster": {
+    "cluster_id": "notation_tab",
+    "size": 5
+  },
+  "expect_top_finding": {
+    "kind": "surface_broken",
+    "min_nodes": 2,
+    "severity": "warn",
+    "breaks": ["corner_tl_radius_8", "corner_tr_radius_8", "seam_closed", "fill_mismatch"],
+    "first_break": "corner_tl_radius_8"
+  },
+  "expect_seams": {
+    "px": 2,
+    "shows_hex": "#1e1e1e",
+    "shows_owner": "ancestor",
+    "closed": true
+  },
+  "expect_corners": {
+    "node": "notation_content",
+    "which": "tl",
+    "radius_px": 8,
+    "shows_hex": "#1e1e1e",
+    "shows_owner": "ancestor"
+  },
+  "expect_also": ["peer_adjacency", "orphan_style_rule", "invisible_fill"],
+  "expect_verdict": {
+    "spacing_uniformity": "uniform"
+  },
+  "expect_style_state": {
+    "selector": "QTabWidget::pane",
+    "file": "Resources/Styles/Caissa.qss",
+    "line": 214,
+    "effective": "loaded_unmatched"
+  },
+  "expect_measured": ["fill", "ink", "borders", "corners", "seams"],
+  "notes": "There is NO QTabWidget in the app (modern_fritz_ui.py:175,184) — a bare QTabBar plus a sibling _FlowingNotation(QTextEdit). The 8px corners come from the generic QTextEdit rule at Caissa.qss:165-173. QTabWidget::pane at Caissa.qss:214-218 matches nothing. spacing_uniformity PASSES this scene (widget gaps 2,2,2,2 are perfectly uniform — the defect is that the gaps show ancestor background, not that they are uneven). StyleSource MUST NOT report QTabWidget::pane as effective — it is loaded_unmatched. The corner breaks must be listed FIRST because they are the most visible defect (the bite taken out of the page beneath the selected tab)."
+}

@@ -12,6 +12,19 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **RPA design-vision Phase 2c — StyleSource bridge**: `bin/Code/Rpa/Vision/StyleSource.py`
+  (new, stdlib-only Tier 1).  `parse_rules()` generalises `QssRules.qproperties()` to all
+  CSS properties, handling both Q3-correct `selector\n{...}` and inline `selector { prop: val; }`
+  forms, `{KEY}` placeholders, and `::` pseudo-class colons.  `effective()` returns three-valued
+  state: `"loaded_unmatched"` (selector in stylesheet but no widget of that type exists),
+  `"matched_overridden"` (widget exists but `paintEvent` wins), `"effective"`, or `"unconfirmed"`
+  (no live stylesheet).  `paint_colour_constants()` AST-scans a source file for bare
+  `QColor("#RRGGBB")` class constants (E1 violations), handling both `QColor(...)` and
+  `QtGui.QColor(...)` call forms.  `style_sources_for()` returns all rules from provided QSS
+  sources with `effective` classification against the live widget-type set.  28 unit tests
+  (27 passing + 1 `xfail(strict=True)` stub for `font_mismatch` detection, Phase 7).
+  Gate test: `QTabWidget::pane` in `Caissa.qss` is `loaded_unmatched` — the rule that was
+  diagnosed as the wrong fix target three times in a row.
 - **Amiga RPA layer (Phase E)**: `bin/Code/Amiga/` — FS-UAE automation module mirroring
   `bin/Code/Dos/`.  `Driver.py` (`FsUaeProcess` + `FsUaeDriver`): Quartz screenshot
   (`screencapture -x -o -l <wid>`), SDL-safe two-step click (MOUSEMOVE→DOWN→UP), raw

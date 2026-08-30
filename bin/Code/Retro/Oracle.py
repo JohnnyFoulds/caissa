@@ -115,7 +115,10 @@ class Oracle:
         """
         from Code.Retro.Think import ThinkRequest
 
-        request = ThinkRequest(fen=entry.fen, level=entry.level)
+        _fen_fields = entry.fen.split()
+        _active = _fen_fields[1] if len(_fen_fields) > 1 else "w"
+        computer_color = 0 if _active == "w" else 1
+        request = ThinkRequest(fen=entry.fen, level=entry.level, computer_color=computer_color)
         try:
             result = session.think(request)
         except Exception as exc:  # noqa: BLE001

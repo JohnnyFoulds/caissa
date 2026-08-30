@@ -34,7 +34,7 @@ from Code.Retro.Bridge import A4 as _A4_VALUE
 from Code.Retro.Bridge import AI_BEST_MOVE_ADDR, AI_INIT_ADDR, BOARD_ARRAY_ADDR, Bridge
 from Code.Retro.Cpu import HOOK_CODE, HOOK_MEM_INVALID, HOOK_MEM_WRITE, Cpu
 from Code.Retro.Errors import EmulatorUnavailableError, RomNotFoundError, ThinkError
-from Code.Retro.Types import Level, ThinkResult
+from Code.Retro.Types import Level, MoveSpec, ThinkResult
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,32 @@ _BYPASS_NOOP: frozenset[int] = frozenset({
 _TIME_CHECK_ADDR: int = 0x008A
 # [A4 - 0x35B4] = 0x4A4A — abort-search flag read by the iterative deepening loop.
 _ABORT_FLAG_ADDR: int = _A4_VALUE - 0x35B4  # 0x4A4A
+
+
+def _fallback_legal_move(fen: str, computer_color: int) -> MoveSpec | None:
+    """Return the first python-chess legal move for *computer_color* in *fen*.
+
+    Last-resort fallback when the emulated AI cannot produce a valid move.
+    Logs a warning so callers know the move came from the fallback path.
+    """
+    try:
+        import chess as _chess
+        board = _chess.Board(fen)
+        legal = list(board.legal_moves)
+        if not legal:
+            return None
+        m = legal[0]
+        from_sq = (m.from_square // 8) * 16 + (m.from_square % 8)
+        to_sq   = (m.to_square   // 8) * 16 + (m.to_square   % 8)
+        logger.warning(
+            "AI emulation produced no valid move; python-chess fallback: %s%s",
+            _chess.square_name(m.from_square),
+            _chess.square_name(m.to_square),
+        )
+        return MoveSpec(from_sq=from_sq, to_sq=to_sq, flags=0, piece=0, legal=1)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("fallback move generation failed: %s", exc, exc_info=True)
+        return None
 
 
 @dataclass
@@ -333,15 +359,38 @@ class ThinkSession:
 
         if snap is not None:
             snap_to, snap_from = struct.unpack(">HH", snap)
-            from Code.Retro.Types import MoveSpec
             move = MoveSpec(from_sq=snap_from, to_sq=snap_to, flags=0, piece=0, legal=1)
             logger.debug("%s-snapshot move: %s", snap_kind, move.to_uci())
         else:
-            move = bridge.read_best_move()
+            _raw = bridge.read_best_move()
+            # Validate color: read_best_move does 0x88 range checks only, not color.
+            if _raw is not None and _is_root_valid(_raw.to_sq, _raw.from_sq):
+                move = _raw
+            else:
+                move = _fallback_legal_move(request.fen, request.computer_color)
             if move is None:
                 raise ThinkError(
                     "emulation completed without writing a best move to AI_BEST_MOVE_ADDR"
                 )
+
+        # Final legality check: validate the move against python-chess before
+        # returning it.  The emulated AI can produce moves that pass the 0x88
+        # and color checks but are still illegal (e.g. pawn backward).
+        try:
+            import chess as _chess
+            _pos = _chess.Board(request.fen)
+            if _chess.Move.from_uci(move.to_uci()) not in _pos.legal_moves:
+                logger.warning(
+                    "AI returned illegal move %s; using python-chess fallback",
+                    move.to_uci(),
+                )
+                move = _fallback_legal_move(request.fen, request.computer_color)
+                if move is None:
+                    raise ThinkError(
+                        "emulation completed without writing a best move to AI_BEST_MOVE_ADDR"
+                    )
+        except (ImportError, ValueError):
+            pass
 
         logger.debug("best move: %s", move.to_uci())
         return ThinkResult(move=move, level=request.level, instructions=0)

@@ -1,0 +1,150 @@
+#!/Users/johannes/code/lucaschess/.venv/bin/python3
+"""Interactive game against the Battle Chess Retro Engine.
+
+Usage:
+    play-retro            # you play White, engine plays Black
+    play-retro --black    # you play Black, engine plays White
+
+Enter moves in UCI format (e.g. e2e4, g1f3, e1g1 for castling).
+Type 'quit' to exit, 'board' to redisplay, 'moves' to list legal moves.
+"""
+import argparse
+import subprocess
+import sys
+
+try:
+    import chess
+except ImportError:
+    print("python-chess is required: pip install chess")
+    sys.exit(1)
+
+ENGINE = "tools/caissa-retro"
+
+
+def uci_talk(proc, msg: str, wait_for: str, timeout: float = 120.0) -> list[str]:
+    proc.stdin.write(msg + "\n")
+    proc.stdin.flush()
+    lines = []
+    import select
+    import time
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        r, _, _ = select.select([proc.stdout], [], [], 0.5)
+        if r:
+            line = proc.stdout.readline().strip()
+            if line:
+                lines.append(line)
+                if line.startswith(wait_for):
+                    return lines
+    return lines
+
+
+def print_board(board: chess.Board) -> None:
+    print()
+    print(board.unicode(borders=True))
+    print(f"  FEN: {board.fen()}")
+    if board.is_checkmate():
+        print("  *** CHECKMATE ***")
+    elif board.is_check():
+        print("  *** CHECK ***")
+    elif board.is_stalemate():
+        print("  *** STALEMATE ***")
+    print()
+
+
+def engine_move(proc, board: chess.Board) -> str | None:
+    """Ask the engine for a move from the current position; return UCI string or None."""
+    fen = board.fen()
+    print("Engine thinking…", flush=True)
+    resp = uci_talk(proc, f"position fen {fen}\ngo", "bestmove", timeout=120)
+    bm_line = next((ln for ln in resp if ln.startswith("bestmove")), None)
+    if bm_line is None or "0000" in bm_line:
+        return None
+    return bm_line.split()[1]
+
+
+def human_move(board: chess.Board) -> str | None:
+    """Prompt the user for a legal move; return UCI string or None to quit."""
+    legal = {m.uci() for m in board.legal_moves}
+    while True:
+        raw = input("Your move (UCI, e.g. e2e4): ").strip().lower()
+        if raw == "quit":
+            return None
+        if raw == "board":
+            print_board(board)
+            continue
+        if raw == "moves":
+            print("Legal:", sorted(legal))
+            continue
+        if raw in legal:
+            return raw
+        print(f"  '{raw}' is not legal. Type 'moves' to list legal moves.")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Play against the Battle Chess Retro Engine."
+    )
+    parser.add_argument(
+        "--black",
+        action="store_true",
+        help="Play as Black (engine plays White).",
+    )
+    args = parser.parse_args()
+
+    user_color = chess.BLACK if args.black else chess.WHITE
+    color_name = "Black" if args.black else "White"
+    engine_color_name = "White" if args.black else "Black"
+
+    print("Starting Battle Chess Retro Engine…")
+    proc = subprocess.Popen(
+        [ENGINE],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
+    )
+
+    uci_talk(proc, "uci", "uciok")
+    uci_talk(proc, "isready", "readyok")
+    print(f"Engine ready. You play {color_name}, engine plays {engine_color_name}.\n")
+
+    board = chess.Board()
+    move_list: list[str] = []
+
+    print_board(board)
+
+    while not board.is_game_over():
+        if board.turn == user_color:
+            uci_mv = human_move(board)
+            if uci_mv is None:
+                print("Goodbye.")
+                break
+            board.push_uci(uci_mv)
+            move_list.append(uci_mv)
+        else:
+            uci_mv = engine_move(proc, board)
+            if uci_mv is None:
+                print("Engine returned no move. Game over.")
+                break
+            try:
+                board.push_uci(uci_mv)
+                move_list.append(uci_mv)
+                print(f"Engine plays: {uci_mv}")
+            except Exception as e:
+                print(f"Engine returned illegal move {uci_mv!r}: {e}")
+                break
+
+        print_board(board)
+
+    result = board.result()
+    print(f"Game over: {result}")
+    print(f"Moves: {' '.join(move_list)}")
+    proc.stdin.write("quit\n")
+    proc.stdin.flush()
+    proc.wait()
+
+
+if __name__ == "__main__":
+    main()

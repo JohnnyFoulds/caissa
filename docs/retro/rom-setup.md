@@ -72,6 +72,69 @@ print('manifest:', match['label'] if match else 'NOT IN MANIFEST')
 
 ---
 
+## FS-UAE setup for ground-truth recording
+
+To record real Battle Chess moves (corpus phase A3b), you need FS-UAE and a Kickstart ROM.
+Both ROMs are committed to `Resources/Retro/Kickstarts/`. The FS-UAE config is not committed
+(machine-specific paths) — recreate it from the template below.
+
+### Kickstart ROM
+
+Required: **Kickstart 1.3 r34.005** — the version Battle Chess (1988) was built for.
+
+| Field | Value |
+|---|---|
+| Version | 1.3 r34.005 (1987-12) |
+| Platforms | A500 / A1000 / A2000 / CDTV |
+| SHA1 | `90933936cce43ca9bc6bf375662c076b27e3c458` |
+| Filename (canonical) | `kick34005.A500` |
+| Source | Amiga Forever (Cloanto), or your own legitimate floppy dump |
+
+Place the file at `~/Documents/FS-UAE/Kickstarts/kick34005.A500`.
+
+### FS-UAE install
+
+```bash
+brew install fs-uae
+```
+
+### Game directory
+
+```bash
+mkdir -p /tmp/bc_amiga/s
+cp Resources/Retro/BattleChess.amiga /tmp/bc_amiga/BattleChess
+cp Resources/Retro/ChessStuff /tmp/bc_amiga/ChessStuff
+printf 'BattleChess\n' > /tmp/bc_amiga/s/startup-sequence
+```
+
+### FS-UAE config
+
+Save as `~/Documents/FS-UAE/Configurations/BattleChess.fs-uae`:
+
+```ini
+[fs-uae]
+amiga_model = A500
+chip_memory = 512
+slow_memory = 512
+fast_memory = 0
+kickstart_file = /path/to/repo/Resources/Retro/Kickstarts/kick34005.A500
+hard_drive_0 = /tmp/bc_amiga
+hard_drive_0_label = DH0
+hard_drive_0_priority = 6
+hard_drive_0_bootable = 1
+fullscreen = 0
+window_width = 640
+window_height = 400
+```
+
+### Launch
+
+```bash
+fs-uae ~/Documents/FS-UAE/Configurations/BattleChess.fs-uae
+```
+
+---
+
 ## If the binary is packed
 
 Some copies of Battle Chess use PowerPacker or Imploder compression on the Amiga.

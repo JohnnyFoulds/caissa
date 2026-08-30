@@ -177,9 +177,10 @@ class TestLaunchBattleChessFromWorkbench:
         act = LaunchBattleChessFromWorkbench()
         assert act.precondition(_black_image(), {}) is False
 
-    def test_execute_double_clicks_icon(self):
-        """execute() calls driver.double_click at the calibrated icon position."""
+    def test_execute_double_clicks_disk_then_executable(self):
+        """execute() makes two double_clicks: disk icon first, then executable."""
         from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        import unittest.mock as mock
         act = LaunchBattleChessFromWorkbench()
         double_clicks = []
 
@@ -187,25 +188,32 @@ class TestLaunchBattleChessFromWorkbench:
             def double_click(self, x, y):
                 double_clicks.append((x, y))
 
-        driver = _Drv([_workbench_image()])
-        act.execute(driver, {})
-        assert len(double_clicks) == 1
-        x, y = double_clicks[0]
-        assert x == LaunchBattleChessFromWorkbench._ICON_X  # 516
-        assert y == LaunchBattleChessFromWorkbench._ICON_Y  # 56
+        driver = _Drv([_workbench_image()] * 5)
+        with mock.patch("Code.Amiga.Activities.time.sleep"):
+            act.execute(driver, {})
+        assert len(double_clicks) == 2
+        assert double_clicks[0] == (LaunchBattleChessFromWorkbench._DISK_ICON_X,
+                                    LaunchBattleChessFromWorkbench._DISK_ICON_Y)
+        assert double_clicks[1] == (LaunchBattleChessFromWorkbench._EXEC_ICON_X,
+                                    LaunchBattleChessFromWorkbench._EXEC_ICON_Y)
 
-    def test_postcondition_true_on_bright_game_image(self):
-        """postcondition True once game loads (brightness > 10)."""
+    def test_postcondition_true_on_title_screen(self):
+        """postcondition True once game title screen loads (brightness > 15)."""
         from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
         act = LaunchBattleChessFromWorkbench()
-        assert act.postcondition(_bright_image(), {}) is True
+        assert act.postcondition(_solid_rgb_image(50, 30, 20), {}) is True  # mean ~33
 
     def test_postcondition_false_on_workbench_image(self):
-        """postcondition False while still on Workbench (mean brightness 8, below 10)."""
+        """postcondition False while still on Workbench (mean brightness 8, below 15)."""
         from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
         act = LaunchBattleChessFromWorkbench()
-        # _workbench_image() has mean=8, below the 10.0 game-loading threshold
         assert act.postcondition(_workbench_image(), {}) is False
+
+    def test_postcondition_false_on_black_loading_screen(self):
+        """postcondition False during black loading phase (brightness ~3)."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        act = LaunchBattleChessFromWorkbench()
+        assert act.postcondition(_black_image(), {}) is False
 
 
 # ---------------------------------------------------------------------------

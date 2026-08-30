@@ -225,5 +225,30 @@ def test_uci_go_without_moves_passes_fen_unmodified(monkeypatch):
 
 @pytest.mark.retro_rom
 def test_uci_go_with_rom_returns_legal_bestmove():
-    """With a real ROM, go must return a legal bestmove."""
-    pytest.skip("retro_rom: no ROM supplied in this environment")
+    """With a real ROM, go must return a legal bestmove for a corpus position."""
+    import json
+    from pathlib import Path
+
+    from Code.Retro.Manifest import default_rom_path
+
+    rom = default_rom_path()
+    if not rom or not Path(rom).exists():
+        pytest.skip("retro_rom: no ROM file found")
+
+    corpus = Path(__file__).parents[3] / "Resources" / "Retro" / "Corpus" / "fs-uae-manual.jsonl"
+    if not corpus.exists() or corpus.stat().st_size == 0:
+        pytest.skip("retro_rom: corpus file not found")
+
+    import chess as _chess
+    entry = json.loads(corpus.read_text().splitlines()[0])
+    fen = entry["fen"]
+    board = _chess.Board(fen)
+
+    lines = _run(f"uci\nisready\nposition fen {fen}\ngo\nquit\n")
+    bestmove_lines = [ln for ln in lines if ln.startswith("bestmove ")]
+    assert bestmove_lines, "no bestmove line in UCI output"
+    move_uci = bestmove_lines[-1].split()[1]
+    assert move_uci != "0000", "engine returned null move"
+    assert _chess.Move.from_uci(move_uci) in board.legal_moves, (
+        f"engine returned illegal move {move_uci!r} in position {fen!r}"
+    )

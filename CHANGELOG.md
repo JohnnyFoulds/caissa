@@ -32,6 +32,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   a precondition that verifies a white piece is actually at the source square, catching stale game
   state from previous runs.  Fresh DOSBox-X kill-and-relaunch guarantees startpos.  Pipeline now
   records 5+ consecutive moves including captures without error.
+- **Amiga ground-truth corpus (Phase F)**: `Resources/Retro/Corpus/fs-uae-manual.jsonl`
+  records 27 unique Battle Chess (Amiga) AI responses via FS-UAE RPA automation.
+  Five opening lines (Italian, Four Knights, London, English, King's Indian); AI plays Black.
+  `SelectTwoDBoard` activity ensures consistent 2D board geometry before recording.
+  `workbench_double_click` uses pure absolute `CGEventPost` (not delta events) so SDL2
+  stays in non-captured mode during the Workbench phase.
+- **retro_rom test tier — real assertions**: `tests/unit/retro/test_think.py` and
+  `tests/unit/retro/test_uci.py` replace `pytest.skip()` stubs with live engine tests.
+  Both verify that a corpus FEN produces a legal non-null bestmove from the real ROM.
 - **DOS automation — first ground-truth corpus entry**: `Resources/Retro/Corpus/dosbox-manual.jsonl`
   records Battle Chess (DOS) responding `c7c5` (Sicilian Defence) to `1.e4`, verified deterministic
   across two independent fresh-launch runs.  Full pipeline: DOSBox-X launch → 2D board mode →

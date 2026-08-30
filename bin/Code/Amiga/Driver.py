@@ -218,6 +218,7 @@ class FsUaeDriver:
 
     def __init__(self, process: FsUaeProcess) -> None:
         self._process = process
+        self._sdl2_awake: bool = False
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -366,34 +367,90 @@ class FsUaeDriver:
     #    until SDL2 mouse capture is activated. home_cursor() handles this by
     #    sending a click to the macOS title bar first.
     # ---------------------------------------------------------------------------
-    _HOME_X       = 86    # amiga content X after home_cursor()
-    _HOME_Y       = 13    # amiga content Y after home_cursor()
+    _HOME_X       = 71    # amiga content X after home_cursor() — calibrated 2026-08-30
+    _HOME_Y       = 21    # amiga content Y after home_cursor() — calibrated 2026-08-30
     _X_STEP_PX    = 89    # amiga pixels moved per full event (send ≥ _X_FULL_SEND)
     _X_FULL_SEND  = 150   # send value that saturates to _X_STEP_PX
     _X_SMALL_SCALE = 0.74  # amiga px per send unit for small deltas (send ≤ 100)
     _TITLE_BAR_H  = 32    # macOS title bar height in the window screenshot
 
-    def home_cursor(self) -> None:
-        """Clamp the Amiga cursor to the top-left and activate SDL2 mouse capture.
+    def _amiga_to_screen(self, rel_x: int, rel_y: int) -> "Quartz.CGPoint":
+        """Convert Amiga content coordinates to macOS screen coordinates.
 
-        Sends a click to the macOS title bar (no Amiga UI effect) to ensure SDL2
-        receives HID events, then sends ten (−200, −200) delta events to push the
-        cursor to the top-left corner. After this call the cursor is reliably at
-        amiga content (_HOME_X, _HOME_Y).
+        Used for LMB button events so the click lands at the correct position
+        in both SDL2 relative mode (where internal cursor position determines
+        the click) and SDL2 absolute mode (where the event screen position is
+        used directly).
+
+        :param rel_x: Target X in Amiga content pixels.
+        :param rel_y: Target Y in Amiga content pixels.
+        :returns: Screen-space CGPoint for use in Quartz mouse events.
         """
+        import Quartz
+        bounds = self._process.window_bounds()
+        if bounds is not None:
+            win_x, win_y, _w, _h = bounds
+            return Quartz.CGPoint(
+                float(win_x + rel_x),
+                float(win_y + self._TITLE_BAR_H + rel_y),
+            )
+        return Quartz.CGPoint(1000.0, 400.0)
+
+    def wake_sdl2(self) -> None:
+        """Activate SDL2 mouse capture by clicking the macOS title bar once.
+
+        On a fresh FS-UAE launch, SDL2 ignores all HID delta events until
+        mouse capture is activated.  Clicking the macOS title bar (y < 32)
+        triggers capture without sending any input to the Amiga.
+
+        Call this once after the game is visible.  Subsequent calls are no-ops.
+        """
+        if self._sdl2_awake:
+            return
         import Quartz
 
         self.focus()
-        # Click macOS title bar to activate SDL2 mouse capture on fresh launch.
         bounds = self._process.window_bounds()
         if bounds is not None:
             win_x, win_y, win_w, _ = bounds
             pt_title = Quartz.CGPoint(win_x + win_w // 2, win_y + 15)
             for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
-                ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt_title, Quartz.kCGMouseButtonLeft)
+                ev = Quartz.CGEventCreateMouseEvent(
+                    None, ev_type, pt_title, Quartz.kCGMouseButtonLeft
+                )
                 Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
                 time.sleep(0.04)
             time.sleep(0.2)
+            self.focus()
+        self._sdl2_awake = True
+
+    def home_cursor(self) -> None:
+        """Clamp the Amiga cursor to the top-left corner.
+
+        Clicks the macOS title bar to (re-)activate SDL2 relative mouse capture,
+        then sends ten (−200, −200) delta events to push the cursor to the
+        top-left corner.  After this call the cursor is reliably at amiga content
+        (_HOME_X, _HOME_Y).
+
+        The title-bar click is safe to repeat — it does not interact with Amiga UI.
+        It is required every call because focus can move to another app between
+        test steps, which causes SDL2 to silently drop relative-mouse events.
+        """
+        import Quartz
+
+        self.focus()
+        # Click the macOS title bar to re-activate SDL2 relative mouse capture.
+        bounds = self._process.window_bounds()
+        if bounds is not None:
+            win_x, win_y, win_w, _ = bounds
+            pt_title = Quartz.CGPoint(win_x + win_w // 2, win_y + 15)
+            for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+                ev = Quartz.CGEventCreateMouseEvent(
+                    None, ev_type, pt_title, Quartz.kCGMouseButtonLeft
+                )
+                Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+                time.sleep(0.04)
+            time.sleep(0.15)
             self.focus()
         # Push cursor to top-left with ten strong negative steps.
         pt = Quartz.CGPoint(1000.0, 400.0)
@@ -430,16 +487,9 @@ class FsUaeDriver:
     def _move_to_amiga(self, amiga_x: int, amiga_y: int) -> None:
         """Move the Amiga cursor to (*amiga_x*, *amiga_y*) using calibrated fixed steps.
 
-        Algorithm (no cursor detection required):
-
-        1. ``home_cursor()`` → cursor at (_HOME_X, _HOME_Y).
-        2. Compute dx = amiga_x − _HOME_X, dy = amiga_y − _HOME_Y.
-        3. Send ``full_steps`` events of (_X_FULL_SEND, 0) to cover dx in _X_STEP_PX
-           increments.
-        4. Send one final event for the remainder (sub-_X_STEP_PX distance in X and
-           all of dy) using the small-delta scale.
-
-        All constants are calibrated values in BattleChess.py / CLAUDE.md.
+        Both X and Y cap at ``_X_STEP_PX`` (89 px) per event.  Each event moves
+        up to 89 px on each axis simultaneously.  The loop runs until both
+        remaining X and Y reach zero — typically 2–5 events.
 
         :param amiga_x: Target X in Amiga content pixels (excluding title bar).
         :param amiga_y: Target Y in Amiga content pixels (excluding title bar).
@@ -450,36 +500,97 @@ class FsUaeDriver:
         self.home_cursor()
         time.sleep(0.1)
 
-        dx = amiga_x - self._HOME_X
-        dy = amiga_y - self._HOME_Y
-
-        full_steps = dx // self._X_STEP_PX
-        rem_x = dx - full_steps * self._X_STEP_PX   # 0 ≤ rem_x < _X_STEP_PX
+        remaining_x = amiga_x - self._HOME_X
+        remaining_y = amiga_y - self._HOME_Y
 
         pt = Quartz.CGPoint(1000.0, 400.0)
 
-        # Full steps (X only — Y is handled in the final event to keep it simple)
-        for _ in range(full_steps):
+        # Maximum small-step size: keep send ≤ 100 (linear scale zone).
+        # send > 100 undershoots non-linearly; split larger remainders into
+        # multiple events of ≤ _X_SMALL_MAX each.
+        _X_SMALL_MAX = int(self._X_SMALL_SCALE * 100)  # 74 px
+
+        while remaining_x != 0 or remaining_y != 0:
+            step_x = max(-self._X_STEP_PX, min(self._X_STEP_PX, remaining_x))
+            step_y = max(-self._X_STEP_PX, min(self._X_STEP_PX, remaining_y))
+
+            # Cap small steps at _X_SMALL_MAX to avoid the transition zone.
+            if 0 < abs(step_x) < self._X_STEP_PX and abs(step_x) > _X_SMALL_MAX:
+                step_x = _X_SMALL_MAX if step_x > 0 else -_X_SMALL_MAX
+            if 0 < abs(step_y) < self._X_STEP_PX and abs(step_y) > _X_SMALL_MAX:
+                step_y = _X_SMALL_MAX if step_y > 0 else -_X_SMALL_MAX
+
+            if abs(step_x) >= self._X_STEP_PX:
+                send_x = float(self._X_FULL_SEND) if step_x > 0 else float(-self._X_FULL_SEND)
+            else:
+                send_x = step_x / self._X_SMALL_SCALE
+
+            if abs(step_y) >= self._X_STEP_PX:
+                send_y = float(self._X_FULL_SEND) if step_y > 0 else float(-self._X_FULL_SEND)
+            else:
+                send_y = step_y / self._X_SMALL_SCALE
+
             ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
-            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, float(self._X_FULL_SEND))
-            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, 0.0)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, send_x)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, send_y)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
             time.sleep(0.04)
 
-        # Final event: remaining X + all Y
-        send_x = int(rem_x / self._X_SMALL_SCALE) if rem_x > 0 else 0
-        send_y = int(dy / self._X_SMALL_SCALE)
-        if send_x != 0 or send_y != 0:
-            ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
-            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, float(send_x))
-            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, float(send_y))
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
-            time.sleep(0.08)
+            remaining_x -= step_x
+            remaining_y -= step_y
 
-        logger.debug(
-            "_move_to_amiga: target(%d,%d) dx=%d dy=%d full_steps=%d rem_x=%d",
-            amiga_x, amiga_y, dx, dy, full_steps, rem_x,
-        )
+        logger.debug("_move_to_amiga: target(%d,%d) done", amiga_x, amiga_y)
+
+    def _click_from_known(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
+        """Navigate from a known Amiga cursor position to (*to_x*, *to_y*) and left-click.
+
+        Unlike :meth:`click`, this method does **not** call :meth:`home_cursor` first —
+        it navigates using relative deltas from (*from_x*, *from_y*).  Use this when
+        the cursor is known to be at (*from_x*, *from_y*) and homing would disrupt game
+        state (e.g. the two-click chess move between source and destination squares).
+
+        :param from_x: Known current Amiga cursor X.
+        :param from_y: Known current Amiga cursor Y.
+        :param to_x: Target Amiga cursor X.
+        :param to_y: Target Amiga cursor Y.
+        """
+        import Quartz
+
+        self.focus()
+        remaining_x = to_x - from_x
+        remaining_y = to_y - from_y
+        pt = Quartz.CGPoint(1000.0, 400.0)
+
+        while remaining_x != 0 or remaining_y != 0:
+            step_x = max(-self._X_STEP_PX, min(self._X_STEP_PX, remaining_x))
+            step_y = max(-self._X_STEP_PX, min(self._X_STEP_PX, remaining_y))
+            send_x = (
+                float(self._X_FULL_SEND if step_x > 0 else -self._X_FULL_SEND)
+                if abs(step_x) >= self._X_STEP_PX
+                else (step_x / self._X_SMALL_SCALE if step_x != 0 else 0.0)
+            )
+            send_y = (
+                float(self._X_FULL_SEND if step_y > 0 else -self._X_FULL_SEND)
+                if abs(step_y) >= self._X_STEP_PX
+                else (step_y / self._X_SMALL_SCALE if step_y != 0 else 0.0)
+            )
+            ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, send_x)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, send_y)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.04)
+            remaining_x -= step_x
+            remaining_y -= step_y
+
+        # Let SDL2 settle the cursor position before we click.
+        time.sleep(0.15)
+        pt_click = self._amiga_to_screen(to_x, to_y)
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt_click, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 1)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.05)
+        time.sleep(_SETTLE_S)
 
     def click(self, rel_x: int, rel_y: int) -> None:
         """Left-click at Amiga content coordinates (*rel_x*, *rel_y*).
@@ -491,7 +602,7 @@ class FsUaeDriver:
 
         self._move_to_amiga(rel_x, rel_y)
 
-        pt = Quartz.CGPoint(1000.0, 400.0)
+        pt = self._amiga_to_screen(rel_x, rel_y)
         for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
             ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
             Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 1)
@@ -504,6 +615,11 @@ class FsUaeDriver:
 
         Moves cursor then sends two click pairs within the Amiga double-click timeout.
 
+        .. note::
+            This uses ``CGEventPost`` (HID tap) which only works when SDL2 has captured
+            the mouse (i.e. during gameplay).  Use :meth:`workbench_double_click` when
+            the Workbench is visible.
+
         :param rel_x: Target X in Amiga content pixels.
         :param rel_y: Target Y in Amiga content pixels.
         """
@@ -511,7 +627,7 @@ class FsUaeDriver:
 
         self._move_to_amiga(rel_x, rel_y)
 
-        pt = Quartz.CGPoint(1000.0, 400.0)
+        pt = self._amiga_to_screen(rel_x, rel_y)
         for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
             ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
             Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 1)
@@ -523,6 +639,107 @@ class FsUaeDriver:
             Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 2)
             Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
             time.sleep(0.03)
+        time.sleep(_SETTLE_S)
+
+    def workbench_click(self, amiga_x: int, amiga_y: int) -> None:
+        """Single click at absolute Amiga content coordinates (Workbench mode).
+
+        On the Workbench, SDL2 is in **absolute** (non-captured) mouse mode.
+        In this mode absolute ``CGEventPost`` events work correctly — the macOS
+        cursor position maps directly to the Amiga cursor position.  Delta events
+        do NOT work for click positioning when SDL2 is uncaptured.
+
+        Do NOT call :meth:`_move_to_amiga` before this method — that sends delta
+        events which activate SDL2 relative mode and break absolute position clicks.
+
+        :param amiga_x: Target X in Amiga content pixels.
+        :param amiga_y: Target Y in Amiga content pixels.
+        """
+        import Quartz
+
+        bounds = self._process.window_bounds()
+        if bounds is None:
+            raise RuntimeError("FS-UAE window not found")
+        win_x, win_y, _w, _h = bounds
+        sx = float(win_x + amiga_x)
+        sy = float(win_y + self._TITLE_BAR_H + amiga_y)
+
+        self.focus()
+        time.sleep(0.1)
+
+        pt = Quartz.CGPoint(sx, sy)
+        # Move cursor to position before clicking (gives SDL2 a chance to track it).
+        ev_move = Quartz.CGEventCreateMouseEvent(
+            None, Quartz.kCGEventMouseMoved, pt, 0
+        )
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev_move)
+        time.sleep(0.1)
+
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(
+                None, ev_type, pt, Quartz.kCGMouseButtonLeft
+            )
+            Quartz.CGEventSetIntegerValueField(
+                ev, Quartz.kCGMouseEventClickState, 1
+            )
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.04)
+        time.sleep(_SETTLE_S)
+
+    def workbench_double_click(self, amiga_x: int, amiga_y: int) -> None:
+        """Double-click at absolute Amiga content coordinates (Workbench mode).
+
+        Uses absolute ``CGEventPost`` events — valid when SDL2 is in
+        non-captured (absolute) mode.  Do NOT call :meth:`_move_to_amiga`
+        first; delta events would switch SDL2 to relative mode and break this.
+
+        Empirically verified 2026-08-30: absolute double-click with this timing
+        opens Workbench disk-icon drawers reliably.
+
+        :param amiga_x: Target X in Amiga content pixels.
+        :param amiga_y: Target Y in Amiga content pixels.
+        """
+        import Quartz
+
+        bounds = self._process.window_bounds()
+        if bounds is None:
+            raise RuntimeError("FS-UAE window not found")
+        win_x, win_y, _w, _h = bounds
+        sx = float(win_x + amiga_x)
+        sy = float(win_y + self._TITLE_BAR_H + amiga_y)
+
+        self.focus()
+        time.sleep(0.1)
+
+        pt = Quartz.CGPoint(sx, sy)
+        ev_move = Quartz.CGEventCreateMouseEvent(
+            None, Quartz.kCGEventMouseMoved, pt, 0
+        )
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev_move)
+        time.sleep(0.1)
+
+        # First click (click state 1)
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(
+                None, ev_type, pt, Quartz.kCGMouseButtonLeft
+            )
+            Quartz.CGEventSetIntegerValueField(
+                ev, Quartz.kCGMouseEventClickState, 1
+            )
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.04)
+        time.sleep(0.12)   # within Workbench 1.3 double-click window (~250 ms)
+
+        # Second click (click state 2)
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(
+                None, ev_type, pt, Quartz.kCGMouseButtonLeft
+            )
+            Quartz.CGEventSetIntegerValueField(
+                ev, Quartz.kCGMouseEventClickState, 2
+            )
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.04)
         time.sleep(_SETTLE_S)
 
     def mousedown(self, rel_x: int, rel_y: int) -> None:

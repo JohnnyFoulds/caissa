@@ -171,22 +171,12 @@ def test_rpa_timeout_below_pytest_timeout():
 # Test: every planned test name exists in the suite
 # ---------------------------------------------------------------------------
 
-def _planned_test_names() -> list[str]:
-    """Parse feature_steps.md and return all test names listed in TDD test cases."""
-    steps_path = os.path.normpath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..", "..", "..", "docs", "features", "rpa-layer", "feature_steps.md"
-        )
-    )
-    if not os.path.isfile(steps_path):
-        return []
-
-    with open(steps_path, encoding="utf-8") as fh:
-        content = fh.read()
-
+def _parse_test_names_from_steps(path: str) -> list[str]:
+    """Parse one feature_steps.md and return all test names in TDD test cases sections."""
     names = []
     in_tdd = False
+    with open(path, encoding="utf-8") as fh:
+        content = fh.read()
     for line in content.splitlines():
         stripped = line.strip()
         if stripped.startswith("**TDD test cases"):
@@ -205,11 +195,48 @@ def _planned_test_names() -> list[str]:
     return names
 
 
+def _planned_test_names() -> list[str]:
+    """Return all planned test names from all known feature_steps.md files.
+
+    Reads the archived rpa-layer steps (allowed to be missing — it is under _archive/)
+    plus any active feature steps files. Uses pytest.fail (not skip) when an active
+    steps file exists but contains zero planned test names, so the gate stays binding.
+    """
+    repo_root = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..")
+    )
+
+    # Paths in priority order: (path, is_archived)
+    candidates = [
+        (os.path.join(repo_root, "docs", "features", "rpa-layer", "feature_steps.md"), True),
+        (os.path.join(repo_root, "docs", "features", "rpa-design-vision", "feature_steps.md"), False),
+    ]
+
+    all_names: list[str] = []
+    for path, is_archived in candidates:
+        if not os.path.isfile(path):
+            if not is_archived:
+                # An active feature's steps file should exist if listed here.
+                # Missing is suspicious but not a hard failure at this stage.
+                pass
+            continue
+        names = _parse_test_names_from_steps(path)
+        if not names and not is_archived:
+            pytest.fail(
+                f"Active feature_steps.md at {path} has no TDD test cases sections.\n"
+                "Add at least one '**TDD test cases' section with test names, or "
+                "the planned-test-name gate cannot enforce anything."
+            )
+        all_names.extend(names)
+
+    return all_names
+
+
 def test_every_planned_test_name_exists_in_suite(pytestconfig):
     """Every test name listed in feature_steps.md TDD sections must exist in the suite."""
     planned = _planned_test_names()
     if not planned:
-        pytest.skip("No planned test names found in feature_steps.md")
+        pytest.skip("No planned test names found in any feature_steps.md")
 
     # Collect all test node IDs in the test directory
     test_root = os.path.normpath(

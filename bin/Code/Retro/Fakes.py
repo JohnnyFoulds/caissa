@@ -128,11 +128,19 @@ class FakeCpu(Cpu):
     def emu_stop(self) -> None:
         """No-op for FakeCpu (no live execution to stop)."""
 
-    def hook_add(self, hook_type: str, callback) -> int:
+    def hook_add(
+        self,
+        hook_type: str,
+        callback,
+        begin: int | None = None,
+        end: int | None = None,
+    ) -> int:
         """Return a monotonically incrementing handle; no real hook is registered.
 
         :param hook_type: Hook type string (ignored).
         :param callback: Callable (ignored).
+        :param begin: Ignored by FakeCpu.
+        :param end: Ignored by FakeCpu.
         :return: Integer handle for use with :meth:`hook_del`.
         """
         self._hook_counter += 1

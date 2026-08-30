@@ -346,6 +346,14 @@ class Bridge:
 
         Writes the player-type table so the human side = 1 and the computer side = 2.
 
+        NOTE: PLAYER1_COLOR_ADDR and PLAYER2_COLOR_ADDR are intentionally left at
+        their defaults (White=0, Black=1) written by write_position().  Setting
+        PLAYER2_COLOR_ADDR=0 to make the AI search White pieces causes the
+        iterative-deepening loop to hang — the termination mechanism (TC at 0x008A)
+        appears to only work correctly when PLAYER2_COLOR=1 (Black).  The mechanism
+        that controls which side the AI searches when computer_color=0 requires
+        further reverse-engineering before it can be wired correctly.
+
         :param color: 0=Computer plays White, 1=Computer plays Black.
         :raises BridgeError: If *color* is not 0 or 1.
         """

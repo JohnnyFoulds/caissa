@@ -139,5 +139,32 @@ def test_rom_not_found_error_has_path_attribute(tmp_path):
 
 @pytest.mark.retro_rom
 def test_think_session_with_real_rom_returns_known_move():
-    """With a real ROM, startpos level 1 must return a legal move."""
-    pytest.skip("retro_rom: no ROM supplied in this environment")
+    """With a real ROM, a corpus position at level 1 must return a legal move."""
+    import json
+    from pathlib import Path
+
+    from Code.Retro.Manifest import default_rom_path
+
+    rom = default_rom_path()
+    if not rom or not Path(rom).exists():
+        pytest.skip("retro_rom: no ROM file found")
+
+    corpus = Path(__file__).parents[3] / "Resources" / "Retro" / "Corpus" / "fs-uae-manual.jsonl"
+    if not corpus.exists() or corpus.stat().st_size == 0:
+        pytest.skip("retro_rom: corpus file not found")
+
+    import chess as _chess
+    entry = json.loads(corpus.read_text().splitlines()[0])
+    fen = entry["fen"]
+    board = _chess.Board(fen)
+
+    session = ThinkSession(rom_path=Path(rom))
+    # Black to move in corpus entries; computer_color=1 = Black
+    result = session.think(ThinkRequest(fen=fen, level=Level.L1, computer_color=1))
+
+    assert result.move is not None, "engine returned no move"
+    move_uci = result.move.to_uci()
+    assert move_uci != "0000", "engine returned null move"
+    assert _chess.Move.from_uci(move_uci) in board.legal_moves, (
+        f"engine returned illegal move {move_uci!r} in position {fen!r}"
+    )

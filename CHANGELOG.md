@@ -12,6 +12,19 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 ## [Unreleased]
 
 ### Added
+- **Amiga RPA layer (Phase E)**: `bin/Code/Amiga/` — FS-UAE automation module mirroring
+  `bin/Code/Dos/`.  `Driver.py` (`FsUaeProcess` + `FsUaeDriver`): Quartz screenshot
+  (`screencapture -x -o -l <wid>`), SDL-safe two-step click (MOUSEMOVE→DOWN→UP), raw
+  keycode send.  `Activities.py` (`AmigaRunner` + 8 `AmigaActivity` subclasses):
+  `EnsureFsUaeRunning`, `WaitForTitle`, `WaitForBoard`, `AdvancePastTitle`,
+  `StartNewGame`, `PlayMove`, `WaitForComputerReply`, `ExtractComputerMove`; each with
+  precondition/execute/postcondition following the CHECK_PRE→ACT→SETTLE→VERIFY contract.
+  `BattleChess.py`: geometry constants stubbed pending calibration.
+  `tests/unit/amiga/test_activities.py`: 32 unit tests (all passing) using `FakeDriver`.
+- **RPA process documentation**: `CLAUDE.md` adds "RPA Pattern for Automation —
+  Non-Negotiable" rule; `docs/rpa/new-target-guide.md` — step-by-step guide for
+  creating RPA layers for new application targets; `docs/rpa/uipath-mapping.md` gains
+  a "When to Use an Activity vs Ad-Hoc Code" decision tree.
 - **DOS corpus collection — reliable multi-move pipeline**: `WaitCpuReply` rewritten to use
   color-based `board_state()` comparison (pink/blue piece classification) instead of pixel-diff
   heuristics.  Two-phase detection: wait for first movement sign → 0.8s animation settle → read

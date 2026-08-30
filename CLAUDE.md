@@ -269,6 +269,97 @@ nohup tools/caissa > /tmp/caissa.log 2>&1 &   # background
 
 ---
 
+## RPA Pattern for Automation — Non-Negotiable
+
+Any time you need to interact with a running application (FS-UAE, DOSBox, any external
+program), you **MUST** implement the interaction as `Activity` subclasses in
+`bin/Code/<Target>/Activities.py`, following the pattern in `bin/Code/Dos/Activities.py`.
+
+**NEVER write a `/tmp` script for automation.** `/tmp` scripts have no precondition, no
+postcondition, no settle/verify loop, and no unit tests. They cannot be reproduced,
+retried, or tested in isolation.
+
+The UiPath analogy: every UI interaction is a named Activity in a Sequence. You test
+the activity in isolation, verify it passes, then chain it. You do not write VBA to
+click a button outside the workflow.
+
+### Mandatory steps for any new automation target
+
+1. `bin/Code/<Target>/Driver.py` — screenshot + input events for that app (see `Dos/Driver.py`)
+2. `bin/Code/<Target>/Activities.py` — `Activity` subclasses with precondition/execute/postcondition
+3. `tests/unit/<target>/test_activities.py` — unit tests using a `FakeDriver` with pre-captured images
+4. Test each Activity in isolation before chaining
+5. Only then run Activities in a runner loop
+
+### What each Activity must declare
+
+- `precondition(img, ctx) → bool` — is the app in the right state?
+- `execute(driver, ctx) → None` — issue **one** driver action; never loop or sleep here
+- `postcondition(img, ctx) → bool` — did the action take effect? (polled by the runner)
+- `settle_ms` — wait after execute before first postcondition poll
+- `verify_ms` — max time for postcondition to become True before DECIDE_RECOVERY
+
+### Where calibrated constants go
+
+Board coordinates, colour thresholds, window sizes: **immediately** into
+`bin/Code/<Target>/BattleChess.py` AND into this CLAUDE.md. Not in `/tmp`. Not
+discovered-and-discarded. Every constant must survive context compaction.
+
+See `docs/rpa/new-target-guide.md` for the full step-by-step guide.
+See `docs/rpa/uipath-mapping.md` for the UiPath ↔ Caissa vocabulary map.
+
+---
+
+## Context Compaction — Preventing Knowledge Loss Across Sessions
+
+Context compaction is automatic and lossy. When it fires, tool output, /tmp
+contents, calibrated constants, and mid-analysis decisions are dropped. This
+has caused repeated rediscovery of binary offsets, DOS calibration constants,
+and engine phase work.
+
+### Six non-negotiable rules
+
+**1. CLAUDE.md is the only safe persistent store.**
+Everything a future session *must know* goes into CLAUDE.md **immediately when
+discovered** — not at the end, not after confirmation. Compaction re-reads
+CLAUDE.md every turn; it does not preserve conversation history.
+`/tmp` is invisible after compaction. Never use it for knowledge.
+
+**2. Compact at 60%, not 95%.**
+Run `/compact focus on <task>. Key decisions: <X>. Next step: <Y>. Preserve: <constants>.`
+proactively at a natural boundary — after merging a PR, before a long binary
+analysis run, when pivoting from investigation to implementation.
+Never wait for autocompact to fire mid-analysis; the model is least capable at 95%.
+
+**3. End every session with a git commit + a progress note.**
+Before `/clear` or end-of-session, write `docs/features/<name>/progress.md` with:
+- What was accomplished this session
+- What is next
+- Any constants, offsets, or invariants not yet in CLAUDE.md
+
+Then commit everything. The git log + `progress.md` = the session handoff.
+
+**4. Break long tasks into phases; one PR per phase.**
+Each phase must be small enough to complete in one session, end with a merged PR,
+and have all findings committed to code + CLAUDE.md before closing.
+"Phase complete" = code committed + tests pass + CLAUDE.md updated.
+
+**5. Use fork/subagents for investigation work.**
+Binary analysis, calibration runs, and long debugging sessions generate enormous
+tool output that pollutes the parent context. Use `Agent(subagent_type: "fork")`
+for any research task where only the conclusion matters; the fork keeps its
+tool noise out of the parent context.
+
+**6. Session start ritual — always do these three steps before writing code.**
+```bash
+git log --oneline -10                          # what was last committed?
+cat docs/features/<name>/progress.md           # what's next?
+grep -n "<topic>" CLAUDE.md                    # what constants do I need?
+```
+This prevents the "guess at what happened" failure mode at a cost of 3 tool calls.
+
+---
+
 ## DOS/Battle Chess Automation Layer (`bin/Code/Dos/`)
 
 ### Python interpreter

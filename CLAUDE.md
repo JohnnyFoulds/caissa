@@ -291,6 +291,22 @@ click a button outside the workflow.
 4. Test each Activity in isolation before chaining
 5. Only then run Activities in a runner loop
 
+### Activity development protocol (one activity at a time)
+
+For EACH activity, follow this cycle before moving to the next:
+
+1. **Code it** — write the activity class (precondition / execute / postcondition)
+2. **Unit test it** — add `FakeDriver` tests in `tests/unit/<target>/test_activities.py`; run `make test`
+3. **UI test it** — run the single activity against the real running process and observe the result
+4. **Iterate** — if UI test fails, go back to step 1 and fix the activity; do not move on
+5. **Document** — once it works, commit constants to `bin/Code/<Target>/BattleChess.py` and CLAUDE.md
+6. **Then and only then** — add the next activity to the chain
+
+**Never chain two untested activities.** If activity N is known-good and activity N+1 fails, you know
+exactly where the bug is. If you chain 5 untested activities and something breaks, you don't know which one.
+
+This is the UiPath Test Sequence button analogy: run each activity in isolation before wiring it in.
+
 ### What each Activity must declare
 
 - `precondition(img, ctx) → bool` — is the app in the right state?

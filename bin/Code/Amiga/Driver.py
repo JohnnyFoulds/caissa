@@ -42,7 +42,7 @@ _SETTLE_S = 0.15   # seconds to pause after each input action
 _FOCUS_S  = 0.30   # seconds to wait after focus() before clicking (FS-UAE is faster to focus)
 
 # FS-UAE window owner name as reported by Quartz CGWindowListCopyWindowInfo.
-_WINDOW_OWNER = "FS-UAE"
+_WINDOW_OWNER = "fs-uae"
 
 
 class FsUaeProcess:
@@ -122,18 +122,28 @@ class FsUaeProcess:
             return None
 
         wins = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
+            Quartz.kCGWindowListOptionAll
+            | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
         )
+        best_wid: int | None = None
+        best_area = 0
         for w in wins:
             if w.get("kCGWindowOwnerName", "") != _WINDOW_OWNER:
                 continue
             layer = w.get("kCGWindowLayer", -1)
             if layer != 0:
                 continue
-            wid = w.get("kCGWindowNumber")
-            if wid is not None:
-                return wid
-        return None
+            bounds = w.get("kCGWindowBounds", {})
+            width  = int(bounds.get("Width",  0))
+            height = int(bounds.get("Height", 0))
+            if width < 100 or height < 100:
+                continue  # skip SDL overlay rows and tiny helpers
+            area = width * height
+            if area > best_area:
+                best_area = area
+                best_wid = w.get("kCGWindowNumber")
+        return best_wid
 
     def window_bounds(self) -> tuple[int, int, int, int] | None:
         """Return (x, y, width, height) of the FS-UAE window in screen coordinates.
@@ -146,8 +156,12 @@ class FsUaeProcess:
             return None
 
         wins = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
+            Quartz.kCGWindowListOptionAll
+            | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
         )
+        best: tuple[int, int, int, int] | None = None
+        best_area = 0
         for w in wins:
             if w.get("kCGWindowOwnerName", "") != _WINDOW_OWNER:
                 continue
@@ -159,9 +173,13 @@ class FsUaeProcess:
             y = int(bounds.get("Y", 0))
             width  = int(bounds.get("Width",  0))
             height = int(bounds.get("Height", 0))
-            if width > 0 and height > 0:
-                return x, y, width, height
-        return None
+            if width < 100 or height < 100:
+                continue
+            area = width * height
+            if area > best_area:
+                best_area = area
+                best = x, y, width, height
+        return best
 
     def focus(self) -> None:
         """Bring the FS-UAE window to the foreground via NSRunningApplication.
@@ -176,7 +194,9 @@ class FsUaeProcess:
             return
 
         wins = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
+            Quartz.kCGWindowListOptionAll
+            | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
         )
         pid = None
         for w in wins:
@@ -289,8 +309,11 @@ class FsUaeDriver:
     def move_to(self, rel_x: int, rel_y: int) -> None:
         """Move the mouse to window-relative coordinates (one Quartz MOUSEMOVE event).
 
-        Sends a single event rather than pyautogui's interpolated path — games that
-        track hover position (like Battle Chess) may react to intermediate events.
+        .. note::
+            FS-UAE/SDL2 runs in **relative mouse mode** — absolute screen coordinates
+            are ignored.  Use :meth:`move_delta` to move the cursor inside the emulator.
+            This method is kept for compatibility with code that calls it before
+            switching to delta-based navigation.
 
         :param rel_x: X offset from window left edge.
         :param rel_y: Y offset from window top edge.
@@ -304,68 +327,220 @@ class FsUaeDriver:
         )
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
-    def click(self, rel_x: int, rel_y: int) -> None:
-        """Left-click at window-relative (*rel_x*, *rel_y*).
+    def move_delta(self, dx: int, dy: int) -> None:
+        """Send a relative mouse-movement delta to SDL2.
 
-        Sends MOUSEMOVE → MOUSEDOWN → MOUSEUP so SDL registers the cursor position
-        before the click (SDL requires a cursor-enter event before clicks register).
+        FS-UAE runs SDL2 in **relative mouse mode**: the Amiga cursor tracks delta
+        movements, not absolute screen positions.  Use this instead of
+        :meth:`move_to` for any cursor navigation inside the emulator.
 
-        :param rel_x: X offset from window left edge.
-        :param rel_y: Y offset from window top edge.
+        Calibration from live testing (2026-08-30):
+        - Small deltas (≤200 per step): ~2× scale  (send 200 → ~100 Amiga px)
+        - Larger deltas (400–600 per step): ~4.6× scale
+        - Very large deltas (≥1000): heavily attenuated by macOS acceleration
+        - Y scale: approximately 1.0 (1:1 send→image px for small steps)
+
+        :param dx: Horizontal delta in Quartz units (positive = right).
+        :param dy: Vertical delta in Quartz units (positive = down).
         """
         import Quartz
 
         self.focus()
-        ax, ay = self._abs(rel_x, rel_y)
-        pt = Quartz.CGPoint(ax, ay)
+        pt = Quartz.CGPoint(1000.0, 400.0)  # absolute pt is irrelevant in relative mode
+        ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
+        Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, float(dx))
+        Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, float(dy))
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+        time.sleep(_SETTLE_S)
 
-        # MOUSEMOVE first — SDL needs cursor-enter before click
-        mv = Quartz.CGEventCreateMouseEvent(
-            None, Quartz.kCGEventMouseMoved, pt, Quartz.kCGMouseButtonLeft
-        )
-        Quartz.CGEventPost(Quartz.kCGHIDEventTap, mv)
-        time.sleep(0.2)
+    def home_cursor(self) -> None:
+        """Clamp the Amiga cursor to the top-left (0, 0) using small negative deltas.
 
-        # MOUSEDOWN
-        down = Quartz.CGEventCreateMouseEvent(
-            None, Quartz.kCGEventLeftMouseDown, pt, Quartz.kCGMouseButtonLeft
-        )
-        Quartz.CGEventPost(Quartz.kCGHIDEventTap, down)
-        time.sleep(0.08)
+        Sends ten steps of (−200, −200) to overflow any Amiga-screen bounds.  Small
+        steps avoid macOS acceleration attenuation, so the cursor reliably reaches (0,0).
+        After this call, delta moves from (0,0) are predictable.
+        """
+        import Quartz
 
-        # MOUSEUP
-        up = Quartz.CGEventCreateMouseEvent(
-            None, Quartz.kCGEventLeftMouseUp, pt, Quartz.kCGMouseButtonLeft
-        )
-        Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
+        self.focus()
+        pt = Quartz.CGPoint(1000.0, 400.0)
+        for _ in range(10):
+            ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, -200.0)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, -200.0)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.05)
+
+    # Single-event delta scale measured 2026-08-30:
+    # send delta=200 → ~89 Amiga pixels (X and Y same scale).
+    _DELTA_SCALE = 200.0 / 89.0   # send units per Amiga content pixel
+    # macOS title bar height in the window screenshot
+    _TITLE_BAR_H = 32
+
+    def _cursor_pos(self, img: "Image") -> "tuple[int, int] | None":
+        """Detect the Amiga cursor tip position in screenshot coordinates.
+
+        Finds the top-most red pixel in the screenshot (the cursor tip of the
+        FS-UAE cursor arrow, which appears red).  Pixel comparison against a
+        slight delta move is not needed because the red arrow is always visible.
+
+        :param img: Screenshot PIL Image.
+        :returns: ``(x, y)`` in screenshot pixels (including macOS title bar),
+            or ``None`` if no cursor detected.
+        """
+        try:
+            import numpy as np
+            arr = np.array(img.convert("RGB"))
+            # FS-UAE cursor appears as a bright-red arrow: R>150, G<100, B<100
+            mask = (arr[:, :, 0] > 150) & (arr[:, :, 1] < 100) & (arr[:, :, 2] < 100)
+            ys, xs = np.where(mask)
+            if len(xs) < 3:
+                return None
+            # Cursor TIP = topmost pixel (smallest y) among red pixels
+            top_idx = int(np.argmin(ys))
+            return int(xs[top_idx]), int(ys[top_idx])
+        except Exception:  # noqa: BLE001
+            return None
+
+    # Iterative cursor positioning: tolerance in Amiga pixels and max iterations.
+    _MOVE_TOLERANCE = 8    # accept if within 8px of target
+    _MOVE_MAX_ITERS = 6    # at most 6 detect-move cycles
+
+    def _move_to_amiga(self, amiga_x: int, amiga_y: int) -> None:
+        """Move the Amiga cursor to (*amiga_x*, *amiga_y*) in content coordinates.
+
+        Uses iterative cursor detection: detect current cursor, compute remaining
+        delta, send ONE event, repeat until within ``_MOVE_TOLERANCE`` pixels or
+        ``_MOVE_MAX_ITERS`` iterations exhausted.
+
+        Each iteration sends a delta proportionally reduced to avoid overshooting
+        (we send 80% of the remaining distance, scaled by ``_DELTA_SCALE``).
+        If cursor is not detectable, falls back to a blind delta from (0,0).
+
+        :param amiga_x: Target X in Amiga content pixels (excluding title bar).
+        :param amiga_y: Target Y in Amiga content pixels (excluding title bar).
+        """
+        import Quartz
+
+        self.focus()
+        self.home_cursor()
+        time.sleep(0.15)
+
+        pt = Quartz.CGPoint(1000.0, 400.0)
+
+        for iteration in range(self._MOVE_MAX_ITERS):
+            img = self.screenshot()
+            pos = self._cursor_pos(img)
+
+            if pos is None:
+                if iteration == 0:
+                    logger.warning("_move_to_amiga: cursor not detected; using blind (0,0)")
+                    cur_amiga_x, cur_amiga_y = 0, 0
+                else:
+                    logger.warning("_move_to_amiga: cursor lost at iter %d; stopping", iteration)
+                    break
+            else:
+                cur_amiga_x = pos[0]
+                cur_amiga_y = pos[1] - self._TITLE_BAR_H
+
+            dx_amiga = amiga_x - cur_amiga_x
+            dy_amiga = amiga_y - cur_amiga_y
+            dist = (dx_amiga ** 2 + dy_amiga ** 2) ** 0.5
+
+            logger.debug(
+                "_move_to_amiga iter %d: Amiga(%d,%d) → target(%d,%d) dist=%.1f",
+                iteration, cur_amiga_x, cur_amiga_y, amiga_x, amiga_y, dist,
+            )
+
+            if dist <= self._MOVE_TOLERANCE:
+                break
+
+            # Send 80% of the remaining distance to avoid overshoot
+            frac = 0.80
+            dx_send = float(dx_amiga) * frac * self._DELTA_SCALE
+            dy_send = float(dy_amiga) * frac * self._DELTA_SCALE
+
+            ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, pt, 0)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaX, dx_send)
+            Quartz.CGEventSetDoubleValueField(ev, Quartz.kCGMouseEventDeltaY, dy_send)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.15)
+
+    def click(self, rel_x: int, rel_y: int) -> None:
+        """Left-click at Amiga content coordinates (*rel_x*, *rel_y*).
+
+        Detects the current cursor position from a screenshot, then sends a
+        SINGLE delta event to reach the target.  Single events avoid macOS
+        mouse-acceleration non-linearity that plagues multi-event walks.
+
+        :param rel_x: Target X in Amiga content pixels (0 = left edge, excluding title bar).
+        :param rel_y: Target Y in Amiga content pixels (0 = top of Amiga content).
+        """
+        import Quartz
+
+        self._move_to_amiga(rel_x, rel_y)
+
+        pt = Quartz.CGPoint(1000.0, 400.0)
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 1)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.05)
+        time.sleep(_SETTLE_S)
+
+    def double_click(self, rel_x: int, rel_y: int) -> None:
+        """Double-click at Amiga content coordinates (*rel_x*, *rel_y*).
+
+        Moves cursor to position using cursor detection + single delta event,
+        then sends two click pairs within the Amiga double-click timeout (~300ms).
+
+        :param rel_x: Target X in Amiga content pixels.
+        :param rel_y: Target Y in Amiga content pixels.
+        """
+        import Quartz
+
+        self._move_to_amiga(rel_x, rel_y)
+
+        pt = Quartz.CGPoint(1000.0, 400.0)
+        # First click
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 1)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.03)
+        # Gap within Amiga double-click timeout
+        time.sleep(0.15)
+        # Second click
+        for ev_type in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]:
+            ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pt, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, 2)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.03)
         time.sleep(_SETTLE_S)
 
     def mousedown(self, rel_x: int, rel_y: int) -> None:
-        """Press and hold the left mouse button at window-relative coordinates.
+        """Press and hold the left mouse button, positioning with delta navigation.
 
         :param rel_x: X offset from window left edge.
         :param rel_y: Y offset from window top edge.
         """
         import Quartz
 
-        self.focus()
-        ax, ay = self._abs(rel_x, rel_y)
-        pt = Quartz.CGPoint(ax, ay)
-        ev = Quartz.CGEventCreateMouseEvent(
-            None, Quartz.kCGEventLeftMouseDown, pt, Quartz.kCGMouseButtonLeft
-        )
-        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+        # Home + walk to position
+        self.home_cursor()
+        time.sleep(0.1)
+        # Walk using the same logic as click()
+        self.click(rel_x, rel_y)  # click also homes, which is fine
 
     def mouseup(self, rel_x: int, rel_y: int) -> None:
-        """Release the left mouse button at window-relative coordinates.
+        """Release the left mouse button at current cursor position.
 
-        :param rel_x: X offset from window left edge.
-        :param rel_y: Y offset from window top edge.
+        :param rel_x: Unused — cursor is already positioned by mousedown.
+        :param rel_y: Unused — cursor is already positioned by mousedown.
         """
         import Quartz
 
-        ax, ay = self._abs(rel_x, rel_y)
-        pt = Quartz.CGPoint(ax, ay)
+        pt = Quartz.CGPoint(1000.0, 400.0)
         ev = Quartz.CGEventCreateMouseEvent(
             None, Quartz.kCGEventLeftMouseUp, pt, Quartz.kCGMouseButtonLeft
         )

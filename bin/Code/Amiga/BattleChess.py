@@ -31,6 +31,17 @@ _WINDOW_W = 640
 _WINDOW_H = 400
 
 # ---------------------------------------------------------------------------
+# Workbench UI geometry — calibrated 2026-08-30
+# ---------------------------------------------------------------------------
+
+# BattleChess disk icon centre in Amiga content coordinates (EXCLUDING macOS title bar).
+# click() / double_click() now use cursor detection + single-event delta, so these
+# are true content-pixel targets: (screenshot_x, screenshot_y - 32px_title_bar).
+# Measured from screenshot at window size 640×432, 2026-08-30.
+WORKBENCH_ICON_X = 516
+WORKBENCH_ICON_Y = 56
+
+# ---------------------------------------------------------------------------
 # Board geometry — NOT YET CALIBRATED
 #
 # These are placeholder values. Do NOT use them for automation until

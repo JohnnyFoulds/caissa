@@ -210,6 +210,53 @@ class EnsureFsUaeRunning(AmigaActivity):
 # Game state activities
 # ---------------------------------------------------------------------------
 
+class LaunchBattleChessFromWorkbench(AmigaActivity):
+    """Double-click the BattleChess disk icon in Amiga Workbench to launch the game.
+
+    precondition: FS-UAE window has visible content (Workbench screen showing).
+    execute: double-click at the BattleChess icon position.
+    postcondition: screen brightness increases as the game loads (brightness > 10).
+
+    Coordinates are Amiga content pixels (screenshot coords minus 32px title bar).
+    ``double_click()`` now uses cursor detection + single-event delta, so these are
+    the true target pixels, not walk-function units.
+    """
+
+    name = "LaunchBattleChessFromWorkbench"
+    check_pre_screenshot = True
+    verify_screenshot = True
+    settle_ms = 2_000    # wait for game to start loading
+    verify_ms = 30_000   # game can take up to ~20s to load from ADF
+
+    # Icon centre in Amiga content pixels (screenshot_y − 32px title bar).
+    # Measured 2026-08-30 at window size 640×432.
+    _ICON_X = 516
+    _ICON_Y = 56
+
+    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+        """True when Workbench is visible (any content on screen)."""
+        return WaitForTitle().postcondition(img, ctx)
+
+    def execute(self, driver: "FsUaeDriver", ctx: dict) -> None:
+        """Double-click the BattleChess disk icon."""
+        driver.double_click(self._ICON_X, self._ICON_Y)
+
+    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+        """True when game content is loading (brightness > 10).
+
+        The Workbench screen has mean brightness ~7.5; the game loading screen
+        is brighter (crack intro or game title).
+        """
+        if img is None:
+            return False
+        try:
+            import numpy as np
+            arr = np.array(img.convert("RGB"), dtype=float)
+            return float(arr.mean()) > 10.0
+        except Exception:  # noqa: BLE001
+            return False
+
+
 class WaitForTitle(AmigaActivity):
     """Wait until the Battle Chess title screen is visible.
 
@@ -237,9 +284,8 @@ class WaitForTitle(AmigaActivity):
     def postcondition(self, img: "Image | None", ctx: dict) -> bool:
         """True when the FS-UAE window has visible content.
 
-        Placeholder: checks that the mean pixel brightness is above 10
-        (i.e. not a blank / fully-black window).  Replace with a calibrated
-        colour-signature check once a real title-screen screenshot is available.
+        Checks mean pixel brightness > 4.0 (threshold calibrated from the
+        Workbench screen, which has mean ~7.5 on a mostly-black desktop).
 
         :param img: Screenshot from the runner.
         :param ctx: Shared context dict.
@@ -250,7 +296,7 @@ class WaitForTitle(AmigaActivity):
         try:
             import numpy as np
             arr = np.array(img.convert("RGB"), dtype=float)
-            return float(arr.mean()) > 10.0
+            return float(arr.mean()) > 4.0
         except Exception:  # noqa: BLE001
             return False
 
@@ -322,35 +368,103 @@ class AdvancePastTitle(AmigaActivity):
         return _board_visible(img)
 
 
+class AdvancePastCopyrightScreen(AmigaActivity):
+    """Press Enter until the copyright/intro dialog box is gone.
+
+    The game shows a text dialog ("Euwe -- Keres, Match 1940 ..." from the crack
+    intro, or the game's own copyright screen) over the 3D board.  Pressing Enter
+    dismisses it.  This activity sends Enter up to ``_MAX_PRESSES`` times with a
+    short pause between each, stopping as soon as the dialog is no longer visible.
+
+    precondition: dialog is visible (dialog box colour signature detected).
+    execute: send Enter once.
+    postcondition: no dialog visible.
+    """
+
+    name = "AdvancePastCopyrightScreen"
+    check_pre_screenshot = True
+    verify_screenshot = True
+    settle_ms = 800
+    verify_ms = 5_000
+    _ENTER_KEY = 36
+
+    # Colour of the dialog box border/background (yellow/gold in the screenshot).
+    # The box occupies roughly the lower-center region of the 640×432 window.
+    # This region contains the dialog when it is visible.
+    _DIALOG_REGION = (150, 215, 260, 65)  # x, y, w, h in window pixels (incl. title bar)
+    _DIALOG_YELLOW_THRESHOLD = 0.05       # min fraction of yellow pixels = dialog present
+
+    @classmethod
+    def _dialog_visible(cls, img: "Image | None") -> bool:
+        """Return True if the copyright/intro dialog box is visible."""
+        if img is None:
+            return False
+        try:
+            import numpy as np
+            x, y, w, h = cls._DIALOG_REGION
+            arr = np.array(img.crop((x, y, x + w, y + h)).convert("RGB"))
+            r, g, b = arr[:, :, 0].astype(float), arr[:, :, 1].astype(float), arr[:, :, 2].astype(float)
+            # Yellow: high R+G, low B
+            yellow = ((r > 150) & (g > 120) & (b < 100)).sum()
+            frac = float(yellow) / (arr.shape[0] * arr.shape[1])
+            return frac >= cls._DIALOG_YELLOW_THRESHOLD
+        except Exception:  # noqa: BLE001
+            return False
+
+    def precondition(self, img: "Image | None", ctx: dict) -> bool:
+        """True when the dialog box is visible."""
+        return _board_visible(img) and self._dialog_visible(img)
+
+    def execute(self, driver: "FsUaeDriver", ctx: dict) -> None:
+        """Send Enter up to 10 times until the dialog is gone."""
+        for _ in range(10):
+            driver.key_code(self._ENTER_KEY)
+            time.sleep(0.8)
+            try:
+                img = driver.screenshot()
+                if not self._dialog_visible(img):
+                    break
+            except Exception:  # noqa: BLE001
+                pass
+
+    def postcondition(self, img: "Image | None", ctx: dict) -> bool:
+        """True when the dialog is no longer visible."""
+        return not self._dialog_visible(img)
+
+
 class StartNewGame(AmigaActivity):
-    """Start a new Human vs Computer game (computer plays Black, human plays White).
+    """Trigger a new game from the demo board by clicking the centre of the board.
 
-    The exact key sequence depends on the Amiga Battle Chess menu structure.
-    This placeholder sends the key sequence that works on DOSBox (F2 or menu
-    navigation).  It must be verified against a real FS-UAE session.
+    After the copyright/intro has been dismissed, the game shows the 3D board
+    in demo/attract mode.  A left-mouse-button click on the board starts a new
+    game and brings up the game-setup dialog.
 
-    precondition: board or menu visible.
-    execute: navigate to "New Game" option.
-    postcondition: board visible with pieces in starting positions.
+    precondition: board visible AND no dialog visible (demo state).
+    execute: left-click at board centre using delta navigation.
+    postcondition: board visible (game continues — may need further activities
+        to navigate game-setup dialogs).
 
-    **TODO (Phase F1 calibration):** replace the execute() key sequence with
-    the verified Amiga menu navigation path observed from the ADF boot.
+    **Board centre (window-relative, Amiga content):**
+    Amiga 3D board occupies approximately the full 640×400 content area.
+    Centre ≈ (320, 220) after the 32 px macOS title bar.
     """
 
     name = "StartNewGame"
     check_pre_screenshot = True
     verify_screenshot = True
-    settle_ms = 2_000   # wait for game-start animation
-    verify_ms = 30_000
+    settle_ms = 2_000   # wait for game-start dialog/animation
+    verify_ms = 15_000
+
+    # Window-relative coordinates of board centre (including macOS title bar offset)
+    _BOARD_CENTER_X = 320
+    _BOARD_CENTER_Y = 220   # 32 px title bar + ~188 px into Amiga content
 
     def precondition(self, img: "Image | None", ctx: dict) -> bool:
-        return _board_visible(img)
+        return _board_visible(img) and not AdvancePastCopyrightScreen._dialog_visible(img)
 
     def execute(self, driver: "FsUaeDriver", ctx: dict) -> None:
-        # TODO (Phase F1): verify menu navigation key for Amiga BC.
-        # The DOS version uses keyboard shortcuts; Amiga may differ.
-        # For now, send F1 which is a common "new game" key in Amiga games.
-        driver.key("f1")
+        """Click the board centre to trigger the new-game dialog."""
+        driver.click(self._BOARD_CENTER_X, self._BOARD_CENTER_Y)
 
     def postcondition(self, img: "Image | None", ctx: dict) -> bool:
         return _board_visible(img)

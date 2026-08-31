@@ -23,7 +23,7 @@ it takes milliseconds regardless of level.
 ## `EmuClockRate` (spin)
 
 **Default:** 100  
-**Range:** 1–10000
+**Range:** 1–200
 
 The virtual clock rate as a percentage of the original machine's speed.
 
@@ -44,7 +44,7 @@ Setting `EmuStrictOriginal true` disables any value other than 100.
 
 ## `EmuStrictOriginal` (check)
 
-**Default:** false
+**Default:** true
 
 When `true`, the engine:
 - Rejects `EmuClockRate` values other than 100 with an error
@@ -72,8 +72,8 @@ uci
 id name Battle Chess (Retro) 1988
 id author Interplay (emulated)
 option name EmuLevel type spin default 1 min 1 max 9
-option name EmuClockRate type spin default 100 min 1 max 10000
-option name EmuStrictOriginal type check default false
+option name EmuClockRate type spin default 100 min 1 max 200
+option name EmuStrictOriginal type check default true
 option name EmuRomPath type string default <empty>
 uciok
 ```

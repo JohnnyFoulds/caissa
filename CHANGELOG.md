@@ -82,6 +82,16 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
 ### Fixed
+- **Retro Engine — decompressor prefetch simulation**: `Think.py` now correctly emulates
+  the 68000's 4-byte prefetch buffer for Battle Chess's self-modifying startup decompressor.
+  Two per-address hooks (`_hook_prefetch_79bc` at 0x79BC, `_hook_prefetch_79c8` at 0x79C8)
+  detect when the decompressor has partially overwritten its own instruction bytes and
+  manually execute the original ROM instruction (`lsl.w #2, d2` and `move.b (a2)+, (a1)+`
+  respectively) instead of letting Unicorn raise `UC_ERR_EXCEPTION` on the illegal
+  partial-write bytes.  Root cause: a zeroing loop writes zeros sequentially over 0x79BC
+  producing `ORI.B-to-An` (illegal, but Unicorn OR-applies it corrupting A4 to 0xFFFFFFFF);
+  the inner copy loop overwrites its own `12 DA` bytes with a LINE-A opcode.
+  Both smokes now return real moves: `bestmove h2h4` and `bestmove h7h5`.
 - **Retro Engine — White-to-move support (board-flip technique, Phase G)**: Engine now
   returns a real AI move for both sides.  Root cause: the AI's TC abort mechanism
   requires `PLAYER2_COLOR=1` (Black) and hangs when set to White.  Fix: when

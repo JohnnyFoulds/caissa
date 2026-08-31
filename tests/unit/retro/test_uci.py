@@ -108,7 +108,7 @@ def test_uci_setoption_emuclockrate_accepted():
 
 
 def test_uci_setoption_strict_original_rejects_nondefault_clock():
-    """When EmuStrictOriginal is true, setting EmuClockRate != 50 must emit an error."""
+    """When EmuStrictOriginal is true, setting EmuClockRate != 100 must emit an error."""
     lines = _run(
         "uci\n"
         "setoption name EmuStrictOriginal value true\n"
@@ -117,6 +117,9 @@ def test_uci_setoption_strict_original_rejects_nondefault_clock():
     )
     error_lines = [ln for ln in lines if "error" in ln.lower() and "EmuStrictOriginal" in ln]
     assert len(error_lines) >= 1
+    assert any("remain 100" in ln for ln in error_lines), (
+        f"expected 'remain 100' in error, got: {error_lines}"
+    )
 
 
 # ---------------------------------------------------------------------------

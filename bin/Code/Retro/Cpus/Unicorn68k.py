@@ -54,6 +54,7 @@ _REG_MAP: dict[str, int] = {
     "A7": _m68k.UC_M68K_REG_A7,
     "PC": _m68k.UC_M68K_REG_PC,
     "SP": _m68k.UC_M68K_REG_A7,  # SP is an alias for A7
+    "SR": _m68k.UC_M68K_REG_SR,  # Status Register (CCR in low byte)
 }
 
 _HOOK_MAP: dict[str, int] = {

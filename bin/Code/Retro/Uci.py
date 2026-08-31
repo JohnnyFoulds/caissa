@@ -34,14 +34,14 @@ _STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 _DEFAULT_OPTIONS: dict[str, object] = {
     "EmuLevel": 1,
-    "EmuClockRate": 50,
+    "EmuClockRate": 100,
     "EmuStrictOriginal": True,
     "EmuRomPath": "",
 }
 
 _OPTION_LINES = [
     "option name EmuLevel type spin default 1 min 1 max 9",
-    "option name EmuClockRate type spin default 50 min 1 max 200",
+    "option name EmuClockRate type spin default 100 min 1 max 200",
     "option name EmuStrictOriginal type check default true",
     "option name EmuRomPath type string default <empty>",
 ]
@@ -112,10 +112,10 @@ class UciSession:
         elif name == "EmuClockRate":
             try:
                 rate = int(value_str)
-                if self._options.get("EmuStrictOriginal") and rate != 50:
+                if self._options.get("EmuStrictOriginal") and rate != 100:
                     self._emit(
                         f"info string error: EmuStrictOriginal is true; "
-                        f"EmuClockRate must remain 50 (got {rate})"
+                        f"EmuClockRate must remain 100 (got {rate})"
                     )
                     return
                 self._options["EmuClockRate"] = rate

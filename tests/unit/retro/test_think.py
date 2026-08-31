@@ -23,19 +23,26 @@ pytestmark = pytest.mark.retro
 
 _STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-# e2e4: to_sq=0x34 (e4) at offset 0, from_sq=0x14 (e2) at offset 2 (confirmed entry format)
-_E2E4_RAW = struct.pack(">HH4x", 0x34, 0x14)
+# The AI always searches as Black (_search_cc=1).  Write Black's e7e5 move so
+# _is_root_valid passes.  With computer_color=0 (board flipped) the un-flip maps
+# e7e5 back to e2e4; with computer_color=1 (no flip) the result is e7e5 directly.
+# to_sq=0x44 (e5) at offset 0, from_sq=0x64 (e7) at offset 2.
+_AI_MOVE_RAW = struct.pack(">HH4x", 0x44, 0x64)
 
 
-def _cpu_that_plays_e2e4() -> FakeCpu:
-    """Return a FakeCpu scripted to write e2→e4 to AI_BEST_MOVE_ADDR on emu_start."""
+def _cpu_that_plays_ai_move() -> FakeCpu:
+    """Return a FakeCpu scripted to write e7→e5 (Black) to AI_BEST_MOVE_ADDR on emu_start."""
     cpu = FakeCpu()
 
     def _callback(c: FakeCpu) -> None:
-        c.mem_write(AI_BEST_MOVE_ADDR, _E2E4_RAW)
+        c.mem_write(AI_BEST_MOVE_ADDR, _AI_MOVE_RAW)
 
     cpu.set_emu_callback(_callback)
     return cpu
+
+
+# Keep the old name for backwards compatibility within this module.
+_cpu_that_plays_e2e4 = _cpu_that_plays_ai_move
 
 
 # ---------------------------------------------------------------------------
@@ -43,9 +50,13 @@ def _cpu_that_plays_e2e4() -> FakeCpu:
 # ---------------------------------------------------------------------------
 
 def test_think_session_with_scripted_cpu_returns_move():
-    """ThinkSession with FakeCpu scripted to write e2e4 must return ThinkResult."""
-    session = ThinkSession(cpu=_cpu_that_plays_e2e4())
-    # computer_color=0: startpos is White to move and e2e4 is a White move.
+    """ThinkSession with FakeCpu returns the AI move after board-flip reversal.
+
+    The FakeCpu writes e7e5 (Black pawn, valid for the AI's _search_cc=1).
+    With computer_color=0 the board is flipped for search, so the un-flip maps
+    e7e5 back to e2e4 in the original orientation.
+    """
+    session = ThinkSession(cpu=_cpu_that_plays_ai_move())
     result = session.think(ThinkRequest(fen=_STARTPOS, level=Level.L1, computer_color=0))
     assert result.move is not None
     assert result.move.to_uci() == "e2e4"
@@ -81,9 +92,9 @@ def test_think_session_clears_best_move_before_run():
     stale = struct.pack(">HHHBB", 0x13, 0x33, 0, 1, 1)  # d2d4
     cpu.mem_write(AI_BEST_MOVE_ADDR, stale)
 
-    # Callback writes e2e4, overwriting the pre-written stale value
+    # Callback writes AI move, overwriting the pre-written stale value
     def _callback(c: FakeCpu) -> None:
-        c.mem_write(AI_BEST_MOVE_ADDR, _E2E4_RAW)
+        c.mem_write(AI_BEST_MOVE_ADDR, _AI_MOVE_RAW)
 
     cpu.set_emu_callback(_callback)
     session = ThinkSession(cpu=cpu)

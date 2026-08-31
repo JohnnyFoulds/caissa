@@ -208,19 +208,29 @@ def parse_amiga_hunk(data: bytes) -> list[MemRegion]:
                 pos += (size_longs & _MEMF_MASK) * 4
 
             else:
-                # The Dragon Inc crack of BattleChess.amiga appends non-standard code
-                # after the final HUNK_END (0x6600014C = bne.w, not a hunk type).
-                # hunktool confirms only hunk 0 (HUNK_CODE, 72988 bytes) is valid.
-                # Stop parsing here — the AI code is fully contained in hunk 0.
-                trailing = len(data) - (pos - 4)
+                # The Dragon Inc crack of BattleChess.amiga replaces the expected
+                # HUNK_BSS/HUNK_DATA header with raw M68K code (0x6600014C = BNE.W).
+                # This code runs at load_address (immediately after the code hunk).
+                # Load it as a synthetic DRAGON_CRACK region so _ensure_cpu copies
+                # these bytes into chip RAM at the correct address.
+                trailing_offset = pos - 4
+                trailing_size = len(data) - trailing_offset
                 logger.warning(
                     "non-standard hunk type 0x%X (raw 0x%X) at file offset %d "
                     "(hunk index %d) — stopping; %d trailing bytes are "
-                    "Dragon-crack data, not standard HUNK blocks",
-                    hunk_type, raw_type, pos - 4, hunk_idx, trailing,
+                    "Dragon-crack data, loaded at 0x%X",
+                    hunk_type, raw_type, trailing_offset, hunk_idx,
+                    trailing_size, load_address,
                 )
-                # Stop here; remaining declared hunks in HUNK_HEADER are fictitious
-                # (the Dragon crack populated the header but not the data).
+                if trailing_size > 0:
+                    regions.append(
+                        MemRegion(
+                            offset=trailing_offset,
+                            size=trailing_size,
+                            label="DRAGON_CRACK",
+                            load_address=load_address,
+                        )
+                    )
                 hunk_done = True
                 _stop = True
 

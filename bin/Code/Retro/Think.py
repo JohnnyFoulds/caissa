@@ -63,16 +63,70 @@ _MAX_INSTRUCTIONS: int = 500_000_000
 # Amiga OS stubs that crash if executed — pop return address and return immediately.
 # Confirmed from recon: 0x8820 timer/event, 0x8D32/0x7CCE/0x857E pre-search inits,
 # 0x005A event pump, 0x015C/0x00E4/0x0138/0x17D2 other OS stubs.
-# 0x008A = ElapsedTime/TC: called from 0x0C2C8 as `jsr -$7f74(a4)`; falls into
-# the main game loop infinite-loop if executed — must be NOOPed.
+# 0x008A = ElapsedTime/TC stub: handled separately by _hook_tc (counts invocations,
+#          sets abort flag after threshold, then NOOPs) — NOT in BYPASS_NOOP.
 _BYPASS_NOOP: frozenset[int] = frozenset({
-    0x008A, 0x8820, 0x8D32, 0x7CCE, 0x857E, 0x005A, 0x015C, 0x00E4, 0x0138, 0x17D2,
+    # 0x000C = A4-relative OS call (offset -0x7FF2) — timer/event check.
+    # 0x013E = A4-relative OS call from 0x84D4 (dirty path); added defensively.
+    # 0x0036 = Amiga OS timer-rearm stub called from 0xDE7A when not yet aborted.
+    # 0x0084 = Amiga OS elapsed-time stub called from 0xDE7A before abort check.
+    0x000C, 0x013E, 0x0036, 0x0084,
+    0x8820, 0x8D32, 0x7CCE, 0x857E, 0x005A, 0x015C, 0x00E4, 0x0138, 0x17D2,
 })
+
+# TC stub address: called from 0xC2C8 as `jsr -$7f74(a4)` — fires once at the
+# start of the inner search loop (when [0x48B6]=0x0278 ≥ depth param).  Does NOT
+# set abort — the real abort mechanism is _hook_de7a below.
+_TC_ADDR: int = 0x008A
+
+# 0xDE7A = the search-iteration handler called repeatedly from the inner loop
+# (0xC2CE-0xC2F2).  Each invocation drives one call to 0xDD7E (alpha-beta tree
+# traversal) then updates state.  Setting [_ABORT_FLAG_ADDR]=1 before 0xDE7A
+# entry causes 0xC300 inside 0xDE7A to return D0≠0, which clears [0x4A5E] and
+# makes the inner loop exit cleanly → 0xC198 returns → phases 1+2 run.
+_DE7A_ADDR: int = 0xDE7A
+
+# [0x8270] = A4+0x0272 = ROM code bytes at game-load time (value 0x0003).
+# The inner loop (0xC2D4) and outer-loop shortcuts (0xC25E, 0xC294) treat a
+# non-zero value as "game-state complete → exit immediately".  Zero it before
+# each search so the iteration loop enters and uses _hook_de7a for termination.
+_SEARCH_COMPLETE_FLAG_ADDR: int = 0x8270
+
+# DE7A invocation thresholds per level.  One 0xDE7A invocation = one call to
+# 0xDD7E (the alpha-beta tree walk).  Setting abort after N invocations lets
+# the AI_INIT inner search (0xC198) run N alpha-beta passes before the loop
+# exits and phase 1 takes over.  Phase 1's own search is driven by [0x48BA]
+# (see _PHASE1_EVAL_CTR_ADDR), not by DE7A.  These values let phase 0 do a
+# meaningful depth-1 pass before handing off; calibrate via Phase B RPA runs.
+_LEVEL_DE7A_THRESHOLD: dict[int, int] = {
+    1: 30, 2: 60, 3: 120, 4: 200,
+    5: 350, 6: 600, 7: 1000, 8: 1500, 9: 2200,
+}
+
+# Phase-1 evaluation counter: [0x48BA].  0x88DE (called from phase 1 via
+# JSR 0x8876) increments this each entry; phase 1 at 0x8392 checks
+# [0x48BA] < 0x78 (120) to decide whether to run JSR 0xA266 (real search).
+# BSS pre-init sets this to 0x0278 (632), which is above the 120 threshold,
+# so the search is immediately skipped.  Zero it before each think call so
+# phase 1 can do up to 120 evaluation passes before entering the "done" path.
+_PHASE1_EVAL_CTR_ADDR: int = _A4_VALUE - 0x3744   # 0x48BA
+
+# Phase-1 position-index counter: [0x3320].  Used in phase 1 at 0x8358 to
+# index a game-state table; 0x88DE increments it alongside [0x48BA].
+# BSS pre-init of 0x0278 causes an out-of-range table index.  Zero it.
+_PHASE1_POS_IDX_ADDR: int = _A4_VALUE - 0x4CDE    # 0x3320
 
 # Abort flag: [0x4A4A] tested at 0xC2CE (search exits if non-zero).
 # A4 - 0x35B4 = 0x7FFE - 0x35B4 = 0x4A4A.
 # The ROM initialises this to 0xFFFC; must be zeroed before each search.
 _ABORT_FLAG_ADDR: int = _A4_VALUE - 0x35B4  # 0x4A4A
+
+# Wait/timer flag: [0x4A92] checked at 0xCB18 before the actual search begins.
+# A4 - 0x356C = 0x7FFE - 0x356C = 0x4A92.
+# The outer driver loops at 0xCB18-0xCB2E calling the Amiga timer stub at
+# 0x000C until [0x4A92] becomes 0 (timer expired).  We pre-zero it so the
+# wait loop exits immediately and the real search starts.
+_WAIT_FLAG_ADDR: int = _A4_VALUE - 0x356C  # 0x4A92
 
 # Loop-continue flag: outer driver loops while [0x4A5A]==2.
 # Setting this to 0 forces the outer driver to exit after the current phase.
@@ -82,23 +136,38 @@ _LOOP_FLAG_ADDR: int = _A4_VALUE - 0x35A4  # 0x4A5A
 # Field order: from_sq (offset 0), to_sq (offset 2) — opposite of AI_BEST_MOVE_ADDR.
 _AI_BEST_MOVE_FINAL_ADDR: int = _A4_VALUE - 0x49A4  # 0x365A
 
-# Number of outer driver loop passes (each pass = one phase-0+phase-1+phase-2 cycle)
-# before the search is terminated.  Level 1 = exit after phase-0 only (1 pass).
-# The outer driver loops: phase-0 → [check] → phase-1 → [check] → phase-2 → [check].
+# Sentinel to_sq value for search-stack initialisation.
+# The inner search at 0xD99A checks BOARD_ARRAY[to_sq*4]; if non-zero (any occupied
+# square) it skips writing the best move.  Clearing to_sq=0 maps to a1 (Rook) which
+# is always occupied.  0x1000*4=0x4000: BOARD_ARRAY+0x4000=0x70F4, outside BSS
+# (which ends at 0x5FFE), so the _mem_invalid hook maps that page as zeros → check
+# passes and the search can write a move.
+_SEARCH_STACK_SENTINEL: int = 0x1000
+
+# Safety ceiling: outer driver loop passes allowed before forced exit.
+# We stop at 0x81F2 (after phase 0) if a valid move was found, so this is only
+# a backstop in case the 0x81F2 stop never fires.
 _OUTER_LOOP_PASSES: dict[int, int] = {
-    1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
+    1: 2, 2: 2, 3: 2, 4: 2, 5: 2,
+    6: 2, 7: 2, 8: 2, 9: 2,
 }
+
+# [0x07D2] is 2 bytes before PLAYER_TYPE_BASE (0x07D4).  When non-zero (ROM code
+# bytes at that address), AI_INIT at 0x8250 branches to the dirty path (0x8262+)
+# which calls the search with a BSS-sentinel parameter and invokes OS stubs not
+# in BYPASS_NOOP (including 0x013E via 0x84D4).  Zero it so AI_INIT always takes
+# the clean path: CLR.W [0x4A50]; MOVE.W #1, -(A7); JSR 0xC198; BRA 0x82C4.
+_AI_INIT_PATH_FLAG_ADDR: int = 0x07D2
+
+# BSS region: [0x3000..0x5FFE] initialised to 0x0278 by the game's own BSS init
+# routine (0x8820), which we BYPASS_NOOP.  Pre-init in Python before each search
+# so the hash/transposition table contains the correct "empty entry" sentinel.
+_BSS_START: int = 0x3000
+_BSS_END: int   = 0x5FFE  # inclusive, word-aligned; size = 0x3000 bytes
 
 # Address of the abort-flag check inside alpha-beta (confirmed from disassembly).
-# Hooked to count search nodes and abort after the level threshold.
+# Hooked to count search nodes (for diagnostics / fallback snapshot).
 _ABORT_CHECK_ADDR: int = 0x0C2CE
-
-# Node counts before aborting search, keyed by level.  Each visit to 0x0C2CE
-# corresponds roughly to one search node.  Higher levels = more nodes = deeper search.
-_LEVEL_NODE_THRESHOLD: dict[int, int] = {
-    1: 5_000, 2: 10_000, 3: 20_000, 4: 35_000,
-    5: 55_000, 6: 80_000, 7: 110_000, 8: 150_000, 9: 200_000,
-}
 
 
 def _scan_cmpiw(code: bytes, base: int = 0) -> dict[int, tuple]:
@@ -117,11 +186,11 @@ def _scan_cmpiw(code: bytes, base: int = 0) -> dict[int, tuple]:
     :param base: Virtual load address of *code* (0 for Battle Chess).
     """
     # Opcodes for 6-byte word-size immediate instructions with (d16,An) or (An,Xn) EA.
+    # Unicorn M68K decodes these as 4 bytes, leaving 2 trailing bytes to execute.
     # op key → instruction semantics for the hook dispatcher.
     _OP_MAP_D16: dict[int, str] = {
         0x00: 'ori', 0x02: 'andi', 0x04: 'subi', 0x06: 'addi', 0x0A: 'eori', 0x0C: 'cmp',
     }
-    _MOVE_W_D16_B0 = frozenset({0x31, 0x33, 0x35, 0x37, 0x39, 0x3B, 0x3D, 0x3F})
     result: dict[int, tuple] = {}
     n = len(code)
     i = 0
@@ -145,14 +214,6 @@ def _scan_cmpiw(code: bytes, base: int = 0) -> dict[int, tuple]:
                 result[base + i] = (op, 'anXn', an_reg, imm16, ext)
                 i += 6
                 continue
-        elif b0 in _MOVE_W_D16_B0 and b1 == 0x7C:  # move.w #imm, (d16, An)
-            an_reg = (b0 >> 1) & 0x07  # dest register from opcode byte bits 3-1
-            imm16 = (code[i + 2] << 8) | code[i + 3]
-            raw_d16 = (code[i + 4] << 8) | code[i + 5]
-            d16 = raw_d16 if raw_d16 < 0x8000 else raw_d16 - 0x10000
-            result[base + i] = ('mov', 'd16', an_reg, imm16, d16)
-            i += 6
-            continue
         i += 2  # M68K instructions are always word-aligned
     return result
 
@@ -258,16 +319,18 @@ class ThinkSession:
             self._rom_regions = parse_amiga_hunk(self._rom_bytes)
             logger.info("ROM parsed; %d memory region(s)", len(self._rom_regions))
             # Pre-scan for all 6-byte cmpi.w instructions mis-decoded by Unicorn.
-            _code_region = next(
-                (r for r in self._rom_regions if r.label == "HUNK_CODE" and r.size > 0),
-                None,
-            )
-            if _code_region is not None:
-                self._cmpiw_info = _scan_cmpiw(
-                    self._rom_bytes[_code_region.offset:_code_region.offset + _code_region.size],
-                    base=_code_region.load_address,
-                )
-                logger.info("cmpi.w scan: %d 6-byte instructions to patch", len(self._cmpiw_info))
+            # Scan every executable region (HUNK_CODE + DRAGON_CRACK).
+            _all_cmpiw: dict = {}
+            for _r in self._rom_regions:
+                if _r.label in ("HUNK_CODE", "DRAGON_CRACK") and _r.size > 0:
+                    _all_cmpiw.update(
+                        _scan_cmpiw(
+                            self._rom_bytes[_r.offset:_r.offset + _r.size],
+                            base=_r.load_address,
+                        )
+                    )
+            self._cmpiw_info = _all_cmpiw
+            logger.info("cmpi.w scan: %d 6-byte instructions to patch", len(self._cmpiw_info))
 
         # Create a fresh CPU each call — the first search leaves stale BSS,
         # search tables, and register state in chip RAM that corrupt subsequent
@@ -289,6 +352,16 @@ class ThinkSession:
 
         # AllocMem pool (Amiga exec allocator) sits above chip RAM.
         cpu.map_region(ALLOC_POOL, ALLOC_POOL_SIZE)
+
+        # Sentinel page: the AI returns here when its outer function exits normally.
+        # Also absorbs stray writes through garbage index registers (e.g. the
+        # CLR.B (A0+D1.L) at 0x9BAE during the hash-table build loop when D1 is
+        # computed from the transposition table).  Unicorn M68K raises UC_ERR_EXCEPTION
+        # (bus error) rather than UC_ERR_MEM_WRITE_UNMAPPED for high-address writes,
+        # so HOOK_MEM_INVALID is bypassed — pre-map the region to prevent the crash.
+        _SENTINEL_PAGE = _SENTINEL & ~0xFFFF  # 0xFFFF0000
+        cpu.map_region(_SENTINEL_PAGE, 0x10000)
+        cpu.mem_write(_SENTINEL_PAGE, bytes(0x10000))
 
         # Amiga OS stubs + AbsExecBase mem hook.
         traps = AmigaTraps(cpu)
@@ -323,6 +396,39 @@ class ThinkSession:
             _search_fen = request.fen
             _search_cc  = request.computer_color
 
+        # Pre-initialise the BSS hash/transposition table to 0x0278 ("empty entry").
+        # The game's BSS init routine (0x8820) normally does this, but we BYPASS_NOOP
+        # it to avoid its 10-16M instruction overhead.  write_position() overwrites
+        # the chess-board portion of BSS, so BSS pre-init must come first.
+        bss_size = (_BSS_END - _BSS_START + 2)
+        cpu.mem_write(_BSS_START, b"\x02\x78" * (bss_size // 2))
+
+        # Phase-1 evaluation counter and position-index start at 0x0278 (BSS
+        # pre-init value).  BSS pre-init = 0x0278 → [0x48BA]=632 which is already
+        # above the 120 threshold checked at 0x8392, so the real phase-1 search
+        # (JSR 0xA266) is skipped entirely.  Zero both counters so the search runs.
+        cpu.mem_write(_PHASE1_EVAL_CTR_ADDR, struct.pack(">H", 0))
+        cpu.mem_write(_PHASE1_POS_IDX_ADDR,  struct.pack(">H", 0))
+
+        # Zero the abort flag (ROM initialises it to 0xFFFC; non-zero makes the
+        # search exit at the very first abort-check, before any moves are evaluated).
+        cpu.mem_write(_ABORT_FLAG_ADDR, struct.pack(">H", 0))
+        # Zero the wait/timer flag so the pre-search timer loop at 0xCB18 exits
+        # immediately instead of spinning until the Amiga timer expires.
+        cpu.mem_write(_WAIT_FLAG_ADDR, struct.pack(">H", 0))
+        # The outer driver loops while [0x4A5A]==2.  The caller (the Amiga game UI)
+        # normally writes 2 here before invoking the driver; in our headless setup
+        # we must do it explicitly, otherwise the BSS init value (0x0278) causes the
+        # loop to exit on the very first check, before any phase runs.
+        cpu.mem_write(_LOOP_FLAG_ADDR, struct.pack(">H", 2))
+
+        # Force AI_INIT to take the clean path (depth=1 call to 0xC198).
+        cpu.mem_write(_AI_INIT_PATH_FLAG_ADDR, struct.pack(">H", 0))
+        # [0x8270] = ROM code bytes (0x0003) — the inner search loop exits when
+        # non-zero and the outer-loop body shortcuts directly to TC.  Zero it so
+        # the search enters the 0xDE7A-based iteration loop.
+        cpu.mem_write(_SEARCH_COMPLETE_FLAG_ADDR, struct.pack(">H", 0))
+
         bridge.clear_best_move()
         bridge.write_position(_search_fen)
         bridge.set_computer_color(_search_cc)
@@ -334,6 +440,15 @@ class ThinkSession:
         cpu.mem_write(PLAYER_TYPE_BASE + _search_cc * 2, struct.pack(">H", 1))
         # Clear the final-result slot so a stale value isn't mistaken for the result.
         cpu.mem_write(_AI_BEST_MOVE_FINAL_ADDR, b"\x00" * 8)
+        # Initialise search-stack entries 0x67..0x78 (18 × 8 bytes, starting at
+        # _AI_BEST_MOVE_FINAL_ADDR = 0x365A) with sentinel to_sq=_SEARCH_STACK_SENTINEL.
+        # The inner search at 0xD99A checks BOARD_ARRAY[to_sq*4]: with to_sq=0 (from
+        # clear_best_move) that maps to a1 which has a Rook → non-zero → bne 0xDAC4
+        # (no-write path) fires every time, so the search never records a best move.
+        # The sentinel 0x1000 maps BOARD_ARRAY+0x4000 = 0x70F4, outside BSS (ends at
+        # 0x5FFE), so _mem_invalid maps that page as zeros → check passes.
+        _sentinel_entry = struct.pack(">HH4x", _SEARCH_STACK_SENTINEL, _SEARCH_STACK_SENTINEL)
+        cpu.mem_write(_AI_BEST_MOVE_FINAL_ADDR, _sentinel_entry * 18)
 
         # Initialise registers and place the sentinel return address.
         cpu.reg_write("A4", _A4_VALUE)
@@ -347,12 +462,21 @@ class ThinkSession:
         _root_board: bytes = bytes(cpu.mem_read(BOARD_ARRAY_ADDR, 128 * 4))
 
         _mapped: set[int] = set()
-        # Outer driver loop pass counter and threshold for this level.
+        # Outer driver loop pass counter (safety backstop only — TC is primary).
         _loop_count: list[int] = [0]
-        _loop_threshold = _OUTER_LOOP_PASSES.get(request.level.value, 1)
-        # Search node counter (visits to 0x0C2CE) and threshold.
+        _loop_820c_fires: list[int] = [0]  # every time hook at 0x820C fires
+        _diag_81f2_fires: list[int] = [0]  # 0x81F2 reached (BRA->0x820C should follow)
+        _diag_c198_fires: list[int] = [0]  # 0xC198 search entry reached
+        _loop_threshold = _OUTER_LOOP_PASSES.get(request.level.value, 9999)
+        # TC invocation counter — TC fires once before the inner loop starts.
+        # Does NOT set abort; abort is set by _hook_de7a.
+        _tc_count: list[int] = [0]
+        # DE7A invocation counter — each call drives one alpha-beta pass.
+        # Abort flag is set when _de7a_count reaches _de7a_threshold.
+        _de7a_count: list[int] = [0]
+        _de7a_threshold = _LEVEL_DE7A_THRESHOLD.get(request.level.value, 1)
+        # Search node counter (visits to 0x0C2CE) — for diagnostics only.
         _node_count: list[int] = [0]
-        _node_threshold = _LEVEL_NODE_THRESHOLD.get(request.level.value, 5_000)
         # _write_snapshot — last root-valid write to AI_BEST_MOVE_ADDR;
         #                   fallback for positions where the outer driver exits
         #                   before writing a final result.
@@ -383,6 +507,27 @@ class ThinkSession:
                 return False
             return True
 
+        def _hook_diag_81f2(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            # Fires when 0x81F2 is reached (AI_INIT / phase-0 has just returned).
+            # Phase 1 runs 9999+ times and corrupts AI_BEST_MOVE_ADDR with garbage;
+            # stop now if phase 0 already wrote a valid move there.
+            _diag_81f2_fires[0] += 1
+            try:
+                cpu.mem_write(_ABORT_FLAG_ADDR, struct.pack(">H", 0))
+                cpu.mem_write(_SEARCH_COMPLETE_FLAG_ADDR, struct.pack(">H", 0))
+                raw = bytes(cpu.mem_read(AI_BEST_MOVE_ADDR, 4))
+                _to, _from = struct.unpack(">HH", raw)
+                if (_to != _SEARCH_STACK_SENTINEL and _from != _SEARCH_STACK_SENTINEL
+                        and 0 < _to <= 0x77 and not (_to & 0x88)
+                        and 0 <= _from <= 0x77 and not (_from & 0x88)
+                        and _is_root_valid(_to, _from)):
+                    cpu.emu_stop()
+            except Exception:
+                pass
+
+        def _hook_diag_c198(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            _diag_c198_fires[0] += 1  # fires on search entry
+
         def _hook_loop_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
             # Unicorn M68K mis-decodes `cmpi.w #2, -$35a4(a4)` (6 bytes) as 4 bytes,
             # leaving trailing bytes `ca 5c` to execute as `and.w (a4)+, d5` — which
@@ -390,6 +535,7 @@ class ThinkSession:
             # We implement cmpi.w + bne.b manually and redirect PC.
             # Additionally: count outer driver loop passes and exit at the level threshold
             # instead of relying on the game's own TC/timer mechanism.
+            _loop_820c_fires[0] += 1
             try:
                 a4_val = cpu.reg_read("A4")
                 loop_flag_addr = (a4_val - 0x35A4) & 0xFFFFFFFF
@@ -423,13 +569,12 @@ class ThinkSession:
                 cpu.reg_write("PC", 0x8228)
 
         def _hook_abort_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
-            # Called at 0x0C2CE (tst.w [0x4A4A]).  Count search nodes; stop emulation
-            # cleanly when the level threshold is reached.  Setting the abort flag instead
-            # causes the pawn evaluator to commit h7h5 as its abort result — emu_stop()
-            # halts without touching the flag.
-            # At each visit also snapshot AI_BEST_MOVE_ADDR: fires only ~40k times per
-            # 30s (vs per-store HOOK_MEM_WRITE which fires millions of times and kills
-            # performance by 10-100x).
+            # Called at 0x0C2CE (tst.w [0x4A4A]).  Count search nodes for diagnostics
+            # and snapshot AI_BEST_MOVE_ADDR as a fallback in case phase 2 never writes
+            # _AI_BEST_MOVE_FINAL_ADDR.
+            # Termination is now handled by _hook_tc (abort flag mechanism), NOT
+            # emu_stop() — emu_stop() halts mid-phase-1 before phase 2 runs, causing
+            # the final result address to stay zeroed.
             _node_count[0] += 1
             try:
                 raw = bytes(cpu.mem_read(AI_BEST_MOVE_ADDR, 4))
@@ -438,11 +583,6 @@ class ThinkSession:
                     _write_snapshot[0] = raw
             except Exception:
                 pass
-            if _node_count[0] >= _node_threshold:
-                try:
-                    cpu.emu_stop()
-                except Exception:
-                    pass
 
         def _hook_noop(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
             try:
@@ -452,6 +592,33 @@ class ThinkSession:
                 cpu.reg_write("PC", ret)
             except Exception:
                 pass
+
+        def _hook_tc(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            # TC (ElapsedTime) stub at 0x008A — fires once before the inner loop
+            # starts (when outer-loop BGE at 0xC2A2 triggers with [0x48B6]=0x0278).
+            # Does NOT set abort; abort is owned by _hook_de7a.  Just NOOP it.
+            _tc_count[0] += 1
+            try:
+                a7 = cpu.reg_read("A7")
+                ret = struct.unpack(">I", bytes(cpu.mem_read(a7, 4)))[0]
+                cpu.reg_write("A7", a7 + 4)
+                cpu.reg_write("PC", ret)
+            except Exception:
+                pass
+
+        def _hook_de7a(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            # 0xDE7A = search-iteration handler.  Each invocation calls 0xDD7E
+            # (alpha-beta tree walk) then checks timer/abort state.  After
+            # _de7a_threshold invocations, set the abort flag so 0xC300 inside
+            # 0xDE7A returns D0≠0, which clears [0x4A5E] and lets the inner loop
+            # exit → 0xC198 returns → outer driver phases 1+2 run → best move written.
+            # Do NOT redirect PC — let 0xDE7A execute normally with abort=1 set.
+            _de7a_count[0] += 1
+            if _de7a_count[0] >= _de7a_threshold:
+                try:
+                    cpu.mem_write(_ABORT_FLAG_ADDR, struct.pack(">H", 1))
+                except Exception:
+                    pass
 
         # Precomputed cmpi.w info for this session (None when using FakeCpu).
         _cmpiw_info = self._cmpiw_info or {}
@@ -539,6 +706,16 @@ class ThinkSession:
             if addr != AI_BEST_MOVE_ADDR or sz != 2:
                 return
             to_sq = val & 0xFFFF
+            try:
+                pc = cpu.reg_read("PC")
+                d1 = cpu.reg_read("D1")
+                d3 = cpu.reg_read("D3")
+                logger.debug(
+                    "AI_BEST_MOVE write: to_sq=0x%04X pc=0x%04X d1=0x%08X d3=0x%08X nodes=%d",
+                    to_sq, pc, d1, d3, _node_count[0],
+                )
+            except Exception:
+                pass
             if to_sq == 0 or to_sq > 0x77 or (to_sq & 0x88):
                 return
             try:
@@ -548,6 +725,25 @@ class ThinkSession:
                     return
                 if _is_root_valid(to_sq, from_sq):
                     _write_snapshot[0] = struct.pack(">HH", to_sq, from_sq)
+            except Exception:
+                pass
+
+        def _mem_write_final(
+            _emu: object, _acc: int, addr: int, sz: int, val: int, _u: object = None
+        ) -> None:
+            # Fires when phase 2 writes to _AI_BEST_MOVE_FINAL_ADDR (or +2).
+            # Stop emulation once BOTH from_sq and to_sq are non-zero so we
+            # don't stop on partial writes (MOVE.W from_sq; not yet to_sq).
+            # Guard: ignore writes before any search passes have run.
+            if _de7a_count[0] < _de7a_threshold:
+                return
+            if val == 0:
+                return
+            try:
+                data = bytes(cpu.mem_read(_AI_BEST_MOVE_FINAL_ADDR, 4))
+                f_sq, t_sq = struct.unpack(">HH", data)
+                if f_sq > 0 and t_sq > 0 and not (f_sq & 0x88) and not (t_sq & 0x88):
+                    cpu.emu_stop()
             except Exception:
                 pass
 
@@ -621,32 +817,66 @@ class ThinkSession:
         hooks: list[int] = []
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_loop_check,    begin=0x820C,          end=0x820C))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_player_check,  begin=0x8220,          end=0x8220))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_diag_81f2,     begin=0x81F2,          end=0x81F2))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_diag_c198,     begin=0xC198,          end=0xC198))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_abort_check,   begin=_ABORT_CHECK_ADDR, end=_ABORT_CHECK_ADDR))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_prefetch_79bc, begin=0x79BC,          end=0x79BC))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_prefetch_79c8, begin=0x79C8,          end=0x79C8))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_tc,            begin=_TC_ADDR,        end=_TC_ADDR))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_de7a,          begin=_DE7A_ADDR,      end=_DE7A_ADDR))
         for _noop_addr in _BYPASS_NOOP:
             hooks.append(cpu.hook_add(HOOK_CODE, _hook_noop, begin=_noop_addr, end=_noop_addr))
-        # NOTE: no range hook for 0x1-0x1FF.  A range hook overlapping the
-        # per-address BYPASS_NOOP hooks fires _hook_noop twice for addresses like
-        # 0x5A and 0x8A — the second call pops 4 extra bytes off the stack,
-        # corrupting A7 and eventually A4.  BYPASS_NOOP already covers all the OS
-        # stubs that need interception; other low-ROM addresses work unhooked.
-        hook_mem   = cpu.hook_add(HOOK_MEM_INVALID, _mem_invalid)
+        # Register per-address CMPI.W correction hooks for all 6-byte instructions
+        # that Unicorn M68K mis-decodes as 4 bytes.  Exclude 0x820C and 0x8220 which
+        # are already handled by _hook_loop_check / _hook_player_check above.
+        # Also exclude _TC_ADDR (0x008A) which is handled by _hook_tc above.
+        for _cmpiw_addr in _cmpiw_info:
+            if _cmpiw_addr not in (0x820C, 0x8220, _TC_ADDR):
+                hooks.append(cpu.hook_add(HOOK_CODE, _hook_cmpiw, begin=_cmpiw_addr, end=_cmpiw_addr))
+        hook_mem       = cpu.hook_add(HOOK_MEM_INVALID, _mem_invalid)
+        hook_mem_write = cpu.hook_add(
+            HOOK_MEM_WRITE, _mem_write,
+            begin=AI_BEST_MOVE_ADDR,
+            end=AI_BEST_MOVE_ADDR + 3,
+        )
+        hook_mem_final = cpu.hook_add(
+            HOOK_MEM_WRITE, _mem_write_final,
+            begin=_AI_BEST_MOVE_FINAL_ADDR,
+            end=_AI_BEST_MOVE_FINAL_ADDR + 3,  # cover both from_sq (+0) and to_sq (+2)
+        )
         # The ROM initialises abort_flag to 0xFFFC; clear it so the search runs.
         cpu.mem_write(_ABORT_FLAG_ADDR, struct.pack(">H", 0))
-        logger.debug("starting emulation from 0x%X (level=%s, loop_threshold=%d)",
-                     AI_OUTER_DRIVER_ADDR, request.level, _loop_threshold)
+        cpu.mem_write(_WAIT_FLAG_ADDR,  struct.pack(">H", 0))
+        logger.debug("starting emulation from 0x%X (level=%s, de7a_threshold=%d)",
+                     AI_OUTER_DRIVER_ADDR, request.level, _de7a_threshold)
         _emu_error: Exception | None = None
         try:
             cpu.emu_start(AI_OUTER_DRIVER_ADDR, until=_SENTINEL, count=_MAX_INSTRUCTIONS)
         except Exception as _exc:
             _emu_error = _exc
-            logger.warning("emulation raised %s; attempting move recovery", _exc)
+            try:
+                _crash_pc = cpu.reg_read("PC")
+                logger.warning(
+                    "emulation raised %s; crash PC=0x%X loop=%d nodes=%d",
+                    _exc, _crash_pc, _loop_count[0], _node_count[0],
+                )
+            except Exception:
+                logger.warning("emulation raised %s; attempting move recovery", _exc)
         finally:
             for _h in hooks:
                 cpu.hook_del(_h)
             cpu.hook_del(hook_mem)
-        logger.debug("emulation done; loop_count=%d node_count=%d", _loop_count[0], _node_count[0])
+            cpu.hook_del(hook_mem_write)
+            cpu.hook_del(hook_mem_final)
+        logger.warning(
+            "emulation done; loop=%d 820c=%d tc=%d de7a=%d nodes=%d 81f2=%d c198=%d "
+            "final=%s best=%s a4=0x%X",
+            _loop_count[0], _loop_820c_fires[0], _tc_count[0], _de7a_count[0],
+            _node_count[0], _diag_81f2_fires[0], _diag_c198_fires[0],
+            bytes(cpu.mem_read(_AI_BEST_MOVE_FINAL_ADDR, 4)).hex(),
+            bytes(cpu.mem_read(AI_BEST_MOVE_ADDR, 4)).hex(),
+            cpu.reg_read("A4"),
+        )
 
         # Priority 1: phase-2 final result at 0x365A (from_sq @ offset 0, to_sq @ offset 2).
         # Written by best_move_writer (0x0126) during phase-2 cleanup — the actual

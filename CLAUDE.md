@@ -406,6 +406,14 @@ If no node produces a valid move, the search itself has a bug (wrong piece itera
 
 `{0x000C, 0x013E, 0x0036, 0x0084, 0x8820, 0x8D32, 0x7CCE, 0x857E, 0x005A, 0x015C, 0x00E4, 0x0138, 0x17D2}`
 
+### ROM selection verdict (empirically established 2026-08-31)
+
+Two binaries compared: `BattleChess.amiga` (Dragon Inc crack) vs binary extracted from `BattleChess.adf`.
+
+Result: **70052 of 73028 bytes differ** — completely different builds. The ADF binary has unrecognisable code at all key AI addresses (0x81DC, 0xD6D2, 0xD490, 0xD8FE). The Dragon-crack binary has the correct instructions at those addresses, confirmed by live Unicorn hooks (outer driver runs, 31 nodes fire, function frame entries match IRA output).
+
+**Conclusion**: Use `BattleChess.amiga` (Dragon crack). The crack touches only copy-protection; the AI code is identical to the original retail build. The ADF binary is a different version/pack and should not be used for the Unicorn emulation.
+
 ### Dragon-crack region
 
 The ROM file has non-standard trailing bytes (Dragon Inc crack) loaded as `DRAGON_CRACK` region at the load address immediately after the code hunk. `_scan_cmpiw` scans both `HUNK_CODE` and `DRAGON_CRACK`.

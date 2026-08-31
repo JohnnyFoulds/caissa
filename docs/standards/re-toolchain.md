@@ -47,7 +47,7 @@ python3 -c "open('/tmp/bc_valid.amiga','wb').write(open('Resources/Retro/BattleC
 
 **Purpose**: Interactive disassembler + **decompiler**. The decompiler produces C pseudocode for each function — critical for understanding algorithm-level logic without hand-tracing assembly. Supports M68K natively; Amiga hunk format via plugin.
 
-**Status**: NOT INSTALLED — install before Step 1 of the BC AI analysis
+**Status**: INSTALLED — `/opt/homebrew/Cellar/ghidra/12.1.3/libexec/`
 
 **Install on macOS**:
 ```bash
@@ -63,7 +63,7 @@ curl -L https://github.com/BartmanAbyss/ghidra-amiga/releases/download/20260128/
 # OR headless install: unzip into $GHIDRA_INSTALL_DIR/Ghidra/Extensions/
 ```
 
-**Version compatibility note** (2026-08-31): brew provides Ghidra 12.1.3; latest `ghidra-amiga` release targets 12.0.1. Ghidra plugins generally load across minor versions. If it fails, install Ghidra 12.0.1 directly from `github.com/NationalSecurityAgency/ghidra/releases`.
+**Version compatibility note** (2026-08-31): brew provides Ghidra 12.1.3; latest `ghidra-amiga` release targets 12.0.1. Plugin zip installed at `libexec/Extensions/ghidra-amiga.zip` — loads at first GUI or headless launch. Confirmed working.
 
 **Critical Ghidra settings for Amiga assembly code** (from Tetracorp guide):
 - **Untick** "Call-Fixup Installer" — otherwise code after JSR is wrongly marked non-reachable
@@ -78,13 +78,15 @@ curl -L https://github.com/BartmanAbyss/ghidra-amiga/releases/download/20260128/
 
 **Purpose**: Drive Ghidra headlessly from CPython 3. Call the decompiler on specific functions and get C pseudocode programmatically. No GUI. DOD Cyber Crime Center project, now bundled in Ghidra 11+.
 
-**Status**: NOT INSTALLED — install after Ghidra
+**Status**: INSTALLED — `pyghidra 3.1.0` in `.venv`
 
 **Install**:
 ```bash
 /Users/johannes/code/lucaschess/.venv/bin/pip install pyghidra
-# Requires GHIDRA_INSTALL_DIR env var set (see Ghidra section above)
-python3 -c "import pyghidra; print('ok')"
+# Requires GHIDRA_INSTALL_DIR and JAVA_HOME env vars
+export GHIDRA_INSTALL_DIR=/opt/homebrew/Cellar/ghidra/12.1.3/libexec
+export JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.12.1/libexec/openjdk.jdk/Contents/Home
+python3 -c "import pyghidra; pyghidra.start(); print('ok')"
 ```
 
 **Batch decompile pattern**:

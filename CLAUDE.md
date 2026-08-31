@@ -346,6 +346,72 @@ as a SystemException — stop, diagnose, fix, verify, then re-run. Never move on
 
 ---
 
+## Retro Engine Emulator (`bin/Code/Retro/Think.py`) — Investigation 2026-08-31
+
+The Battle Chess Amiga binary runs under Unicorn M68K emulator. The goal is for the AI to write a valid best-move to `AI_BEST_MOVE_ADDR` so `caissa-retro` can return a real move instead of falling back to python-chess.
+
+### Key addresses (confirmed from disassembly + hooks)
+
+| Symbol | Address | Notes |
+|---|---|---|
+| `AI_OUTER_DRIVER_ADDR` | `0x81DC` | Entry point; emulation starts here |
+| `AI_BEST_MOVE_ADDR` | `0x3662` | Where search writes best move (to_sq @ +0, from_sq @ +2) |
+| `_AI_BEST_MOVE_FINAL_ADDR` | `0x365A` | Phase-2 final result slot (from_sq @ +0, to_sq @ +2) |
+| `_ABORT_FLAG_ADDR` | `0x4A4A` | Non-zero → inner search exits; ROM init = 0xFFFC, zero before search |
+| `_LOOP_FLAG_ADDR` | `0x4A5A` | Must be 2 for outer driver to loop; BSS = 0x0278 (exits immediately) |
+| `_WAIT_FLAG_ADDR` | `0x4A92` | Timer wait loop; zero before search |
+| `_SEARCH_COMPLETE_FLAG_ADDR` | `0x8270` | ROM code bytes = 0x0003; zero before search or inner loop exits immediately |
+| `_AI_INIT_PATH_FLAG_ADDR` | `0x07D2` | ROM bytes; zero so AI_INIT takes clean depth-1 path |
+| `_DE7A_ADDR` | `0xDE7A` | Search-iteration handler; each call = one alpha-beta tree walk |
+| `_TC_ADDR` | `0x008A` | ElapsedTime stub; NOOP'd by `_hook_tc` |
+| `_ABORT_CHECK_ADDR` | `0x0C2CE` | `tst.w [0x4A4A]` — node counter hook fires here |
+| `PLAYER_TYPE_BASE` | `0x07D4` | ROM opcodes, NOT player data. `[0x07D4+color*2]` must be written to 1 (Human) before search |
+| `BOARD_ARRAY_ADDR` | `0x30F4` | 128×4 bytes; `[sq*4]=piece_type, [sq*4+1]=color` |
+| BSS range | `0x3000..0x5FFE` | Pre-init to `0x0278` before each search (game's own 0x8820 routine bypassed) |
+
+### What currently works (as of 2026-08-31)
+
+```
+loop=2 820c=2 tc=1 de7a=30 nodes=31 81f2=1 c198=1
+```
+- Outer driver loops twice ✓, DE7A fires 30 times ✓, 31 search nodes ✓, phase 0 returns ✓
+- `_hook_de7a` sets `[0x4A4A]=1` after 30 calls → inner search exits cleanly
+- `_hook_diag_81f2` stops emulation at phase-0 return if a valid move is found
+
+### What is still broken
+
+`best=94620002` → `to_sq=0x9462` (garbage), `from_sq=0x0002` (c1 Bishop = White piece).
+Engine falls back to python-chess g8h6.
+
+**Two confirmed write sites at `AI_BEST_MOVE_ADDR` (from `_mem_write` hook):**
+
+- **PC=0xD490** — writes `to_sq=0x0002` or `0x0000`, D1=2 or 0, nodes=0 at write time
+- **PC=0xD8FE** — writes `to_sq=0x9462`, D1=0x9462, nodes=0 at write time
+
+Both fire with `nodes=0` — before any alpha-beta nodes are counted. This is initialisation code, NOT the search. The actual search (31 nodes) may write valid moves but they get overwritten.
+
+**ROM bytes at those addresses** (for next session to decode):
+```bash
+xxd -s $((0xD490 + 0x28)) -l 32 Resources/Retro/BattleChess.amiga
+xxd -s $((0xD8FE + 0x28)) -l 32 Resources/Retro/BattleChess.amiga
+```
+
+### Next step
+
+Determine whether the valid best-move is ever written to `AI_BEST_MOVE_ADDR` DURING the 31-node search, before the init code at 0xD8FE overwrites it. Add snapshot logic in `_hook_abort_check` that captures the value at each of the 31 nodes and logs it. If any of the 31 snapshots are a valid Black pawn move, the fix is to stop at the right moment.
+
+If no node produces a valid move, the search itself has a bug (wrong piece iteration, wrong color filtering, wrong board state) and needs deeper diagnosis.
+
+### BYPASS_NOOP set (current)
+
+`{0x000C, 0x013E, 0x0036, 0x0084, 0x8820, 0x8D32, 0x7CCE, 0x857E, 0x005A, 0x015C, 0x00E4, 0x0138, 0x17D2}`
+
+### Dragon-crack region
+
+The ROM file has non-standard trailing bytes (Dragon Inc crack) loaded as `DRAGON_CRACK` region at the load address immediately after the code hunk. `_scan_cmpiw` scans both `HUNK_CODE` and `DRAGON_CRACK`.
+
+---
+
 ## Amiga/FS-UAE Automation Layer (`bin/Code/Amiga/`) — Calibrated 2026-08-30
 
 ### SDL2 relative-mouse-mode physics (macOS, this machine)

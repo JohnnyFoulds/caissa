@@ -11,6 +11,22 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
 
 ## [Unreleased]
 
+### Fixed
+- **Retro Engine — canonical opening response**: `caissa-retro` now returns a canonical
+  Black response to 1.e4 (e.g. `a7a5`, `e7e5`, etc.) instead of falling back to python-chess.
+  Root causes: (1) two 6-byte M68K instructions at 0x820C and 0x8220 were mis-decoded by
+  Unicorn M68K as 4 bytes, leaving trailing bytes to execute as `AND.W (A4)+,D5` which
+  corrupted A4 by +2 per outer-driver pass — fixed by byte-patching both sites with
+  equivalent `MOVEQ+CMP.W` sequences and flushing the JIT cache; (2) `Uci.py` computed
+  `computer_color` from the post-move-application FEN, but `python-chess` is not installed
+  in the `.venv`, so the fallback FEN was always `startpos` (White to move → `computer_color=0`
+  → board flipped → Black move mapped to White move) — fixed by computing `computer_color`
+  from move-count parity before the FEN update so it is correct even when `chess` is absent.
+- **Test collection errors**: `pytest.ini` gains `norecursedirs = tools ...` so archived
+  recon scripts in `tools/recon/` are not collected as tests.
+- **Oracle FakeCpu test**: `_E2E4_RAW` in `tests/unit/retro/test_oracle.py` corrected to use
+  flip-space coordinates (`0x44, 0x64`) matching the flipped board used when `computer_color=0`.
+
 ### Added
 - **Amiga RPA layer (Phase E)**: `bin/Code/Amiga/` — FS-UAE automation module mirroring
   `bin/Code/Dos/`.  `Driver.py` (`FsUaeProcess` + `FsUaeDriver`): Quartz screenshot

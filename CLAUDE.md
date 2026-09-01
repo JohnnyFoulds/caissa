@@ -378,29 +378,27 @@ loop=2 820c=2 tc=1 de7a=30 nodes=31 81f2=1 c198=1
 - `_hook_de7a` sets `[0x4A4A]=1` after 30 calls → inner search exits cleanly
 - `_hook_diag_81f2` stops emulation at phase-0 return if a valid move is found
 
-### What is still broken
+### Root cause analysis (established 2026-08-31 via Ghidra C decompilation + ROM byte scan)
 
 `best=94620002` → `to_sq=0x9462` (garbage), `from_sq=0x0002` (c1 Bishop = White piece).
-Engine falls back to python-chess g8h6.
 
-**Two confirmed write sites at `AI_BEST_MOVE_ADDR` (from `_mem_write` hook):**
+**`_scan_cmpiw` did not cover two MOVE.W 6-byte forms** that Unicorn mis-decodes as 4 bytes:
 
-- **PC=0xD490** — writes `to_sq=0x0002` or `0x0000`, D1=2 or 0, nodes=0 at write time
-- **PC=0xD8FE** — writes `to_sq=0x9462`, D1=0x9462, nodes=0 at write time
+**Pattern A** (`MOVE.W (d16,An), (0,Am,Dn.L)`) — source is d16-displaced, destination is indexed:
+- Opcode: DstMode=6 (indexed), SrcMode=5 (d16,An) → 6 bytes total
+- Byte pattern: `31 AD <d16_hi> <d16_lo> 08 00` (specific case: src=A5, dst=A0+D0.L)
+- 11 occurrences in ROM including 0xD522, 0xD700, 0xD7B2, 0xD830, 0xD8FE
+- Result when mis-decoded: wrong value written to `PIECE_TABLE[slot].from_sq` or `.to_sq`
 
-Both fire with `nodes=0` — before any alpha-beta nodes are counted. This is initialisation code, NOT the search. The actual search (31 nodes) may write valid moves but they get overwritten.
+**Pattern B** (`MOVE.W (0,An,Dn.L), (d16,Am)`) — source is indexed, destination is d16-displaced:
+- Opcode: SrcMode=6 (indexed), DstMode=5 (d16,An) → 6 bytes total
+- Byte pattern: `3B 70 08 00 <d16_hi> <d16_lo>` (specific case: src=A0+D0.L, dst=A5)
+- 34 occurrences in ROM including 0xD8AE (loads pawn direction delta from table)
+- Result when mis-decoded: wrong direction delta loaded → garbage candidate square
 
-**ROM bytes at those addresses** (for next session to decode):
-```bash
-xxd -s $((0xD490 + 0x28)) -l 32 Resources/Retro/BattleChess.amiga
-xxd -s $((0xD8FE + 0x28)) -l 32 Resources/Retro/BattleChess.amiga
-```
-
-### Next step
-
-Determine whether the valid best-move is ever written to `AI_BEST_MOVE_ADDR` DURING the 31-node search, before the init code at 0xD8FE overwrites it. Add snapshot logic in `_hook_abort_check` that captures the value at each of the 31 nodes and logs it. If any of the 31 snapshots are a valid Black pawn move, the fix is to stop at the right moment.
-
-If no node produces a valid move, the search itself has a bug (wrong piece iteration, wrong color filtering, wrong board state) and needs deeper diagnosis.
+**Fix**: extend `_scan_cmpiw` to detect both patterns and add corresponding hook dispatch cases.
+The hook for Pattern A reads source from `(d16,An)` memory and writes to `(An+Dn.L)` memory.
+The hook for Pattern B reads source from `(An+Dn.L)` memory and writes to `(d16,An)` memory.
 
 ### BYPASS_NOOP set (current)
 

@@ -201,3 +201,10 @@ class Unicorn68k(Cpu):
         :param handle: Handle returned by :meth:`hook_add`.
         """
         self._uc.hook_del(handle)
+
+    def flush_tb(self) -> None:
+        """Flush the Unicorn JIT translation-block cache."""
+        try:
+            self._uc.ctl_flush_tb()
+        except AttributeError:
+            pass  # older Unicorn builds that lack ctl_flush_tb

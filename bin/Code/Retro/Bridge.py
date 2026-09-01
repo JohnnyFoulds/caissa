@@ -10,11 +10,14 @@ reads back the AI's chosen move from the ``ai_best_move`` buffer.
     PIECE_TABLE_ADDR    0x3322  array   8 bytes/entry, piece list
     PLAYER1_COLOR_ADDR  0x331E  word    0=White, 1=Black (side to move)
     PLAYER2_COLOR_ADDR  0x331C  word    0=White, 1=Black (other side)
+    PIECE_COUNT_TABLE   0x3318  array   2 words; [color] = count-1 for that color
     AI_BEST_MOVE_ADDR   0x3662  8 bytes [to_sq, from_sq, state, ...]
     PLAYER_TYPE_BASE    0x07D4  array   1=Human, 2=Computer; entry[color*2]
     BOARD_ARRAY_ADDR    0x30F4  array   128*4 bytes; [sq*4]=type, [sq*4+1]=color
     PAWN_DIR_TABLE      0x07A2  array   2 words; [0]=white_dir (+0x10), [1]=black_dir (-0x10)
+    PIECE_DIR_TABLE     0x0782  array   8 words; [0-3]=rook dirs (N/S/E/W), [4-7]=bishop dirs (NE/SW/NW/SE)
     SEARCH_SKIP_FLAG    0x07D2  word    non-zero → AI skips search at 0x824C
+    POSITION_TABLE      0x32D4  array   byte[color*32 + piece_idx*2] = from_sq; stride 2
 
 **Piece-table entry** (8 bytes, confirmed from disassembly of 0xD960–0xD97A)::
 
@@ -56,7 +59,12 @@ AI_BEST_MOVE_ADDR: int = PIECE_TABLE_ADDR + 0x68 * 8  # 0x3662
 PLAYER_TYPE_BASE: int = A4 - 0x782A    # 0x07D4
 BOARD_ARRAY_ADDR: int = A4 - 0x4F0A   # 0x30F4  (128 entries * 4 bytes each)
 PAWN_DIR_TABLE: int = A4 - 0x785C     # 0x07A2  (2 words: white_dir, black_dir)
+PIECE_DIR_TABLE: int = A4 - 0x787C    # 0x0782  (8 words: rook dirs [0-3] + bishop dirs [4-7])
+SECOND_DIR_TABLE: int = A4 - 0x786C   # 0x0792  (8 words: diagonal dirs; used by Loop B / Bishop)
 SEARCH_SKIP_FLAG: int = A4 - 0x782C   # 0x07D2  (non-zero skips search at 0x824C)
+# Piece count per color and per-color position list; initialised by bypassed startup.
+PIECE_COUNT_TABLE: int = A4 - 0x4CE6  # 0x3318  word[color] = piece_count[color] - 1
+POSITION_TABLE: int = A4 - 0x4D2A    # 0x32D4  byte at [color*32 + piece_idx*2] = from_sq
 
 PIECE_ENTRY_SIZE: int = 8
 MAX_PIECES: int = 32   # 16 per side
@@ -374,6 +382,32 @@ class Bridge:
         # +0x10 = north (+1 rank), 0xFFF0 = south (−1 rank, −0x10 in signed 16-bit).
         self._cpu.mem_write(PAWN_DIR_TABLE, struct.pack(">HH", 0x0010, 0xFFF0))
 
+        # Piece direction table: 8 move-delta words for sliding-piece generation.
+        # Entries [0-3] = rook dirs (N/S/E/W); entries [4-7] = bishop diags (NE/SW/NW/SE).
+        # Queen uses all 8; rook stops at index 3; bishop starts at index 4.
+        # Startup code initialises these; we bypass startup so write them explicitly.
+        self._cpu.mem_write(
+            PIECE_DIR_TABLE,
+            struct.pack(
+                ">8H",
+                0x0010, 0xFFF0, 0x0001, 0xFFFF,  # [0-3] N, S, E, W (rook)
+                0x0011, 0xFFEF, 0x000F, 0xFFF1,  # [4-7] NE, SW, NW, SE (bishop)
+            ),
+        )
+
+        # Second direction table at 0x0792: 8 words used by Loop B (Bishop dispatch via
+        # 0xD7D8).  Startup code overwrites the ROM bytes here at runtime; we bypass
+        # startup so write explicitly.  Bishop moves diagonally; repeat all 4 diagonal
+        # directions twice so every loop-B slot maps to a valid direction.
+        self._cpu.mem_write(
+            SECOND_DIR_TABLE,
+            struct.pack(
+                ">8H",
+                0x0011, 0xFFEF, 0x000F, 0xFFF1,  # NE, SW, NW, SE
+                0x0011, 0xFFEF, 0x000F, 0xFFF1,  # NE, SW, NW, SE (repeated)
+            ),
+        )
+
         # Allow the AI to run (0 = search enabled at 0x824C).
         self._cpu.mem_write(SEARCH_SKIP_FLAG, struct.pack(">H", 0))
 
@@ -386,6 +420,24 @@ class Bridge:
 
         # Set piece counter to -1 (ai_phase0_init ready state)
         self._cpu.mem_write(PIECE_COUNTER_ADDR, struct.pack(">h", -1))
+
+        # Piece count table (0x3318): word[color] = piece_count - 1 (0-indexed max).
+        # Position table (0x32D4): byte at [color*32 + piece_idx*2] = from_sq.
+        # Both are used by the move-generation loop at 0xC8B8–0xC908 to iterate pieces
+        # for each side.  The game's bypassed startup code normally initialises them;
+        # without explicit initialisation they contain 0x0278 (BSS pre-init) which
+        # causes the AI to read sq=0x02 (c1) as every piece's position.
+        pieces_by_color: dict[int, list[int]] = {0: [], 1: []}
+        for sq, color, _piece_type in pieces:
+            pieces_by_color[color].append(sq)
+        for color in (0, 1):
+            color_pieces = pieces_by_color[color]
+            count = len(color_pieces)
+            self._cpu.mem_write(PIECE_COUNT_TABLE + color * 2,
+                                struct.pack(">H", max(0, count - 1)))
+            for piece_idx, sq in enumerate(color_pieces):
+                self._cpu.mem_write(POSITION_TABLE + color * 32 + piece_idx * 2,
+                                    bytes([sq]))
 
         # Player role identifiers: Player1=White (human), Player2=Black (computer).
         # These are fixed role assignments, not side-to-move indicators.

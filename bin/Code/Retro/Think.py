@@ -145,13 +145,6 @@ _AI_BEST_MOVE_FINAL_ADDR: int = _A4_VALUE - 0x49A4  # 0x365A
 _SEARCH_STACK_SENTINEL: int = 0x1000
 
 # Safety ceiling: outer driver loop passes allowed before forced exit.
-# We stop at 0x81F2 (after phase 0) if a valid move was found, so this is only
-# a backstop in case the 0x81F2 stop never fires.
-_OUTER_LOOP_PASSES: dict[int, int] = {
-    1: 2, 2: 2, 3: 2, 4: 2, 5: 2,
-    6: 2, 7: 2, 8: 2, 9: 2,
-}
-
 # [0x07D2] is 2 bytes before PLAYER_TYPE_BASE (0x07D4).  When non-zero (ROM code
 # bytes at that address), AI_INIT at 0x8250 branches to the dirty path (0x8262+)
 # which calls the search with a BSS-sentinel parameter and invokes OS stubs not
@@ -171,23 +164,29 @@ _ABORT_CHECK_ADDR: int = 0x0C2CE
 
 
 def _scan_cmpiw(code: bytes, base: int = 0) -> dict[int, tuple]:
-    """Scan *code* for 6-byte ``cmpi.w`` instructions mis-decoded by Unicorn M68K.
+    """Scan *code* for 6-byte instructions mis-decoded by Unicorn M68K.
 
-    Unicorn M68K decodes 6-byte ``cmpi.w #imm, (d16,An)`` and
-    ``cmpi.w #imm, (An,Xn)`` as 4 bytes, leaving the trailing 2 bytes to
-    execute as a separate instruction.  Many trailing pairs cause
-    divide-by-zero or F-line traps that crash the emulator.
+    Unicorn M68K decodes certain 6-byte instructions as 4 bytes, leaving
+    2 trailing bytes to execute as a separate instruction.
 
-    Returns a dict mapping each instruction address to
-    ``(mode, an_reg, imm16_unsigned, d16_signed_or_ext_word)`` so that
-    :func:`think` can register a correcting per-address hook for each one.
+    Three instruction classes are affected:
+
+    1. ``op.w #imm, (d16,An)`` and ``op.w #imm, (An,Xn)`` for immediate-
+       source operations (ORI/ANDI/SUBI/ADDI/EORI/CMPI).
+
+    2. ``MOVE.W (d16,An_src), (0,Am,Dn.L)`` — source d16-displaced, destination
+       indexed (SrcMode=5, DstMode=6).  Tuple: ``('mov_d16_idx', src_an, d16, dst_an, ext)``.
+
+    3. ``MOVE.W (0,An_src,Dn.L), (d16,Am)`` — source indexed, destination
+       d16-displaced (SrcMode=6, DstMode=5).  Tuple: ``('mov_idx_d16', src_an, ext, dst_an, d16)``.
+
+    Returns a dict mapping each instruction address to its parameter tuple so
+    that :func:`think` can register a correcting per-address hook for each one.
 
     :param code: ROM bytes (HUNK_CODE content).
     :param base: Virtual load address of *code* (0 for Battle Chess).
     """
     # Opcodes for 6-byte word-size immediate instructions with (d16,An) or (An,Xn) EA.
-    # Unicorn M68K decodes these as 4 bytes, leaving 2 trailing bytes to execute.
-    # op key → instruction semantics for the hook dispatcher.
     _OP_MAP_D16: dict[int, str] = {
         0x00: 'ori', 0x02: 'andi', 0x04: 'subi', 0x06: 'addi', 0x0A: 'eori', 0x0C: 'cmp',
     }
@@ -197,6 +196,8 @@ def _scan_cmpiw(code: bytes, base: int = 0) -> dict[int, tuple]:
     while i < n - 5:
         b0 = code[i]
         b1 = code[i + 1]
+
+        # Immediate-source 6-byte instructions (ORI/ANDI/SUBI/ADDI/EORI/CMPI).
         op = _OP_MAP_D16.get(b0)
         if op is not None:
             if 0x68 <= b1 <= 0x6F:  # op.w #imm, (d16, An)
@@ -214,6 +215,43 @@ def _scan_cmpiw(code: bytes, base: int = 0) -> dict[int, tuple]:
                 result[base + i] = (op, 'anXn', an_reg, imm16, ext)
                 i += 6
                 continue
+
+        # MOVE.W 6-byte forms (both operands require extension words).
+        # The opcode word high nibble is 0x3 for MOVE.W.
+        opword = (b0 << 8) | b1
+        if (opword >> 12) == 0x3:
+            dst_mode = (opword >> 6) & 0x07
+            src_mode = (opword >> 3) & 0x07
+            if src_mode == 5 and dst_mode == 6:
+                # MOVE.W (d16,An_src), (ext_An_dst,Dn.L) — 6-byte
+                src_an = opword & 0x07
+                dst_an = (opword >> 9) & 0x07
+                raw_d16 = (code[i + 2] << 8) | code[i + 3]
+                d16 = raw_d16 if raw_d16 < 0x8000 else raw_d16 - 0x10000
+                ext = (code[i + 4] << 8) | code[i + 5]
+                result[base + i] = ('mov_d16_idx', src_an, d16, dst_an, ext)
+                i += 6
+                continue
+            elif src_mode == 6 and dst_mode == 5:
+                # MOVE.W (d8,An_src,Dn.L), (d16,An_dst) — 6-byte
+                src_an = opword & 0x07
+                dst_an = (opword >> 9) & 0x07
+                ext = (code[i + 2] << 8) | code[i + 3]
+                raw_d16 = (code[i + 4] << 8) | code[i + 5]
+                d16 = raw_d16 if raw_d16 < 0x8000 else raw_d16 - 0x10000
+                result[base + i] = ('mov_idx_d16', src_an, ext, dst_an, d16)
+                i += 6
+                continue
+            elif src_mode == 7 and (opword & 0x07) == 4 and dst_mode == 5:
+                # MOVE.W #imm, (d16,An_dst) — 6-byte immediate-to-memory
+                dst_an = (opword >> 9) & 0x07
+                imm16 = (code[i + 2] << 8) | code[i + 3]
+                raw_d16 = (code[i + 4] << 8) | code[i + 5]
+                d16 = raw_d16 if raw_d16 < 0x8000 else raw_d16 - 0x10000
+                result[base + i] = ('mov', 'd16', dst_an, imm16, d16)
+                i += 6
+                continue
+
         i += 2  # M68K instructions are always word-aligned
     return result
 
@@ -424,10 +462,10 @@ class ThinkSession:
 
         # Force AI_INIT to take the clean path (depth=1 call to 0xC198).
         cpu.mem_write(_AI_INIT_PATH_FLAG_ADDR, struct.pack(">H", 0))
-        # [0x8270] = ROM code bytes (0x0003) — the inner search loop exits when
-        # non-zero and the outer-loop body shortcuts directly to TC.  Zero it so
-        # the search enters the 0xDE7A-based iteration loop.
-        cpu.mem_write(_SEARCH_COMPLETE_FLAG_ADDR, struct.pack(">H", 0))
+        # [0x8270] = ROM value 0x0003 — must remain non-zero.  When non-zero the
+        # leaf-node path at 0xCAE6 (move.w #1, -$2(a5)) is reached and C91A
+        # returns 1 for accepted candidates.  When zero the beq at 0xCAE4 skips
+        # CAE6 and C91A always returns 0 (no move is ever accepted).
 
         bridge.clear_best_move()
         bridge.write_position(_search_fen)
@@ -456,6 +494,19 @@ class ThinkSession:
         cpu.mem_write(sp, struct.pack(">I", _SENTINEL))
         cpu.reg_write("A7", sp)
 
+        # Patch 0x820C: replace mis-decoded CMPI.W #2,-$35A4(A4) (6 bytes) with
+        # MOVEQ #2,D7 (2 bytes) + CMP.W -$35A4(A4),D7 (4 bytes).
+        # Unicorn M68K mis-decodes the original as 4 bytes, treating the trailing
+        # CA 5C as AND.W (A4)+,D5 which corrupts A4 by +2 each outer loop iteration.
+        cpu.mem_write(0x820C, bytes([0x7E, 0x02, 0xBE, 0x6C, 0xCA, 0x5C]))
+        # Patch 0x8220: replace mis-decoded CMPI.W #1,(A0,D0.L) (6 bytes) with
+        # MOVEQ #1,D6 (2 bytes) + CMP.W (A0,D0.L),D6 (4 bytes).
+        cpu.mem_write(0x8220, bytes([0x7C, 0x01, 0xBC, 0x70, 0x08, 0x00]))
+        # Flush the Unicorn JIT block cache so the patched bytes take effect.
+        # Without this, a stale pre-scan block may still execute the old
+        # AND.W (A4)+,D5 trailing bytes, corrupting A4 by +2 per outer-driver pass.
+        cpu.flush_tb()
+
         # Snapshot of the root board (may be the flipped board), taken before
         # emulation.  The search modifies BOARD_ARRAY_ADDR in-place during
         # make/unmake, so we must capture it here.
@@ -467,7 +518,6 @@ class ThinkSession:
         _loop_820c_fires: list[int] = [0]  # every time hook at 0x820C fires
         _diag_81f2_fires: list[int] = [0]  # 0x81F2 reached (BRA->0x820C should follow)
         _diag_c198_fires: list[int] = [0]  # 0xC198 search entry reached
-        _loop_threshold = _OUTER_LOOP_PASSES.get(request.level.value, 9999)
         # TC invocation counter — TC fires once before the inner loop starts.
         # Does NOT set abort; abort is set by _hook_de7a.
         _tc_count: list[int] = [0]
@@ -508,20 +558,20 @@ class ThinkSession:
             return True
 
         def _hook_diag_81f2(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
-            # Fires when 0x81F2 is reached (AI_INIT / phase-0 has just returned).
-            # Phase 1 runs 9999+ times and corrupts AI_BEST_MOVE_ADDR with garbage;
-            # stop now if phase 0 already wrote a valid move there.
+            # Fires when 0x81F2 is reached (AI_INIT + inner search have returned).
+            # The outer driver will now continue into Phase 2 (0x82DE) which
+            # writes the final result to _AI_BEST_MOVE_FINAL_ADDR.  Save the
+            # Phase-0 result as a fallback snapshot but do NOT stop — Phase 2 must
+            # run so that _mem_write_final can capture the canonical best move.
             _diag_81f2_fires[0] += 1
             try:
-                cpu.mem_write(_ABORT_FLAG_ADDR, struct.pack(">H", 0))
-                cpu.mem_write(_SEARCH_COMPLETE_FLAG_ADDR, struct.pack(">H", 0))
                 raw = bytes(cpu.mem_read(AI_BEST_MOVE_ADDR, 4))
                 _to, _from = struct.unpack(">HH", raw)
                 if (_to != _SEARCH_STACK_SENTINEL and _from != _SEARCH_STACK_SENTINEL
                         and 0 < _to <= 0x77 and not (_to & 0x88)
                         and 0 <= _from <= 0x77 and not (_from & 0x88)
                         and _is_root_valid(_to, _from)):
-                    cpu.emu_stop()
+                    _write_snapshot[0] = raw
             except Exception:
                 pass
 
@@ -529,44 +579,17 @@ class ThinkSession:
             _diag_c198_fires[0] += 1  # fires on search entry
 
         def _hook_loop_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
-            # Unicorn M68K mis-decodes `cmpi.w #2, -$35a4(a4)` (6 bytes) as 4 bytes,
-            # leaving trailing bytes `ca 5c` to execute as `and.w (a4)+, d5` — which
-            # corrupts A4 by +2 each outer loop iteration.
-            # We implement cmpi.w + bne.b manually and redirect PC.
-            # Additionally: count outer driver loop passes and exit at the level threshold
-            # instead of relying on the game's own TC/timer mechanism.
+            # Diagnostic counter only — no PC redirect.
+            # 0x820C is now patched to a correctly-decoded MOVEQ+CMP.W sequence;
+            # the native BNE.B at 0x8212 handles loop exit, and _mem_write_final
+            # stops emulation when Phase 2 writes to _AI_BEST_MOVE_FINAL_ADDR.
             _loop_820c_fires[0] += 1
-            try:
-                a4_val = cpu.reg_read("A4")
-                loop_flag_addr = (a4_val - 0x35A4) & 0xFFFFFFFF
-                raw = bytes(cpu.mem_read(loop_flag_addr, 2))
-                loop_flag = (raw[0] << 8) | raw[1]
-                if loop_flag != 2:
-                    cpu.reg_write("PC", 0x8228)
-                    return
-                _loop_count[0] += 1
-                if _loop_count[0] >= _loop_threshold:
-                    cpu.reg_write("PC", 0x8228)  # threshold reached — exit outer driver
-                else:
-                    cpu.reg_write("PC", 0x8214)  # continue to player check
-            except Exception:
-                cpu.reg_write("PC", 0x8228)
 
         def _hook_player_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
-            # Unicorn M68K mis-decodes `cmpi.w #1, (a0, d0.l)` (6 bytes) as 4 bytes,
-            # trailing `08 00` bytes corrupt A4 by +2.
-            # A0 = player_type_base, D0 = player2_color * 2 (set at 0x8214-0x821C).
-            # We implement cmpi.w + beq.b manually and redirect PC.
-            try:
-                a0_val = cpu.reg_read("A0")
-                d0_val = cpu.reg_read("D0")
-                d0_signed = d0_val if d0_val < 0x80000000 else d0_val - 0x100000000
-                cmp_addr = (a0_val + d0_signed) & 0xFFFFFFFF
-                raw = bytes(cpu.mem_read(cmp_addr, 2))
-                player_type_val = (raw[0] << 8) | raw[1]
-                cpu.reg_write("PC", 0x81E4 if player_type_val == 1 else 0x8228)
-            except Exception:
-                cpu.reg_write("PC", 0x8228)
+            # Diagnostic only — no PC redirect.
+            # 0x8220 is now patched to a correctly-decoded MOVEQ+CMP.W sequence;
+            # the native BEQ.B at 0x8226 handles the branch to the loop body.
+            pass
 
         def _hook_abort_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
             # Called at 0x0C2CE (tst.w [0x4A4A]).  Count search nodes for diagnostics
@@ -625,24 +648,19 @@ class ThinkSession:
 
         def _hook_cmpiw(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
             # Implement the 6-byte instruction that Unicorn mis-decodes as 4 bytes.
-            # Unicorn correctly computes the EA and performs the data operation but
-            # advances PC by only 4, leaving 2 trailing bytes to execute. This hook
-            # fires before execution, performs the correct operation, and skips to addr+6.
+            # Unicorn advances PC by only 4, leaving 2 trailing bytes to execute.
+            # This hook fires before execution, performs the correct operation,
+            # and skips PC to addr+6.
             info = _cmpiw_info.get(addr)
             if info is None:
                 return
-            op, mode, an_reg, imm16, d16_or_ext = info
+            op = info[0]
             try:
-                an_val = cpu.reg_read(f"A{an_reg}")
-                if mode == 'd16':
-                    ea_addr = (an_val + d16_or_ext) & 0xFFFFFFFF
-                else:
-                    ext = d16_or_ext
+                def _read_indexed_ea(an_reg: int, ext: int) -> int:
+                    """Compute EA for (d8, An, Dn/An.W/L) given extension word."""
                     xn_is_an = (ext >> 15) & 1
                     xn_reg   = (ext >> 12) & 0x07
                     xn_long  = (ext >> 11) & 1
-                    # 68000 does not have a scale field — bits 9-8 are reserved.
-                    # Always use scale=0 (index * 1).
                     disp8    = ext & 0xFF
                     if disp8 >= 0x80:
                         disp8 -= 256
@@ -655,7 +673,79 @@ class ThinkSession:
                         xn_raw = xn_raw & 0xFFFF
                         if xn_raw >= 0x8000:
                             xn_raw -= 0x10000
-                    ea_addr = (an_val + xn_raw + disp8) & 0xFFFFFFFF
+                    return (cpu.reg_read(f"A{an_reg}") + xn_raw + disp8) & 0xFFFFFFFF
+
+                if op == 'mov_d16_idx':
+                    # MOVE.W (d16, An_src), (d8+Dn, An_dst) — memory-to-memory
+                    _, src_an, src_d16, dst_an, ext = info
+                    src_addr = (cpu.reg_read(f"A{src_an}") + src_d16) & 0xFFFFFFFF
+                    raw = bytes(cpu.mem_read(src_addr, 2))
+                    val = (raw[0] << 8) | raw[1]
+                    dst_addr = _read_indexed_ea(dst_an, ext)
+                    if addr in (0xD700, 0xD7B2, 0xD830, 0xD8FE):
+                        logger.debug(
+                            "mov_d16_idx@0x%04X: A%d=0x%X d16=%d "
+                            "src=0x%05X val=0x%04X dst=0x%05X "
+                            "A%d=0x%X D0=0x%X",
+                            addr, src_an, cpu.reg_read(f"A{src_an}"), src_d16,
+                            src_addr, val, dst_addr,
+                            dst_an, cpu.reg_read(f"A{dst_an}"),
+                            cpu.reg_read("D0"),
+                        )
+                    if addr in (0xD700, 0xD830) and _node_count[0] > 0:
+                        logger.warning(
+                            "SEARCH WRITE@0x%04X val=0x%04X dst=0x%05X D0=0x%08X nodes=%d",
+                            addr, val, dst_addr, cpu.reg_read("D0"), _node_count[0],
+                        )
+                    elif dst_addr == AI_BEST_MOVE_ADDR:
+                        logger.warning(
+                            "BEST_MOVE WRITE to_sq=0x%04X from pc=0x%04X nodes=%d D0=0x%08X",
+                            val, addr, _node_count[0], cpu.reg_read("D0"),
+                        )
+                    elif dst_addr == AI_BEST_MOVE_ADDR + 2:
+                        logger.warning(
+                            "BEST_MOVE WRITE from_sq=0x%04X from pc=0x%04X nodes=%d D0=0x%08X",
+                            val, addr, _node_count[0], cpu.reg_read("D0"),
+                        )
+                    cpu.mem_write(dst_addr, struct.pack(">H", val))
+                    n_flag = 1 if val >= 0x8000 else 0
+                    z_flag = 1 if val == 0 else 0
+                    sr_old = cpu.reg_read("SR")
+                    cpu.reg_write("SR", ((sr_old & ~0x0F) | (n_flag << 3) | (z_flag << 2)) & 0xFFFF)
+                    cpu.reg_write("PC", addr + 6)
+                    return
+
+                if op == 'mov_idx_d16':
+                    # MOVE.W (d8+Dn, An_src), (d16, An_dst) — memory-to-memory
+                    _, src_an, ext, dst_an, dst_d16 = info
+                    src_addr = _read_indexed_ea(src_an, ext)
+                    raw = bytes(cpu.mem_read(src_addr, 2))
+                    val = (raw[0] << 8) | raw[1]
+                    dst_addr = (cpu.reg_read(f"A{dst_an}") + dst_d16) & 0xFFFFFFFF
+                    if addr == 0xD8AE:
+                        logger.debug(
+                            "mov_idx_d16@0xD8AE: A%d=0x%X D0=0x%X "
+                            "src=0x%05X val=0x%04X dst=0x%05X A%d=0x%X",
+                            src_an, cpu.reg_read(f"A{src_an}"),
+                            cpu.reg_read("D0"),
+                            src_addr, val, dst_addr,
+                            dst_an, cpu.reg_read(f"A{dst_an}"),
+                        )
+                    cpu.mem_write(dst_addr, struct.pack(">H", val))
+                    n_flag = 1 if val >= 0x8000 else 0
+                    z_flag = 1 if val == 0 else 0
+                    sr_old = cpu.reg_read("SR")
+                    cpu.reg_write("SR", ((sr_old & ~0x0F) | (n_flag << 3) | (z_flag << 2)) & 0xFFFF)
+                    cpu.reg_write("PC", addr + 6)
+                    return
+
+                # Legacy immediate-source forms.
+                op, mode, an_reg, imm16, d16_or_ext = info
+                an_val = cpu.reg_read(f"A{an_reg}")
+                if mode == 'd16':
+                    ea_addr = (an_val + d16_or_ext) & 0xFFFFFFFF
+                else:
+                    ea_addr = _read_indexed_ea(an_reg, d16_or_ext)
                 if op == 'cmp':
                     raw = bytes(cpu.mem_read(ea_addr, 2))
                     ea_u = (raw[0] << 8) | raw[1]
@@ -677,7 +767,7 @@ class ThinkSession:
                     new_sr = ((sr_old & ~0x0F) | (n_flag << 3) | (z_flag << 2)) & 0xFFFF
                     cpu.reg_write("SR", new_sr)
                 else:
-                    # Read-modify-write: ORI/ANDI/SUBI/ADDI/EORI — dispatch per op.
+                    # Read-modify-write: ORI/ANDI/SUBI/ADDI/EORI
                     raw = bytes(cpu.mem_read(ea_addr, 2))
                     ea_u = (raw[0] << 8) | raw[1]
                     if op == 'ori':
@@ -716,6 +806,10 @@ class ThinkSession:
                 )
             except Exception:
                 pass
+            logger.warning(
+                "NATIVE BEST_MOVE write to_sq=0x%04X pc=0x%04X nodes=%d",
+                to_sq, pc, _node_count[0],
+            )
             if to_sq == 0 or to_sq > 0x77 or (to_sq & 0x88):
                 return
             try:
@@ -757,6 +851,30 @@ class ThinkSession:
                 except Exception:
                     pass
             return True
+
+        def _hook_dispatch_d7d8(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            # Dispatch table at 0xDAC8 (piece-type handler table) jumps directly to
+            # 0xD7D8 — 2 bytes INTO the 6-byte instruction `MOVE.W #7, -8(a5)` at 0xD7D6.
+            # The 2-byte opword is skipped, so local[-8] is never initialized to 7, and
+            # Unicorn would try to execute the interior bytes as garbage instructions.
+            # Fix: write 7 to local[-8] and redirect PC to 0xD7DC (first valid byte of
+            # Loop B body) so execution continues correctly.
+            try:
+                a5 = cpu.reg_read("A5")
+                cpu.mem_write((a5 - 8) & 0xFFFFFFFF, struct.pack(">H", 7))
+                cpu.reg_write("PC", 0xD7DC)
+            except Exception:
+                pass
+
+        def _hook_dispatch_d854(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
+            # Same problem: dispatch jumps to 0xD854 — 2 bytes INTO `MOVE.W #7, -4(a5)`
+            # at 0xD852.  Fix: write 7 to local[-4] and skip to 0xD858 (Loop 2 body start).
+            try:
+                a5 = cpu.reg_read("A5")
+                cpu.mem_write((a5 - 4) & 0xFFFFFFFF, struct.pack(">H", 7))
+                cpu.reg_write("PC", 0xD858)
+            except Exception:
+                pass
 
         # --- Decompressor prefetch simulation (0x79BC and 0x79C8) ---
         # Battle Chess has a self-modifying decompressor that overwrites its own
@@ -815,8 +933,10 @@ class ThinkSession:
                 pass
 
         hooks: list[int] = []
-        hooks.append(cpu.hook_add(HOOK_CODE, _hook_loop_check,    begin=0x820C,          end=0x820C))
-        hooks.append(cpu.hook_add(HOOK_CODE, _hook_player_check,  begin=0x8220,          end=0x8220))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_loop_check,      begin=0x820C,  end=0x820C))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_player_check,    begin=0x8220,  end=0x8220))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_dispatch_d7d8,   begin=0xD7D8,  end=0xD7D8))
+        hooks.append(cpu.hook_add(HOOK_CODE, _hook_dispatch_d854,   begin=0xD854,  end=0xD854))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_diag_81f2,     begin=0x81F2,          end=0x81F2))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_diag_c198,     begin=0xC198,          end=0xC198))
         hooks.append(cpu.hook_add(HOOK_CODE, _hook_abort_check,   begin=_ABORT_CHECK_ADDR, end=_ABORT_CHECK_ADDR))

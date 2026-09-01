@@ -179,3 +179,33 @@ def test_think_session_with_real_rom_returns_known_move():
     assert _chess.Move.from_uci(move_uci) in board.legal_moves, (
         f"engine returned illegal move {move_uci!r} in position {fen!r}"
     )
+
+
+@pytest.mark.retro_rom
+def test_think_startpos_after_e4_returns_legal_black_move():
+    """After 1.e4 (Black to move) the engine must return a legal Black move.
+
+    Regression guard for the color-parity bug where the engine returned
+    ``a2a4`` (a White pawn move) instead of a Black response.
+    """
+    import chess as _chess
+    from pathlib import Path
+    from Code.Retro.Manifest import default_rom_path
+
+    rom = default_rom_path()
+    if not rom or not Path(rom).exists():
+        pytest.skip("retro_rom: no ROM file found")
+
+    _E4_FEN = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+    board = _chess.Board(_E4_FEN)
+
+    session = ThinkSession(rom_path=Path(rom))
+    result = session.think(ThinkRequest(fen=_E4_FEN, level=Level.L1, computer_color=1))
+
+    assert result.move is not None, "engine returned no move"
+    move_uci = result.move.to_uci()
+    assert move_uci != "0000", "engine returned null move"
+    assert move_uci != "a2a4", "engine returned a White pawn move (color-parity regression)"
+    assert _chess.Move.from_uci(move_uci) in board.legal_moves, (
+        f"engine returned illegal move {move_uci!r} after 1.e4"
+    )

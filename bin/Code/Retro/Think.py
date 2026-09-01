@@ -341,6 +341,17 @@ class ThinkSession:
         cpu.mem_write(sp, struct.pack(">I", _SENTINEL))
         cpu.reg_write("A7", sp)
 
+        # Patch 0x820C: replace mis-decoded CMPI.W #2,-$35A4(A4) (6 bytes) with
+        # MOVEQ #2,D7 (2 bytes) + CMP.W -$35A4(A4),D7 (4 bytes).
+        # Unicorn M68K mis-decodes the original as 4 bytes, treating the trailing
+        # CA 5C as AND.W (A4)+,D5 which corrupts A4 by +2 each outer loop iteration.
+        cpu.mem_write(0x820C, bytes([0x7E, 0x02, 0xBE, 0x6C, 0xCA, 0x5C]))
+        # Patch 0x8220: replace mis-decoded CMPI.W #1,(A0,D0.L) (6 bytes) with
+        # MOVEQ #1,D6 (2 bytes) + CMP.W (A0,D0.L),D6 (4 bytes).
+        cpu.mem_write(0x8220, bytes([0x7C, 0x01, 0xBC, 0x70, 0x08, 0x00]))
+        # Flush the Unicorn JIT translation-block cache so the patched bytes take effect.
+        cpu.flush_tb()
+
         # Snapshot of the root board (may be the flipped board), taken before
         # emulation.  The search modifies BOARD_ARRAY_ADDR in-place during
         # make/unmake, so we must capture it here.
@@ -384,43 +395,17 @@ class ThinkSession:
             return True
 
         def _hook_loop_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
-            # Unicorn M68K mis-decodes `cmpi.w #2, -$35a4(a4)` (6 bytes) as 4 bytes,
-            # leaving trailing bytes `ca 5c` to execute as `and.w (a4)+, d5` — which
-            # corrupts A4 by +2 each outer loop iteration.
-            # We implement cmpi.w + bne.b manually and redirect PC.
-            # Additionally: count outer driver loop passes and exit at the level threshold
-            # instead of relying on the game's own TC/timer mechanism.
-            try:
-                a4_val = cpu.reg_read("A4")
-                loop_flag_addr = (a4_val - 0x35A4) & 0xFFFFFFFF
-                raw = bytes(cpu.mem_read(loop_flag_addr, 2))
-                loop_flag = (raw[0] << 8) | raw[1]
-                if loop_flag != 2:
-                    cpu.reg_write("PC", 0x8228)
-                    return
-                _loop_count[0] += 1
-                if _loop_count[0] >= _loop_threshold:
-                    cpu.reg_write("PC", 0x8228)  # threshold reached — exit outer driver
-                else:
-                    cpu.reg_write("PC", 0x8214)  # continue to player check
-            except Exception:
-                cpu.reg_write("PC", 0x8228)
+            # Diagnostic counter only — no PC redirect.
+            # 0x820C is now patched to a correctly-decoded MOVEQ+CMP.W sequence;
+            # the native BNE.B at 0x8212 handles loop exit, and _mem_write_final
+            # stops emulation when Phase 2 writes to _AI_BEST_MOVE_FINAL_ADDR.
+            _loop_count[0] += 1
 
         def _hook_player_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
-            # Unicorn M68K mis-decodes `cmpi.w #1, (a0, d0.l)` (6 bytes) as 4 bytes,
-            # trailing `08 00` bytes corrupt A4 by +2.
-            # A0 = player_type_base, D0 = player2_color * 2 (set at 0x8214-0x821C).
-            # We implement cmpi.w + beq.b manually and redirect PC.
-            try:
-                a0_val = cpu.reg_read("A0")
-                d0_val = cpu.reg_read("D0")
-                d0_signed = d0_val if d0_val < 0x80000000 else d0_val - 0x100000000
-                cmp_addr = (a0_val + d0_signed) & 0xFFFFFFFF
-                raw = bytes(cpu.mem_read(cmp_addr, 2))
-                player_type_val = (raw[0] << 8) | raw[1]
-                cpu.reg_write("PC", 0x81E4 if player_type_val == 1 else 0x8228)
-            except Exception:
-                cpu.reg_write("PC", 0x8228)
+            # Diagnostic only — no PC redirect.
+            # 0x8220 is now patched to a correctly-decoded MOVEQ+CMP.W sequence;
+            # the native BEQ.B at 0x8226 handles the branch to the loop body.
+            pass
 
         def _hook_abort_check(_emu: object, addr: int, _sz: int, _u: object = None) -> None:
             # Called at 0x0C2CE (tst.w [0x4A4A]).  Count search nodes; stop emulation

@@ -30,8 +30,9 @@ _FIXTURES = Path(__file__).parent / "_fixtures"
 _TRACE_FIXTURES = _FIXTURES / "traces"
 _CORPUS_FIXTURES = _FIXTURES / "corpus"
 
-# e2e4: to_sq=0x34 (e4) at offset 0, from_sq=0x14 (e2) at offset 2 (confirmed entry format)
-_E2E4_RAW = struct.pack(">HH4x", 0x34, 0x14)
+# e2e4 as written by the AI when the board is flipped (computer_color=0 → _board_flipped=True):
+# flip_sq88(e4=0x34)=0x44 (to_sq), flip_sq88(e2=0x14)=0x64 (from_sq)
+_E2E4_RAW = struct.pack(">HH4x", 0x44, 0x64)
 # d2d4: from_sq=0x13, to_sq=0x33
 _D2D4_RAW = struct.pack(">HHHBB", 0x13, 0x33, 0, 1, 1)
 

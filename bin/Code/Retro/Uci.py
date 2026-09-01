@@ -166,6 +166,18 @@ class UciSession:
         except (ValueError, KeyError):
             level = Level.L1
 
+        # Compute computer_color from initial FEN + move parity so it is
+        # correct even when python-chess is unavailable.  Each applied half-move
+        # flips the active color; an odd number of moves means the side has
+        # changed from whatever the FEN says.
+        _fen_fields0 = self._fen.split()
+        _initial_active = _fen_fields0[1] if len(_fen_fields0) > 1 else "w"
+        if len(self._moves) % 2 == 1:
+            _active = "b" if _initial_active == "w" else "w"
+        else:
+            _active = _initial_active
+        computer_color = 0 if _active == "w" else 1
+
         # Apply move list to get actual position FEN before calling the AI.
         fen = self._fen
         if self._moves:
@@ -177,11 +189,6 @@ class UciSession:
                 fen = _board.fen()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("move application failed (%s); using base FEN", exc)
-
-        # Infer which side the computer plays from the FEN active-color field.
-        _fen_fields = fen.split()
-        _active = _fen_fields[1] if len(_fen_fields) > 1 else "w"
-        computer_color = 0 if _active == "w" else 1
 
         try:
             result = self._session.think(

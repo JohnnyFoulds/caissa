@@ -82,6 +82,20 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
 ### Fixed
+- **Retro Engine — canonical Black opening response**: `caissa-retro` now returns a
+  canonical opening response (e7e5, c7c5, e7e6, c7c6, d7d5, or a7a5) instead of falling
+  back to a2a4 after `position startpos moves e2e4 go`.  Root cause: `computer_color` was
+  computed after a `python-chess` FEN update that silently fell back to the startpos when
+  `chess` was not installed, always producing `computer_color=0` and mirroring the board
+  the wrong way.  Fix: compute `computer_color` from move-list parity before the
+  `chess` block so it is always correct (`Uci.py`).  Separately, Unicorn M68K
+  mis-decoded two 6-byte `CMPI.W` instructions as 4 bytes, leaving `CA 5C` / `08 00`
+  trailing bytes executing as `AND.W (A4)+,D5` that corrupted A4 by +2 per outer-driver
+  pass; fixed with inline byte patches (MOVEQ+CMP.W) and `ctl_flush_tb()` (`Think.py`).
+  Retro oracle test (`test_oracle.py`) corrected to use flipped coordinates (0x44, 0x64)
+  for the expected e2e4 raw bytes when `computer_color=0`.
+  `pytest.ini` now excludes `tools/` from collection to prevent unrunnable recon scripts
+  from aborting the test suite.
 - **Retro Engine — decompressor prefetch simulation**: `Think.py` now correctly emulates
   the 68000's 4-byte prefetch buffer for Battle Chess's self-modifying startup decompressor.
   Two per-address hooks (`_hook_prefetch_79bc` at 0x79BC, `_hook_prefetch_79c8` at 0x79C8)

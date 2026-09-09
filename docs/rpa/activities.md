@@ -33,8 +33,9 @@ All activities live in `bin/Code/Rpa/Activities.py`.
 
 ### `Activity`
 
-Plain base class (no ABC).  Raises `NotImplementedError` for `precondition`, `execute`, and
-`postcondition`.  `compensate` and `prepare_next` have no-op defaults.
+Plain base class (no ABC).  Raises `NotImplementedError` for `precondition`, `execute`,
+`postcondition` **and `compensate`** — only `prepare_next` has a no-op default.
+(`OpenConfig` is currently the only built-in activity that overrides `compensate`.)
 
 **Fields:**
 
@@ -53,7 +54,7 @@ Plain base class (no ABC).  Raises `NotImplementedError` for `precondition`, `ex
 | `precondition` | `(ctx) → bool` | `NotImplementedError` | Return True when the activity can execute |
 | `execute` | `(ctx) → None` | `NotImplementedError` | Issue one driver actuation |
 | `postcondition` | `(ctx) → bool` | `NotImplementedError` | Return True when the effect is observed |
-| `compensate` | `(ctx) → None` | — | Undo the effect; no-op by default |
+| `compensate` | `(ctx) → None` | `NotImplementedError` unless overridden | Undo the effect; only when `compensable` is True |
 | `prepare_next` | `(ctx) → None` | — | Set up context for the next activity; no-op by default |
 
 ---
@@ -71,6 +72,7 @@ Click a widget located by a `Selector`.
 | `selector` | `Selector` | Yes |
 | `settle_ms` | `int` | No (default 200) |
 
+**Class attrs:** `settle_ms = 200` (per-instance via ctor), `max_attempts = 3`.  
 **Precondition:** Target widget is found and visible.  
 **Execute:** `ctx.driver.click(selector)`.  
 **Postcondition:** Always True (fire-and-forget; use a subsequent `ElementExists` to verify if needed).
@@ -86,11 +88,11 @@ Type text into a focused field.
 | Parameter | Type | Required |
 |---|---|---|
 | `selector` | `Selector` | Yes |
-| `text` | `str` | Yes |
-| `clear_before` | `bool` | No (default True) |
+| `value` | `str` | Yes |
 
+**Class attrs:** `settle_ms = 100`, `max_attempts = 2`.  
 **Precondition:** Target field is visible.  
-**Execute:** Click field to focus, optionally clear, type text via `driver.set_field`.  
+**Execute:** `ctx.driver.set_text(selector, value)`.  
 **Postcondition:** Always True.
 
 ---
@@ -106,8 +108,9 @@ Choose an item in a combo box or list.
 | `selector` | `Selector` | Yes |
 | `value` | `str` | Yes |
 
+**Class attrs:** `settle_ms = 100`, `max_attempts = 2`.  
 **Precondition:** Target combo/list is visible.  
-**Execute:** `driver.combo_select(selector, value)`.  
+**Execute:** `ctx.driver.select_combo(selector, value)`.  
 **Postcondition:** Always True.
 
 ---
@@ -121,11 +124,13 @@ Read the current text of a widget and store it in the context.
 | Parameter | Type | Required |
 |---|---|---|
 | `selector` | `Selector` | Yes |
-| `output_key` | `str` | Yes |
+| `key` | `str` | No (default `"text"`) |
 
-**Precondition:** Target widget is visible.  
-**Execute:** `driver.get_field(selector)` → stored in `ctx.extra[output_key]`.  
-**Postcondition:** `output_key` present and non-empty in `ctx.extra`.
+**Class attrs:** `settle_ms = 0`, `max_attempts = 1`.  
+**Precondition:** A widget with matching `object_name` is visible.  
+**Execute:** Reads the text from the current snapshot → stored in `ctx.extra[key]`
+(no driver call — snapshot-tier read).  
+**Postcondition:** `key` present in `ctx.extra`.
 
 ---
 
@@ -138,12 +143,12 @@ Assert that a widget matching a selector is currently visible.
 | Parameter | Type | Required |
 |---|---|---|
 | `selector` | `Selector` | Yes |
-| `output_key` | `str` | No |
-| `timeout_ms` | `int` | No (default 0 — single check) |
+| `expected` | `bool` | No (default True — must exist; False = must be absent) |
 
+**Class attrs:** `settle_ms = 0`, `max_attempts = 1`.  
 **Precondition:** Always True.  
-**Execute:** No-op.  
-**Postcondition:** Target widget found in current snapshot.
+**Execute:** Records presence from the current snapshot (no driver call).  
+**Postcondition:** Presence matches `expected` (`found == expected`).
 
 ---
 
@@ -155,11 +160,13 @@ Capture the full window and save it to `ctx.run_dir/<filename>`.
 
 | Parameter | Type | Required |
 |---|---|---|
-| `filename` | `str` | Yes |
+| `path` | `str` | Yes |
+| `key` | `str` | No (default `"screenshot"`) |
 
+**Class attrs:** `settle_ms = 0`, `max_attempts = 1`.  
 **Precondition:** Always True.  
-**Execute:** `driver.screenshot()` → writes PNG.  
-**Postcondition:** File exists at the expected path.
+**Execute:** `ctx.driver.capture(path)` → return value stored in `ctx.extra[key]`.  
+**Postcondition:** `key` present in `ctx.extra`.
 
 ---
 
@@ -169,21 +176,24 @@ Open the General Configuration dialog.
 
 **UiPath analogue:** `Open Application / Navigate To`
 
+**Class attrs:** `settle_ms = 300`, `max_attempts = 2`, `compensable = True`,
+`required_state = "HOME"`.  
 **Precondition:** App state is `HOME` (not already in a dialog).  
-**Execute:** `driver.trigger_action("TB_OPTIONS")`.  
+**Execute:** `ctx.driver.trigger_action("Options")`.  
 **Postcondition:** App state is `DIALOG_CONFIG`.  
-**Compensate:** `driver.trigger_action("close_dialog")`.
+**Compensate:** `ctx.driver.trigger_action("Cancel")`.
 
 ---
 
 ### `CloseDialog`
 
-Close the topmost modal dialog by clicking OK or pressing Escape.
+Close the topmost modal dialog via Cancel.
 
 **UiPath analogue:** `Close Application`
 
+**Class attrs:** `settle_ms = 150`, `max_attempts = 2`.  
 **Precondition:** App state is `DIALOG_CONFIG` or `DIALOG_OTHER`.  
-**Execute:** `driver.trigger_action("close_dialog")`.  
+**Execute:** `ctx.driver.trigger_action("Cancel")`.  
 **Postcondition:** App state is not a dialog.
 
 ---
@@ -194,10 +204,11 @@ Activate a named tab in the Configuration dialog.
 
 | Parameter | Type | Required |
 |---|---|---|
-| `tab_name` | `str` | Yes |
+| `tab_text` | `str` | Yes |
 
-**Precondition:** App state is `DIALOG_CONFIG`.  
-**Execute:** `driver.click_tab(tab_name)`.  
+**Class attrs:** `settle_ms = 100`, `max_attempts = 2`.  
+**Precondition:** Always True — the click is attempted and the result is not verified.  
+**Execute:** `ctx.driver.trigger_action(f"tab:{tab_text}")`.  
 **Postcondition:** Always True.
 
 ---
@@ -249,6 +260,7 @@ class Context:
     graph    # the StateGraph for convergence planning
     run_id   # the run identifier
     extra    # dict for workflow parameters and activity outputs
+    run_dir  # journal output directory (None skips persistence)
     snapshot # the most recent Snapshot (updated by refresh_snapshot())
 
     def refresh_snapshot(self) -> Snapshot:
@@ -279,6 +291,8 @@ class WaitForEngine(Activity):
 
 Key rules:
 - `execute()` issues **at most one driver actuation** — the runner enforces this by design.
+  The eight driver verbs are `snapshot`, `click`, `set_text`, `select_combo`,
+  `trigger_action`, `now`, `defer`, `capture`.
 - `postcondition()` must be **idempotent** — it is called multiple times per attempt.
 - Never call `time.sleep()` — use `settle_ms` instead.
 - Never import PySide6 — the rule `N-RPA-2` reserves Qt imports to `Driver.py`,

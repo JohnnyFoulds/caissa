@@ -341,7 +341,9 @@ class RpaService:
     def rpa_run(self, arg: str) -> dict:
         """Start a named workflow and return its run_id.
 
-        :param arg: JSON string with ``workflow`` key, optional ``dry_run``.
+        :param arg: JSON string with ``workflow`` key.  A ``dry_run`` key is
+            accepted but not yet implemented (planned: structural validation
+            without Qt actuation — see ``docs/rpa/testing.md``).
         :returns: Dict with ``run_id``.
         """
         from Code.Rpa.Errors import RunAlreadyActiveError, WorkflowNotFoundError

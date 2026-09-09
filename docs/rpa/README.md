@@ -3,11 +3,11 @@
 This directory contains the product documentation for the Caissa RPA layer — the closed-loop
 automation engine built above `RemoteControl`.
 
-**If you've never used the RPA layer before:** start with `quickstart.md` (available after Phase 6).
+**If you've never used the RPA layer before:** start with `quickstart.md`.
 
 **If you want to understand how it works:** start with `concepts.md`.
 
-**If you're debugging a failed run:** `troubleshooting.md` (available after Phase 9).
+**If you're debugging a failed run:** start with `troubleshooting.md`.
 
 ---
 

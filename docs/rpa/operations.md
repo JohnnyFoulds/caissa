@@ -45,10 +45,11 @@ Key fields:
 
 | Field | Meaning |
 |---|---|
-| `run_id` | Unique run identifier |
+| `run_id` | Unique run identifier (`r-<yyyymmddThhmmss>-<4hex>`, UTC) |
 | `workflow_name` | Registered workflow name |
-| `run_status` | `SUCCEEDED`, `FAILED`, `CANCELLED`, `TIMED_OUT` |
+| `status` | `PENDING`, `RUNNING`, `CANCELLING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `TIMED_OUT` |
 | `total_pumps` | Total runner pump count |
+| `error` | Exception message if the run failed |
 | `env.dpr` | Device pixel ratio at run start |
 | `env.theme` | Active theme at run start |
 | `env.ui_mode` | Active UI mode at run start |
@@ -61,12 +62,18 @@ Per-step record fields:
 |---|---|
 | `activity_name` | Activity class name |
 | `entry_state` | App state when the step started |
+| `exit_state` | App state when the step exited (None on failure) |
 | `attempts` | Number of ACT→VERIFY cycles |
 | `pumps` | Pumps consumed by this step |
-| `sub_state_trace` | Bounded (500-entry) sequence of sub-state transitions |
-| `converge_transitions` | State transitions used during CONVERGE |
-| `error_type` | Exception type on failure |
-| `confidence` | Winning element confidence (object/image/ocr tier) |
+| `result` | `ok`, `compensated`, `failed` (or `pending` while running) |
+| `error` | Exception message on failure |
+| `sub_state_trace` | Bounded (500-entry) sequence of sub-state transitions visited |
+| `duration_ms` | Wall-clock duration of the step |
+
+There is no per-step element confidence or tier field — element resolution is
+not recorded in the journal.  For CV-related failures, re-run with
+`CAISSA_LOG_LEVEL=DEBUG` and correlate the template/OCR log lines with the
+failing step's `activity_name`.
 
 ---
 
@@ -78,7 +85,8 @@ Per-step record fields:
 4. Check `env.theme` and `env.ui_mode` — a theme or mode change can break
    object selectors that depended on widget text
 5. Check `env.cv_available` — if True, a template match may have been used;
-   check `confidence` and `tier` in the step record
+   re-run with `CAISSA_LOG_LEVEL=DEBUG` to see the match details (the journal
+   itself records no confidence or tier)
 6. Check `env.dpr` — a display change (connecting/disconnecting a Retina screen)
    can invalidate templates captured at a different DPR
 

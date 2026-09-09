@@ -82,6 +82,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
 ### Fixed
+- **RPA review fixes (red/green)**: `Rect.intersects` docstring corrected to exclusive-edge
+  semantics (touching edges do not count, consistent with `intersection()`/`iou()` and the
+  existing edge-touch test); `Driver` base raises now name their method; flagged
+  best-effort probes (`_sub_rects_for`, `snapshot`, `widget_info`) log with `exc_info=True`
+  instead of bare `except-pass`; `Runner._on_converge` logs `ConvergeError` with `exc_info`;
+  `StyleSource.paint_colour_constants` split into pure `..._from_text` + thin I/O wrapper;
+  completeness gates no longer pass vacuously (missing active steps file / empty plan now
+  fail) and the PySide6 allowlist matches on `Rpa/`-relative paths plus a top-level
+  transitive taint test; new `tests/unit/rpa/test_activities.py` pins the
+  `precondition/execute/postcondition(ctx)` contract for `Click`/`Sequence`/`RetryScope`
+  over `FakeDriver`.
 - **Retro Engine — canonical Black opening response**: `caissa-retro` now returns a
   canonical opening response (e7e5, c7c5, e7e6, c7c6, d7d5, or a7a5) instead of falling
   back to a2a4 after `position startpos moves e2e4 go`.  Root cause: `computer_color` was

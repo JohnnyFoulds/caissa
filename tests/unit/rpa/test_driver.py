@@ -78,6 +78,49 @@ def test_qt_driver_overrides_all_driver_methods():
         ), f"QtDriver does not override Driver.{method_name}"
 
 
+def test_driver_base_errors_name_the_method():
+    """Every Driver base raise names its method so callers can identify the problem."""
+    d = Driver()
+    cases = {
+        "snapshot": (),
+        "click": ("selector",),
+        "set_text": ("selector", "value"),
+        "select_combo": ("selector", "value"),
+        "trigger_action": ("key",),
+        "now": (),
+        "defer": (0, lambda: None),
+        "capture": ("/tmp/test.png",),
+    }
+    for method_name, args in cases.items():
+        with pytest.raises(NotImplementedError, match=method_name):
+            getattr(d, method_name)(*args)
+
+
+def test_driver_probe_catch_sites_log_with_exc_info():
+    """Flagged Driver probes log with exc_info instead of swallowing silently."""
+    import ast as _ast
+    import os as _os
+    path = _os.path.join(
+        _os.path.dirname(__file__), "..", "..", "..", "bin", "Code", "Rpa", "Driver.py"
+    )
+    source = open(path, encoding="utf-8").read()
+    tree = _ast.parse(source)
+    flagged = {"_sub_rects_for", "snapshot", "widget_info"}
+    for node in _ast.walk(tree):
+        if not isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            continue
+        if node.name not in flagged:
+            continue
+        for child in _ast.walk(node):
+            if isinstance(child, _ast.ExceptHandler):
+                body = child.body
+                if len(body) == 1 and isinstance(body[0], _ast.Pass):
+                    raise AssertionError(
+                        f"Bare except-pass in {node.name} at line {child.lineno}: "
+                        "log with exc_info=True"
+                    )
+
+
 # ---------------------------------------------------------------------------
 # FakeClock
 # ---------------------------------------------------------------------------

@@ -46,7 +46,7 @@ class Driver:
                   until :mod:`~Code.Rpa.AppState` is wired in Phase 4.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.snapshot() must be overridden")
 
     def click(self, selector: str, target_type: str = "widget") -> dict:
         """Click a UI element identified by ``selector``.
@@ -57,7 +57,7 @@ class Driver:
         :returns:           Dict with ``ok=True`` on success, ``error=...`` on failure.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.click() must be overridden")
 
     def set_text(self, selector: str, value: str) -> dict:
         """Set the text value of a QLineEdit / QTextEdit / QSpinBox.
@@ -67,7 +67,7 @@ class Driver:
         :returns:        Dict with ``ok=True`` on success, ``error=...`` on failure.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.set_text() must be overridden")
 
     def select_combo(self, selector: str, value: str) -> dict:
         """Select an item in a QComboBox.
@@ -77,7 +77,7 @@ class Driver:
         :returns:        Dict with ``ok=True`` on success, ``error=...`` on failure.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.select_combo() must be overridden")
 
     def trigger_action(self, key: str) -> dict:
         """Invoke ``procesador.run_action(key)``.
@@ -87,7 +87,7 @@ class Driver:
                         if no procesador is available.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.trigger_action() must be overridden")
 
     def now(self) -> float:
         """Return current time in **milliseconds**.
@@ -99,7 +99,7 @@ class Driver:
         :returns: Monotonic time in ms.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.now() must be overridden")
 
     def defer(self, ms: float, callback: typing.Callable[[], None]) -> None:
         """Schedule ``callback`` to run after ``ms`` milliseconds.
@@ -112,7 +112,7 @@ class Driver:
         :param callback: Zero-argument callable to invoke after the delay.
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.defer() must be overridden")
 
     def capture(self, path: str) -> str:
         """Capture the main window to ``path`` and return the saved path.
@@ -121,7 +121,7 @@ class Driver:
         :returns:    The saved file path (same as ``path``).
         :raises NotImplementedError: Must be overridden.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Driver.capture() must be overridden")
 
 
 # ---------------------------------------------------------------------------
@@ -206,8 +206,8 @@ def _sub_rects_for(w) -> list[dict]:
                     "text": action.text(),
                     "selected": action.isChecked(),
                 })
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("actionGeometry failed for toolbar action: %s", exc, exc_info=True)
 
     return results
 
@@ -255,8 +255,9 @@ class QtDriver(Driver):
                 mw = QApplication.activeWindow()
                 if mw is not None:
                     screenshot = _grab(mw)
-        except Exception:
-            pass  # Vision unavailable or window not ready — object tier unaffected
+        except Exception as exc:
+            # Vision unavailable or window not ready — object tier unaffected.
+            logger.debug("Vision screenshot omitted: %s", exc, exc_info=True)
 
         return Snapshot(
             state_name="UNKNOWN",
@@ -466,24 +467,24 @@ class QtDriver(Driver):
                 if val:
                     info["text"] = val
                     break
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("widget text probe failed for %s: %s", attr, exc, exc_info=True)
 
         # sub_rects: per-element geometry for composite painted widgets
         try:
             sub_rects = _sub_rects_for(w)
             if sub_rects:
                 info["sub_rects"] = sub_rects
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("sub_rects probe failed: %s", exc, exc_info=True)
 
         # paint_overrides: which Qt virtual methods are overridden in the concrete class
         try:
             overrides = _paint_overrides_for(w)
             if overrides:
                 info["paint_overrides"] = overrides
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("paint_overrides probe failed: %s", exc, exc_info=True)
 
         if depth > 0:
             children = []

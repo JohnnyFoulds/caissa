@@ -66,3 +66,27 @@ def test_rect_contains_point():
     assert r.contains_point(30, 10) is False  # exclusive right
     assert r.contains_point(10, 30) is False  # exclusive bottom
     assert r.contains_point(9, 10) is False
+
+
+def test_rect_intersects_edge_touch_is_false_and_doc_says_so():
+    """Edge-touching rects do not intersect; docstring matches exclusive-edge code."""
+    from Code.Rpa.Types import Rect
+    a = Rect(0, 0, 10, 10)
+    edge = Rect(10, 0, 10, 10)
+    assert a.intersects(edge) is False
+    assert a.intersection(edge) is None
+    assert a.iou(edge) == 0.0
+    assert "do NOT count" in (Rect.intersects.__doc__ or "")
+
+
+def test_rect_intersects_consistent_with_intersection():
+    """intersects() agrees with intersection() is-not-None for overlap cases."""
+    from Code.Rpa.Types import Rect
+    pairs = [
+        (Rect(0, 0, 10, 10), Rect(5, 5, 10, 10), True),
+        (Rect(0, 0, 10, 10), Rect(10, 0, 10, 10), False),
+        (Rect(0, 0, 10, 10), Rect(20, 20, 5, 5), False),
+    ]
+    for lhs, rhs, expected in pairs:
+        assert lhs.intersects(rhs) is expected
+        assert (lhs.intersection(rhs) is not None) is expected

@@ -18,11 +18,21 @@ bin/Code/Rpa/Vision/
 ├── Capture.py           QWidget → Screenshot  (Qt-touching — N-RPA-2)
 ├── Template.py          matchTemplate + NMS, hosts Match
 ├── Ocr.py               pytesseract phrase location
-└── Manifest.py          Template manifest loader + sha256 verifier
+├── Manifest.py          Template manifest loader + sha256 verifier
+├── Scene.py             Frozen dataclasses for the design-vision inventory
+├── Measure.py           Pure geometry / gap-comparison functions (cv2-free)
+├── Region.py            Widget-tree flattening + phrase region grounding
+├── Detectors.py         Pure `(scene, spec) → findings` detector registry
+├── StyleSource.py       QSS-source resolution for Vision findings (stdlib-only)
+└── Report.py            Report emission + diff utilities
 ```
 
-**Only `Capture.py` may import PySide6.** All other Vision modules import only
-`numpy`, `cv2`, and `pytesseract`.  Enforced by
+Within `Vision/`, **only `Capture.py` may import PySide6.**  The repo-wide rule
+(`N-RPA-2`, enforced by the transitive taint test in
+`tests/unit/rpa/test_completeness.py`) additionally permits PySide6 in
+`Driver.py` and `Service.py` — nowhere else in `Code.Rpa`.
+The non-CV design-vision modules (`Scene`, `Measure`, `Region`, `Detectors`,
+`StyleSource`, `Report`) are cv2-free by construction.  Enforced by
 `test_no_toplevel_numpy_or_cv2_import_outside_vision`.
 
 The `Screenshot` dataclass and `Match` dataclass live in `Capture.py` and
@@ -241,7 +251,11 @@ from the default run.
 
 ## Whole-screen reference captures
 
-`Resources/Rpa/Reference/` stores full-window reference captures:
+> **Status: planned — not implemented.**  No code under `bin/Code/Rpa/` reads
+> `Resources/Rpa/Reference/`, and the directory does not exist yet.  The design
+> below is kept as the target.
+
+`Resources/Rpa/Reference/` will store full-window reference captures:
 
 ```
 Resources/Rpa/Reference/

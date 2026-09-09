@@ -18,7 +18,7 @@ explains how to run the test suites and write new RPA-based tests.
 | All | — | `make test-all` | By path, cross-check |
 
 ```bash
-make test      # QT_QPA_PLATFORM=offscreen pytest -m "unit or rpa" -v
+make test      # QT_QPA_PLATFORM=offscreen pytest -m "unit or rpa or retro" -v
 make test-ui   # pytest -m "ui or rpa_ui" -v
 make test-cv   # CAISSA_RPA_CV=1 pytest -m rpa_cv -v
 make cov       # --cov=Code.Rpa --cov-fail-under=90
@@ -94,8 +94,12 @@ logic.  A failure means the Classical Invariant has been broken.
 
 ## The dry_run flag
 
-`rpa_run {"workflow": "my_wf", "dry_run": true}` validates a workflow's structure
-without executing any Qt actions:
+> **Status: planned — not implemented.**  `rpa_run` currently ignores the
+> `dry_run` key entirely (it is only mentioned in the `rpa_run` docstring).
+> The validation design below is kept as the target.
+
+`rpa_run {"workflow": "my_wf", "dry_run": true}` will validate a workflow's
+structure without executing any Qt actions:
 
 - Selector syntax is valid
 - Every template reference is in the manifest
@@ -119,9 +123,8 @@ tools/caissa-rpa journal <run_id>
 The journal shows:
 
 - `env` block: DPR, theme, ui_mode, cv/ocr availability at run start
-- Per-step trace: entry state, sub-state progression, convergence transitions
-- Confidence and tier for every resolved element
-- Error type on failure
+- Per-step trace: entry/exit state, attempts, pumps, result, sub-state progression
+- Error message on failure
 
 A `failure-<step>.png` capture is written alongside the journal when a step's
 final attempt fails.

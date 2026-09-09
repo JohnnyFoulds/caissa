@@ -45,6 +45,15 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   a precondition that verifies a white piece is actually at the source square, catching stale game
   state from previous runs.  Fresh DOSBox-X kill-and-relaunch guarantees startpos.  Pipeline now
   records 5+ consecutive moves including captures without error.
+- **Amiga ground-truth corpus (Phase F)**: `Resources/Retro/Corpus/fs-uae-manual.jsonl`
+  records 27 unique Battle Chess (Amiga) AI responses via FS-UAE RPA automation.
+  Five opening lines (Italian, Four Knights, London, English, King's Indian); AI plays Black.
+  `SelectTwoDBoard` activity ensures consistent 2D board geometry before recording.
+  `workbench_double_click` uses pure absolute `CGEventPost` (not delta events) so SDL2
+  stays in non-captured mode during the Workbench phase.
+- **retro_rom test tier — real assertions**: `tests/unit/retro/test_think.py` and
+  `tests/unit/retro/test_uci.py` replace `pytest.skip()` stubs with live engine tests.
+  Both verify that a corpus FEN produces a legal non-null bestmove from the real ROM.
 - **DOS automation — first ground-truth corpus entry**: `Resources/Retro/Corpus/dosbox-manual.jsonl`
   records Battle Chess (DOS) responding `c7c5` (Sicilian Defence) to `1.e4`, verified deterministic
   across two independent fresh-launch runs.  Full pipeline: DOSBox-X launch → 2D board mode →
@@ -84,6 +93,30 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   transitive taint test; new `tests/unit/rpa/test_activities.py` pins the
   `precondition/execute/postcondition(ctx)` contract for `Click`/`Sequence`/`RetryScope`
   over `FakeDriver`.
+- **Retro Engine — canonical Black opening response**: `caissa-retro` now returns a
+  canonical opening response (e7e5, c7c5, e7e6, c7c6, d7d5, or a7a5) instead of falling
+  back to a2a4 after `position startpos moves e2e4 go`.  Root cause: `computer_color` was
+  computed after a `python-chess` FEN update that silently fell back to the startpos when
+  `chess` was not installed, always producing `computer_color=0` and mirroring the board
+  the wrong way.  Fix: compute `computer_color` from move-list parity before the
+  `chess` block so it is always correct (`Uci.py`).  Separately, Unicorn M68K
+  mis-decoded two 6-byte `CMPI.W` instructions as 4 bytes, leaving `CA 5C` / `08 00`
+  trailing bytes executing as `AND.W (A4)+,D5` that corrupted A4 by +2 per outer-driver
+  pass; fixed with inline byte patches (MOVEQ+CMP.W) and `ctl_flush_tb()` (`Think.py`).
+  Retro oracle test (`test_oracle.py`) corrected to use flipped coordinates (0x44, 0x64)
+  for the expected e2e4 raw bytes when `computer_color=0`.
+  `pytest.ini` now excludes `tools/` from collection to prevent unrunnable recon scripts
+  from aborting the test suite.
+- **Retro Engine — decompressor prefetch simulation**: `Think.py` now correctly emulates
+  the 68000's 4-byte prefetch buffer for Battle Chess's self-modifying startup decompressor.
+  Two per-address hooks (`_hook_prefetch_79bc` at 0x79BC, `_hook_prefetch_79c8` at 0x79C8)
+  detect when the decompressor has partially overwritten its own instruction bytes and
+  manually execute the original ROM instruction (`lsl.w #2, d2` and `move.b (a2)+, (a1)+`
+  respectively) instead of letting Unicorn raise `UC_ERR_EXCEPTION` on the illegal
+  partial-write bytes.  Root cause: a zeroing loop writes zeros sequentially over 0x79BC
+  producing `ORI.B-to-An` (illegal, but Unicorn OR-applies it corrupting A4 to 0xFFFFFFFF);
+  the inner copy loop overwrites its own `12 DA` bytes with a LINE-A opcode.
+  Both smokes now return real moves: `bestmove h2h4` and `bestmove h7h5`.
 - **Retro Engine — White-to-move support (board-flip technique, Phase G)**: Engine now
   returns a real AI move for both sides.  Root cause: the AI's TC abort mechanism
   requires `PLAYER2_COLOR=1` (Black) and hangs when set to White.  Fix: when

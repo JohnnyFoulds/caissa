@@ -127,3 +127,10 @@ class Cpu:
         :raises CpuError: If *handle* is not a live hook.
         """
         raise NotImplementedError
+
+    def flush_tb(self) -> None:
+        """Flush the JIT translation-block cache.
+
+        Call after patching emulated memory so that recompiled blocks pick up
+        the new bytes.  No-op on backends that do not cache translated blocks.
+        """

@@ -106,6 +106,64 @@ discipline here.
 
 ---
 
+## Exception Taxonomy — BusinessRuleException vs SystemException
+
+This is the most important distinction in UiPath and applies directly to Caissa RPA.
+
+### SystemException
+
+The activity, driver, or environment is broken.  The automation cannot proceed.
+
+**Signs:**
+- An activity fails **every** attempt across all retries
+- A core activity (e.g. `PlayMove`) has never once succeeded in the current session
+- The postcondition times out repeatedly with no change in the screenshot
+- A required resource is missing (window not found, binary not running)
+
+**What to do:**
+1. **Stop the workflow immediately.** Do not continue to the next activity.
+2. **Diagnose the activity in isolation** — run it once against the live app and observe the screenshot.
+3. **Fix the root cause** in the Activity code (or Driver code, or calibration constants).
+4. **Verify the single activity passes** before re-chaining the workflow.
+
+**Never** continue a workflow after a SystemException.  Never add more retries as a
+workaround for a broken activity.  The retry count is for transient environmental
+flakiness, not for a fundamentally broken step.
+
+**Caissa equivalent:** `AmigaRunner` raises `RuntimeError` on postcondition timeout.
+If you see this after all retries are exhausted, treat it as a SystemException:
+stop, fix, verify, then re-run.
+
+### BusinessRuleException
+
+The automation ran correctly but the business outcome is unexpected.
+
+**Signs:**
+- The activity succeeded (postcondition returned True) but a later step found an
+  unexpected state (e.g. computer played an illegal move, game entered a weird mode)
+- A precondition failed because the app is in an unexpected-but-recoverable state
+
+**What to do:**
+1. Log the exception with full context (screenshot, ctx dict).
+2. Decide: is recovery possible (try a different path) or must a human intervene?
+3. If recovery is possible, handle it in a compensation activity.
+4. If not, halt and report.
+
+### Activity development checklist (before running any workflow)
+
+For each Activity, run it **in isolation** against the live app before chaining:
+
+```
+1. precondition:  does it return True in the expected state?
+2. execute:       does the action visually happen? (take screenshot immediately after)
+3. postcondition: does it return True after the action?
+```
+
+If step 2 fails, you have a SystemException in the Activity.  Fix it before
+adding this Activity to any workflow.  This is the UiPath "Test Activity" button.
+
+---
+
 ## What Is Intentionally Different
 
 Caissa intentionally diverges from UiPath in a few places:

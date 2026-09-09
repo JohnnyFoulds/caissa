@@ -291,6 +291,22 @@ click a button outside the workflow.
 4. Test each Activity in isolation before chaining
 5. Only then run Activities in a runner loop
 
+### Activity development protocol (one activity at a time)
+
+For EACH activity, follow this cycle before moving to the next:
+
+1. **Code it** — write the activity class (precondition / execute / postcondition)
+2. **Unit test it** — add `FakeDriver` tests in `tests/unit/<target>/test_activities.py`; run `make test`
+3. **UI test it** — run the single activity against the real running process and observe the result
+4. **Iterate** — if UI test fails, go back to step 1 and fix the activity; do not move on
+5. **Document** — once it works, commit constants to `bin/Code/<Target>/BattleChess.py` and CLAUDE.md
+6. **Then and only then** — add the next activity to the chain
+
+**Never chain two untested activities.** If activity N is known-good and activity N+1 fails, you know
+exactly where the bug is. If you chain 5 untested activities and something breaks, you don't know which one.
+
+This is the UiPath Test Sequence button analogy: run each activity in isolation before wiring it in.
+
 ### What each Activity must declare
 
 - `precondition(img, ctx) → bool` — is the app in the right state?
@@ -307,6 +323,101 @@ discovered-and-discarded. Every constant must survive context compaction.
 
 See `docs/rpa/new-target-guide.md` for the full step-by-step guide.
 See `docs/rpa/uipath-mapping.md` for the UiPath ↔ Caissa vocabulary map.
+
+### Exception taxonomy — non-negotiable
+
+Two exception types govern how a broken automation step is handled.
+
+**SystemException** — the Activity or driver is broken.
+- Signal: an Activity fails **every** attempt across all retries (postcondition never True).
+- Rule: **STOP immediately.** Do not continue the workflow. Fix the Activity in isolation.
+- Protocol: (1) run the single Activity against the live app; (2) take a screenshot immediately
+  after execute; (3) fix the root cause (code, calibration, or driver); (4) verify the Activity
+  passes alone before re-chaining the workflow.
+- Adding more retries to a SystemException is WRONG. Retries are for transient environmental
+  flakiness only, not for fundamentally broken steps.
+
+**BusinessRuleException** — the automation ran correctly but the outcome is unexpected.
+- Signal: postcondition returned True but a later step found an unexpected state.
+- Rule: log full context (screenshot + ctx), decide if recovery is possible, compensate or halt.
+
+**Practical rule:** If a core Activity has NEVER succeeded in the current session, treat it
+as a SystemException — stop, diagnose, fix, verify, then re-run. Never move on.
+
+---
+
+## Amiga/FS-UAE Automation Layer (`bin/Code/Amiga/`) — Calibrated 2026-08-30
+
+### SDL2 relative-mouse-mode physics (macOS, this machine)
+
+- **Per-event X cap**: each `kCGEventMouseMoved` moves the Amiga cursor at most **89px**
+  regardless of the delta value, once the send value ≥ 150.
+- **Small-delta scale**: send ≤ 100 → scale ≈ **0.74 amiga-px / send-unit**
+  (e.g. send=100 → 74px, send=50 → 37px).
+- **Y behaves identically to X** (same cap and scale).
+- **Home position**: after `home_cursor()`, cursor is reliably at amiga content
+  **(86, 13)** — screenshot **(86, 45)**.
+- **SDL2 wake on fresh launch**: on a brand-new FS-UAE process, delta events are
+  silently ignored until SDL2 mouse capture is activated. `home_cursor()` handles
+  this by clicking the macOS **title bar** (y = win_y + 15 in screen coords) before
+  sending negative steps.  The title-bar click does **not** interact with Amiga UI.
+
+### One-shot positioning algorithm (implemented in `_move_to_amiga`)
+
+```
+home_cursor()  →  cursor at (HOME_X=86, HOME_Y=13)
+dx = target_x - 86
+dy = target_y - 13
+full_steps = dx // 89           # send _X_FULL_SEND=150 per step → 89px each
+rem_x = dx - full_steps * 89    # 0 ≤ rem_x < 89
+
+for _ in range(full_steps):
+    send event (150, 0)    # X only; Y sent in final event
+send event (rem_x / 0.74, dy / 0.74)   # final: remaining X + all Y
+```
+
+Example: icon at amiga (516, 56) → dx=430, dy=43 → 4 full steps + final (100, 58) → lands at (515, 56), 1px error.
+
+### BattleChess disk icon on Workbench
+
+- Icon centre in Amiga content pixels (screenshot Y − 32px title bar):
+  `WORKBENCH_ICON_X = 516`, `WORKBENCH_ICON_Y = 56`
+- Confirmed by `double_click(516, 56)` → screen brightness 7.72 → 12.33 (game loading)
+
+### FS-UAE window geometry
+
+- Config: `window_width=640`, `window_height=400` (Amiga content)
+- Actual window size including macOS title bar: 640×432
+- Window position on secondary display: typically X=640 (varies by monitor layout)
+
+### Battle Chess Amiga menu bar — calibrated 2026-08-30
+
+Menu bar is at Amiga content y=8.  Four headers (left to right):
+
+| Header | Amiga content X | What it opens |
+|---|---|---|
+| Disk | ~175 | Load/Save/New Game/Setup Board/Quit |
+| (Sound/Board/Player) | ~255 | Sound, 3D/2D Board, Human/Amiga/Modem Plays Red |
+| Settings | ~335 | TBD |
+| Level | ~415 | TBD |
+
+**Second menu items** (x=255, Amiga content Y):
+
+| Item | Amiga Y | Notes |
+|---|---|---|
+| Sound On | ~51 | + = currently on |
+| Sound Off | ~67 | |
+| 3D Board | ~83 | |
+| 2D Board | ~99 | + = currently 2D |
+| Human Plays Red | ~115 | + = default (human plays White/bottom) |
+| Amiga Plays Red | ~131 | Makes AI play White/bottom side |
+| Modem Plays Red | ~147 | |
+
+**To make AI play White**: navigate to second menu header (x=255), select "Amiga Plays Red" (y=131).
+Use `SetAmigaPlaysRed` activity. Restore with `SetHumanPlaysRed` (y=115) after corpus recording.
+
+**StartNewGame settle_ms = 4000** — Battle Chess needs ~4s after "New Game" before accepting move input.
+Confirmed: 2s was too short, 8s definitely works, 4s used as a safe value.
 
 ---
 

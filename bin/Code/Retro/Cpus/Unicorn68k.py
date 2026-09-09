@@ -54,6 +54,7 @@ _REG_MAP: dict[str, int] = {
     "A7": _m68k.UC_M68K_REG_A7,
     "PC": _m68k.UC_M68K_REG_PC,
     "SP": _m68k.UC_M68K_REG_A7,  # SP is an alias for A7
+    "SR": _m68k.UC_M68K_REG_SR,  # Status Register (CCR in low byte)
 }
 
 _HOOK_MAP: dict[str, int] = {
@@ -200,3 +201,10 @@ class Unicorn68k(Cpu):
         :param handle: Handle returned by :meth:`hook_add`.
         """
         self._uc.hook_del(handle)
+
+    def flush_tb(self) -> None:
+        """Flush the Unicorn JIT translation-block cache."""
+        try:
+            self._uc.ctl_flush_tb()
+        except AttributeError:
+            pass  # older Unicorn builds that lack ctl_flush_tb

@@ -83,6 +83,9 @@ class FakeDriver:
     def click(self, x: int, y: int) -> None:
         self.clicks.append((x, y))
 
+    def double_click(self, x: int, y: int) -> None:
+        self.clicks.append((x, y))
+
     def key(self, key_name: str) -> None:
         self.keys.append(key_name)
 
@@ -158,6 +161,62 @@ class TestEnsureFsUaeRunning:
 
 
 # ---------------------------------------------------------------------------
+# LaunchBattleChessFromWorkbench
+# ---------------------------------------------------------------------------
+
+class TestLaunchBattleChessFromWorkbench:
+    def test_precondition_true_on_workbench_image(self):
+        """precondition True when Workbench content is visible (brightness > 4)."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        act = LaunchBattleChessFromWorkbench()
+        assert act.precondition(_workbench_image(), {}) is True
+
+    def test_precondition_false_on_black_image(self):
+        """precondition False when screen is still blank."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        act = LaunchBattleChessFromWorkbench()
+        assert act.precondition(_black_image(), {}) is False
+
+    def test_execute_double_clicks_disk_then_executable(self):
+        """execute() makes two double_clicks: disk icon first, then executable."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        import unittest.mock as mock
+        act = LaunchBattleChessFromWorkbench()
+        double_clicks = []
+
+        class _Drv(FakeDriver):
+            def double_click(self, x, y):
+                double_clicks.append((x, y))
+
+        driver = _Drv([_workbench_image()] * 5)
+        with mock.patch("Code.Amiga.Activities.time.sleep"):
+            act.execute(driver, {})
+        assert len(double_clicks) == 2
+        assert double_clicks[0] == (LaunchBattleChessFromWorkbench._DISK_ICON_X,
+                                    LaunchBattleChessFromWorkbench._DISK_ICON_Y)
+        assert double_clicks[1] == (LaunchBattleChessFromWorkbench._EXEC_ICON_X,
+                                    LaunchBattleChessFromWorkbench._EXEC_ICON_Y)
+
+    def test_postcondition_true_on_title_screen(self):
+        """postcondition True once game title screen loads (brightness > 15)."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        act = LaunchBattleChessFromWorkbench()
+        assert act.postcondition(_solid_rgb_image(50, 30, 20), {}) is True  # mean ~33
+
+    def test_postcondition_false_on_workbench_image(self):
+        """postcondition False while still on Workbench (mean brightness 8, below 15)."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        act = LaunchBattleChessFromWorkbench()
+        assert act.postcondition(_workbench_image(), {}) is False
+
+    def test_postcondition_false_on_black_loading_screen(self):
+        """postcondition False during black loading phase (brightness ~3)."""
+        from Code.Amiga.Activities import LaunchBattleChessFromWorkbench
+        act = LaunchBattleChessFromWorkbench()
+        assert act.postcondition(_black_image(), {}) is False
+
+
+# ---------------------------------------------------------------------------
 # WaitForTitle
 # ---------------------------------------------------------------------------
 
@@ -195,6 +254,12 @@ class TestWaitForTitle:
         from Code.Amiga.Activities import WaitForTitle
         act = WaitForTitle()
         assert act.postcondition(None, {}) is False
+
+    def test_postcondition_true_on_workbench_image(self):
+        """postcondition True on dark Workbench screen (mean ~8, above 4.0 threshold)."""
+        from Code.Amiga.Activities import WaitForTitle
+        act = WaitForTitle()
+        assert act.postcondition(_workbench_image(), {}) is True
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +313,143 @@ class TestAdvancePastTitle:
         from Code.Amiga.Activities import AdvancePastTitle
         act = AdvancePastTitle()
         assert act.postcondition(_bright_image(), {}) is True
+
+
+# ---------------------------------------------------------------------------
+# AdvancePastCopyrightScreen
+# ---------------------------------------------------------------------------
+
+def _workbench_image() -> Any:
+    """Image with mean brightness ~8 — simulates the Workbench dark desktop.
+
+    Real Workbench screenshot has mean ~7.5.  Above 4.0 (WaitForTitle threshold)
+    but below 10.0 (LaunchBattleChessFromWorkbench postcondition threshold).
+    """
+    return _solid_rgb_image(8, 8, 8)
+
+
+def _yellow_dialog_image() -> Any:
+    """Image with a yellow rectangle in the dialog region — dialog visible."""
+    from PIL import Image
+    import numpy as np
+    # Start with a bright grey (represents 3D board content)
+    img = Image.new("RGB", (640, 400), (100, 100, 100))
+    # Paint yellow in the dialog region: x=150..410, y=215..280
+    # Yellow = (R>150, G>120, B<100)
+    arr = np.array(img)
+    arr[215:280, 150:410] = [200, 180, 50]  # yellow-ish
+    return Image.fromarray(arr.astype("uint8"))
+
+
+class TestAdvancePastCopyrightScreen:
+    def test_dialog_visible_on_yellow_region(self):
+        """_dialog_visible returns True when yellow region is in dialog area."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        assert AdvancePastCopyrightScreen._dialog_visible(_yellow_dialog_image()) is True
+
+    def test_dialog_not_visible_on_grey_image(self):
+        """_dialog_visible returns False when no yellow region present."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        assert AdvancePastCopyrightScreen._dialog_visible(_bright_image()) is False
+
+    def test_dialog_not_visible_on_none(self):
+        """_dialog_visible returns False on None."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        assert AdvancePastCopyrightScreen._dialog_visible(None) is False
+
+    def test_precondition_true_when_board_and_dialog_visible(self):
+        """precondition True when board visible AND yellow dialog present."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        act = AdvancePastCopyrightScreen()
+        assert act.precondition(_yellow_dialog_image(), {}) is True
+
+    def test_precondition_false_when_no_dialog(self):
+        """precondition False when board visible but no dialog."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        act = AdvancePastCopyrightScreen()
+        assert act.precondition(_bright_image(), {}) is False
+
+    def test_precondition_false_on_black_image(self):
+        """precondition False when board not visible."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        act = AdvancePastCopyrightScreen()
+        assert act.precondition(_black_image(), {}) is False
+
+    def test_execute_sends_enter_until_dialog_gone(self):
+        """execute() sends Enter repeatedly; stops early when dialog disappears."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        import unittest.mock as mock
+        act = AdvancePastCopyrightScreen()
+        # Driver returns: dialog image 3 times, then non-dialog (bright grey)
+        driver = FakeDriver(
+            [_yellow_dialog_image()] * 3 + [_bright_image()] * 10
+        )
+        with mock.patch("Code.Amiga.Activities.time.sleep"):
+            act.execute(driver, {})
+        # At minimum 4 Enter keypresses (3 dialog + 1 after it clears)
+        assert driver.keys.count(36) >= 1
+
+    def test_postcondition_true_when_dialog_gone(self):
+        """postcondition True when screenshot shows no dialog."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        act = AdvancePastCopyrightScreen()
+        assert act.postcondition(_bright_image(), {}) is True
+
+    def test_postcondition_false_when_dialog_still_visible(self):
+        """postcondition False when dialog still present."""
+        from Code.Amiga.Activities import AdvancePastCopyrightScreen
+        act = AdvancePastCopyrightScreen()
+        assert act.postcondition(_yellow_dialog_image(), {}) is False
+
+
+# ---------------------------------------------------------------------------
+# StartNewGame
+# ---------------------------------------------------------------------------
+
+class TestStartNewGame:
+    def test_precondition_true_when_board_visible_no_dialog(self):
+        """precondition True when board visible and no copyright dialog."""
+        from Code.Amiga.Activities import StartNewGame
+        act = StartNewGame()
+        # bright grey = board visible, no yellow dialog
+        assert act.precondition(_bright_image(), {}) is True
+
+    def test_precondition_false_when_dialog_visible(self):
+        """precondition False when copyright dialog is still showing."""
+        from Code.Amiga.Activities import StartNewGame
+        act = StartNewGame()
+        assert act.precondition(_yellow_dialog_image(), {}) is False
+
+    def test_precondition_false_on_black_image(self):
+        """precondition False when board is not visible."""
+        from Code.Amiga.Activities import StartNewGame
+        act = StartNewGame()
+        assert act.precondition(_black_image(), {}) is False
+
+    def test_execute_clicks_board_center(self):
+        """execute() sends a click at board centre coordinates."""
+        from Code.Amiga.Activities import StartNewGame
+        import unittest.mock as mock
+        act = StartNewGame()
+        driver = FakeDriver([_bright_image()])
+        with mock.patch("Code.Amiga.Activities.time.sleep"):
+            act.execute(driver, {})
+        assert len(driver.clicks) == 1
+        x, y = driver.clicks[0]
+        assert x == StartNewGame._BOARD_CENTER_X
+        assert y == StartNewGame._BOARD_CENTER_Y
+
+    def test_postcondition_true_when_board_visible(self):
+        """postcondition True when board is still showing after click."""
+        from Code.Amiga.Activities import StartNewGame
+        act = StartNewGame()
+        assert act.postcondition(_bright_image(), {}) is True
+
+    def test_postcondition_false_on_black_screen(self):
+        """postcondition False when screen goes blank (unexpected crash/reset)."""
+        from Code.Amiga.Activities import StartNewGame
+        act = StartNewGame()
+        assert act.postcondition(_black_image(), {}) is False
 
 
 # ---------------------------------------------------------------------------
@@ -483,3 +685,83 @@ class TestAmigaRunner:
         driver = FakeDriver([_bright_image()] * 50)
         with pytest.raises(RuntimeError, match="postcondition timed out"):
             AmigaRunner().run(driver, [_FailPost()])
+
+
+# ---------------------------------------------------------------------------
+# FsUaeDriver._cursor_pos — cursor detection unit tests
+# ---------------------------------------------------------------------------
+
+def _image_with_red_pixel(x: int, y: int, w: int = 640, h: int = 432):
+    """Return a grey image with a single bright-red pixel at (x, y)."""
+    from PIL import Image
+    img = Image.new("RGB", (w, h), (80, 80, 80))
+    img.putpixel((x, y), (200, 50, 40))
+    return img
+
+
+def _image_with_red_cluster(cx: int, cy: int, size: int = 5, w: int = 640, h: int = 432):
+    """Return a grey image with a small red cluster (cursor arrow tip simulation)."""
+    from PIL import Image
+    img = Image.new("RGB", (w, h), (80, 80, 80))
+    for dy in range(size):
+        for dx in range(size - dy):
+            img.putpixel((cx + dx, cy + dy), (200, 50, 40))
+    return img
+
+
+class TestFsUaeDriverCursorPos:
+    """Unit tests for FsUaeDriver._cursor_pos (cursor tip detection)."""
+
+    def _make_driver(self):
+        """Return a FsUaeDriver instance without a real process."""
+        from Code.Amiga.Driver import FsUaeDriver
+        drv = object.__new__(FsUaeDriver)
+        return drv
+
+    def test_returns_none_on_solid_grey_image(self):
+        """No red pixels → None."""
+        drv = self._make_driver()
+        img = _solid_rgb_image(80, 80, 80)
+        assert drv._cursor_pos(img) is None
+
+    def test_returns_none_when_too_few_red_pixels(self):
+        """Fewer than 3 red pixels → None (avoids noise false positives)."""
+        drv = self._make_driver()
+        from PIL import Image
+        img = Image.new("RGB", (640, 432), (80, 80, 80))
+        img.putpixel((100, 100), (200, 50, 40))
+        img.putpixel((200, 200), (200, 50, 40))
+        assert drv._cursor_pos(img) is None
+
+    def test_detects_topmost_red_pixel_as_tip(self):
+        """Cursor tip is the topmost (smallest y) red pixel."""
+        drv = self._make_driver()
+        img = _image_with_red_cluster(cx=150, cy=80)
+        pos = drv._cursor_pos(img)
+        assert pos is not None
+        x, y = pos
+        assert y == 80
+        assert x == 150
+
+    def test_detects_tip_with_red_cluster(self):
+        """Cursor arrow cluster: topmost-leftmost pixel is tip."""
+        drv = self._make_driver()
+        img = _image_with_red_cluster(cx=200, cy=60, size=8)
+        pos = drv._cursor_pos(img)
+        assert pos is not None
+        _, y = pos
+        assert y == 60
+
+    def test_not_confused_by_non_red_pixels(self):
+        """Green pixels are ignored; only R>150, G<100, B<100 qualifies."""
+        drv = self._make_driver()
+        from PIL import Image
+        img = Image.new("RGB", (640, 432), (80, 80, 80))
+        for i in range(20):
+            img.putpixel((i, 50), (50, 200, 50))  # green — not red
+        for i in range(5):
+            img.putpixel((300, 200 + i), (200, 50, 40))  # actual red cluster
+        pos = drv._cursor_pos(img)
+        assert pos is not None
+        _, y = pos
+        assert y == 200

@@ -73,6 +73,17 @@ Upstream base: **Lucas Chess R6.0.4** by Lucas Monge (GPL-3.0).
   an opt-in tier (retro_rom, rpa_ui, rpa_cv) is closed.
 
 ### Fixed
+- **RPA review fixes (red/green)**: `Rect.intersects` docstring corrected to exclusive-edge
+  semantics (touching edges do not count, consistent with `intersection()`/`iou()` and the
+  existing edge-touch test); `Driver` base raises now name their method; flagged
+  best-effort probes (`_sub_rects_for`, `snapshot`, `widget_info`) log with `exc_info=True`
+  instead of bare `except-pass`; `Runner._on_converge` logs `ConvergeError` with `exc_info`;
+  `StyleSource.paint_colour_constants` split into pure `..._from_text` + thin I/O wrapper;
+  completeness gates no longer pass vacuously (missing active steps file / empty plan now
+  fail) and the PySide6 allowlist matches on `Rpa/`-relative paths plus a top-level
+  transitive taint test; new `tests/unit/rpa/test_activities.py` pins the
+  `precondition/execute/postcondition(ctx)` contract for `Click`/`Sequence`/`RetryScope`
+  over `FakeDriver`.
 - **Retro Engine — White-to-move support (board-flip technique, Phase G)**: Engine now
   returns a real AI move for both sides.  Root cause: the AI's TC abort mechanism
   requires `PLAYER2_COLOR=1` (Black) and hangs when set to White.  Fix: when

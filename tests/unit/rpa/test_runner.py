@@ -750,3 +750,15 @@ def test_every_rpa_verb_returns_under_200ms_while_run_active():
 @pytest.mark.xfail(strict=True, reason="Requires Phase 6 (feat/rpa-service)")
 def test_run_progresses_while_a_modal_dialog_is_open():
     pytest.fail("not yet implemented — will be unblocked in Phase 6")
+
+
+def test_converge_error_log_includes_exc_info():
+    """_on_converge logs ConvergeError with exc_info so the path failure is traceable."""
+    import os as _os
+    path = _os.path.join(
+        _os.path.dirname(__file__), "..", "..", "..", "bin", "Code", "Rpa", "Runner.py"
+    )
+    source = open(path, encoding="utf-8").read()
+    assert "except ConvergeError" in source
+    block = source.split("except ConvergeError", 1)[1].split("return", 1)[0]
+    assert "exc_info" in block, "ConvergeError catch must log with exc_info=True"

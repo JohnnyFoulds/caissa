@@ -9,7 +9,6 @@ via service.pump_once().
 """
 
 import json
-import os
 import re
 import tempfile
 
@@ -339,18 +338,16 @@ def test_rpa_act_unknown_type_returns_error():
 # ---------------------------------------------------------------------------
 
 def test_rpa_disabled_means_no_service(monkeypatch):
-    """When CAISSA_RPA=0, _rpa() returns None."""
+    """When CAISSA_RPA=0, _rpa() returns None without touching Qt."""
     monkeypatch.setenv("CAISSA_RPA", "0")
 
-    from Code.Debug import RemoteControl as _rc_module
-    import importlib
+    from Code.Debug.RemoteControl import RemoteControl
 
-    # We can't easily instantiate RemoteControl (needs Qt), so just test the
-    # env-var gate logic directly via RpaService.
-    svc, _, _ = _make_service()
-    # Service itself doesn't check the env var — that's RemoteControl's job.
-    # Just verify that the env var value is accessible.
-    assert os.environ.get("CAISSA_RPA") == "0"
+    rc = RemoteControl.__new__(RemoteControl)
+    rc._rpa_disabled = True
+    rc._rpa_service = "sentinel-should-stay-untouched"
+    assert rc._rpa() is None
+    assert rc._rpa_service == "sentinel-should-stay-untouched"
 
 
 # ---------------------------------------------------------------------------

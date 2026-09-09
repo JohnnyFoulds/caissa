@@ -23,6 +23,7 @@ from Code.Rpa.Vision.StyleSource import (
     resolve_placeholders,
     effective,
     paint_colour_constants,
+    paint_colour_constants_from_text,
     style_sources_for,
     _selector_widget_type,
 )
@@ -262,6 +263,17 @@ def test_paint_colour_constants_wrong_class(tmp_path):
 def test_paint_colour_constants_missing_file(tmp_path):
     """paint_colour_constants returns empty when the file does not exist."""
     assert paint_colour_constants(tmp_path / "nonexistent.py", "_FlatTabBar") == []
+
+
+def test_paint_colour_constants_from_text_is_pure_and_matches_file(tmp_path):
+    """Pure scanner matches the I/O wrapper without touching the filesystem."""
+    src = tmp_path / "WRibbon.py"
+    src.write_text(_WRIBBON_SOURCE)
+    from_file = paint_colour_constants(src, "_FlatTabBar")
+    from_text = paint_colour_constants_from_text(_WRIBBON_SOURCE, "_FlatTabBar")
+    assert from_text == from_file
+    assert len(from_text) == 7
+    assert paint_colour_constants_from_text("not python ((((", "_FlatTabBar") == []
 
 
 # ---------------------------------------------------------------------------

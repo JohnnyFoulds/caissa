@@ -101,10 +101,14 @@ class Rect:
         return inter / union if union > 0 else 0.0
 
     def intersects(self, other: Rect) -> bool:
-        """Return True if this rect overlaps *other* (touching edges count).
+        """Return True if this rect overlaps *other* (touching edges do NOT count).
+
+        Edges are exclusive (see :attr:`right`/:attr:`bottom`): rects that only
+        touch at an edge share no pixel column or row and return False,
+        consistent with :meth:`intersection` returning ``None``.
 
         :param other: The rect to test against.
-        :return: True when the rects share at least one pixel column and row.
+        :return: True when the interiors overlap.
         """
         return (
             self.x < other.right

@@ -460,7 +460,9 @@ class Runner:
         try:
             path = self._graph.plan(current_state, required)
         except ConvergeError as exc:
-            logger.warning("[%s] no path to %r: %s", self._run_id, required, exc)
+            logger.warning(
+                "[%s] no path to %r: %s", self._run_id, required, exc, exc_info=True
+            )
             self._sub_state = SubState.DECIDE_RECOVERY
             return
 

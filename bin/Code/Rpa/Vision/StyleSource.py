@@ -6,7 +6,9 @@ onto the style rules that actually govern it.  Emits three-valued ``effective``
 states, named placeholders, and ``e1_violation`` flags for bare ``QColor``
 class constants.
 
-**No Qt imports.  No cv2.  No I/O.  Callers own the file reads.**
+**No Qt imports.  No cv2.**
+File reads live only in the ``paint_colour_constants`` wrapper.
+Callers holding source text use the pure ``..._from_text`` variant.
 
 Usage::
 
@@ -222,23 +224,21 @@ def _selector_widget_type(selector: str) -> str:
 # Paint colour constants (AST scan for E1 violations)
 # ---------------------------------------------------------------------------
 
-def paint_colour_constants(
-    source_path: Path,
+def paint_colour_constants_from_text(
+    source_text: str,
     cls: str,
 ) -> list[dict]:
-    """Find bare ``QColor("#RRGGBB")`` class-level attributes in *source_path*.
+    """Find bare ``QColor("#RRGGBB")`` class-level attributes in *source_text*.
 
-    These are E1 violations: a ``#RRGGBB`` literal in a widget module that is
-    not a ``QtCore.Property`` default.
+    Pure (no I/O): callers that already hold the file contents use this.
 
-    :param source_path: Path to a Python source file.
-    :param cls: Class name to scan within the file.
+    :param source_text: Python source text to scan.
+    :param cls: Class name to scan within the text.
     :return: List of ``{symbol, hex, line, e1_violation: True}`` dicts.
     """
     try:
-        src = Path(source_path).read_text(encoding="utf-8")
-        tree = ast.parse(src)
-    except (OSError, SyntaxError):
+        tree = ast.parse(source_text)
+    except SyntaxError:
         return []
 
     results: list[dict] = []
@@ -272,6 +272,28 @@ def paint_colour_constants(
                         "e1_violation": True,
                     })
     return results
+
+
+def paint_colour_constants(
+    source_path: Path,
+    cls: str,
+) -> list[dict]:
+    """Find bare ``QColor("#RRGGBB")`` class-level attributes in *source_path*.
+
+    Thin I/O wrapper around :func:`paint_colour_constants_from_text`: reads the
+    file, then delegates to the pure scanner. Returns ``[]`` when the file is
+    missing or unparseable.
+
+    :param source_path: Path to a Python source file.
+    :param cls: Class name to scan within the file.
+    :return: List of ``{symbol, hex, line, e1_violation: True}`` dicts.
+    """
+    try:
+        src = Path(source_path).read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.debug("paint constants read failed for %s: %s", source_path, exc, exc_info=True)
+        return []
+    return paint_colour_constants_from_text(src, cls)
 
 
 # ---------------------------------------------------------------------------
